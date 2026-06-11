@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory — Stage 8</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-elevated: #f7f7f8;
+      --bg-panel: #fafafa;
+      --bg-panel-alt: #fff7ed;
+      --bg-sale-row: #ffffff;
+      --bg-stockin-row: #fff7ed;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-faint: #b0b4ba;
+      --border: #e5e7eb;
+      --border-strong: #d1d5db;
+      --border-orange: #fed7aa;
+      --accent: #3ecf8e;
+      --accent-hover: #2eb87a;
+      --accent-orange: #fb923c;
+      --accent-orange-hover: #ea580c;
+      --status-online: #22c55e;
+      --status-reconnecting: #eab308;
+      --status-offline: #ef4444;
+      --row-hover: #f3f4f6;
+      --row-hover-orange: #fef3e7;
+      --id-matched-bg: #dcfce7;
+      --id-matched-border: #86efac;
+      --id-freeform-bg: #fee2e2;
+      --id-freeform-border: #fca5a5;
+      --overlay-bg: rgba(255, 255, 255, 0.7);
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; }
+
+    /* ============ Login screen ============ */
+    .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: var(--bg-elevated); }
+    .login-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 32px; width: 100%; max-width: 380px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .login-card h1 { margin: 0 0 8px 0; font-size: 22px; font-weight: 600; }
+    .login-card p.subtitle { margin: 0 0 24px 0; color: var(--text-muted); font-size: 14px; }
+    .login-form { display: flex; flex-direction: column; gap: 14px; }
+    .login-form input { padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 14px; font-family: inherit; }
+    .login-form input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.2); }
+    .login-form button { padding: 10px 16px; background: var(--accent); color: #000; border: none; border-radius: 6px; font-size: 15px; font-weight: 500; cursor: pointer; }
+    .login-form button:hover:not(:disabled) { background: var(--accent-hover); }
+    .login-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-error { color: var(--status-offline); font-size: 13px; min-height: 18px; }
+    .password-wrap { position: relative; display: flex; }
+    .password-wrap input { flex: 1; padding-right: 40px; }
+    .password-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: transparent !important; background-color: transparent !important; border: none !important; cursor: pointer; padding: 4px; margin: 0; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; line-height: 0; box-shadow: none !important; outline: none; }
+    .password-toggle:hover, .password-toggle:focus, .password-toggle:active { color: var(--text); background: transparent !important; background-color: transparent !important; box-shadow: none !important; }
+    .password-toggle svg { width: 18px; height: 18px; display: block; }
+
+    /* ============ Main app ============ */
+    .app-shell { display: none; }
+    .app-shell.visible { display: block; }
+
+    .header { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; z-index: 10; }
+    .header h1 { font-size: 18px; font-weight: 600; margin: 0; }
+    .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .user-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); padding: 4px 10px; background: var(--bg-elevated); border-radius: 16px; }
+    .user-chip .user-name { color: var(--text); font-weight: 500; }
+    .conn-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--status-offline); transition: background 0.3s ease; }
+    .conn-status[data-status="online"] .conn-dot { background: var(--status-online); }
+    .conn-status[data-status="reconnecting"] .conn-dot { background: var(--status-reconnecting); animation: pulse 1.2s ease-in-out infinite; }
+    .conn-status[data-status="offline"] .conn-dot { background: var(--status-offline); }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .last-updated { font-size: 13px; color: var(--text-muted); }
+    .btn { padding: 8px 16px; background: var(--accent); color: #000; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s ease; }
+    .btn:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.secondary { background: transparent; color: var(--text-muted); border: 1px solid var(--border-strong); }
+    .btn.secondary:hover:not(:disabled) { background: var(--bg-elevated); }
+    .btn.orange { background: var(--accent-orange); color: #fff; }
+    .btn.orange:hover:not(:disabled) { background: var(--accent-orange-hover); }
+    .btn.danger { background: var(--danger); color: #fff; }
+    .btn.danger:hover:not(:disabled) { background: var(--danger-hover); }
+    .btn.small { padding: 4px 10px; font-size: 12px; }
+    .panel { border-bottom: 1px solid var(--border); padding: 16px 20px; }
+    .panel.sale-panel { background: var(--bg-panel); }
+    .panel.stockin-panel { background: var(--bg-panel-alt); border-bottom: 1px solid var(--border-orange); }
+    .panel h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin: 0 0 12px 0; }
+    .sale-form { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 12px; align-items: start; }
+    .stockin-form { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr auto; gap: 12px; align-items: start; }
+    @media (max-width: 900px) { .stockin-form { grid-template-columns: 1fr 1fr; } .stockin-form .field-product { grid-column: span 2; } .stockin-form .field-submit { grid-column: span 2; } }
+    @media (max-width: 700px) { .sale-form { grid-template-columns: 1fr 1fr; } .sale-form .field-product { grid-column: span 2; } .sale-form .field-submit { grid-column: span 2; } }
+    .field { display: flex; flex-direction: column; gap: 4px; position: relative; }
+    .field label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 500; }
+    .field input, .field select { padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 14px; background: var(--bg); color: var(--text); font-family: inherit; }
+    .field input:focus, .field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.2); }
+    .stockin-panel .field input:focus, .stockin-panel .field select:focus { border-color: var(--accent-orange); box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.2); }
+    .field input[type="number"] { font-variant-numeric: tabular-nums; }
+    .id-readout { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--bg-elevated); color: var(--text-faint); min-height: 36px; display: flex; align-items: center; word-break: break-all; }
+    .id-readout[data-state="matched"] { background: var(--id-matched-bg); border-color: var(--id-matched-border); color: var(--text); }
+    .id-readout[data-state="freeform"] { background: var(--id-freeform-bg); border-color: var(--id-freeform-border); color: var(--text); }
+    .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; max-height: 240px; overflow-y: auto; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 6px; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 20; display: none; }
+    .autocomplete-list.visible { display: block; }
+    .autocomplete-item { padding: 8px 10px; cursor: pointer; font-size: 14px; border-bottom: 1px solid var(--bg-elevated); }
+    .autocomplete-item:last-child { border-bottom: none; }
+    .autocomplete-item:hover, .autocomplete-item.focused { background: var(--bg-elevated); }
+    .autocomplete-item .ac-id { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-muted); margin-right: 8px; }
+    .autocomplete-empty { padding: 8px 10px; font-size: 13px; color: var(--text-muted); font-style: italic; }
+    .form-feedback { margin-top: 10px; font-size: 13px; min-height: 18px; display: flex; align-items: center; gap: 8px; }
+    .form-feedback.success { color: var(--status-online); }
+    .form-feedback.error { color: var(--status-offline); }
+    .form-feedback.warning { color: #d97706; }
+
+    /* Import button row */
+    .import-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+    .import-help { font-size: 12px; color: var(--text-muted); }
+
+    /* Import modal */
+    .import-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: stretch; justify-content: center; z-index: 200; padding: 20px; overflow-y: auto; }
+    .import-modal.visible { display: flex; }
+    .import-card { background: var(--bg); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.25); width: 100%; max-width: 1100px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; overflow: hidden; }
+    .import-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .import-header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+    .import-source-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+    .import-source-row label { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+    .import-source-row input { flex: 1; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 14px; font-family: inherit; }
+    .import-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .import-section { margin-bottom: 22px; }
+    .import-section-title { font-size: 14px; font-weight: 600; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px; }
+    .import-section-title.new { color: #1e40af; }
+    .import-section-title.restock { color: #166534; }
+    .import-section-title.renames { color: #9a3412; }
+    .import-section-title.skipped { color: #dc2626; }
+    .import-section-title .count { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    .import-section-help { font-size: 12px; color: var(--text-muted); margin: 0 0 8px 0; }
+    .import-table-wrap { border: 1px solid var(--border); border-radius: 6px; overflow: auto; max-height: 280px; }
+    .import-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .import-table th { background: var(--bg-elevated); padding: 8px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+    .import-table td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; }
+    .import-table tr:last-child td { border-bottom: none; }
+    .import-table .code-cell { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+    .import-table .numeric { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .import-table .diff-arrow { color: var(--text-muted); margin: 0 4px; }
+    .import-table .old-val { color: var(--text-faint); text-decoration: line-through; }
+    .import-table .new-val { color: var(--text); font-weight: 500; }
+    .import-table .error-cell { color: var(--status-offline); font-size: 12px; }
+    .import-summary { padding: 12px 20px; background: var(--bg-elevated); border-top: 1px solid var(--border); font-size: 13px; line-height: 1.7; }
+    .import-summary strong { font-weight: 600; }
+    .import-footer { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg); }
+    .import-footer .btn { padding: 10px 20px; font-size: 14px; }
+    @media (max-width: 700px) {
+      .import-modal { padding: 0; }
+      .import-card { max-height: 100vh; border-radius: 0; }
+      .import-header, .import-source-row, .import-body, .import-footer { padding-left: 14px; padding-right: 14px; }
+      .import-source-row { flex-direction: column; align-items: stretch; }
+      .import-source-row label { font-weight: 500; }
+    }
+
+    /* Settings modal */
+    .settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: stretch; justify-content: center; z-index: 200; padding: 20px; overflow-y: auto; }
+    .settings-modal.visible { display: flex; }
+    .settings-card { background: var(--bg); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.25); width: 100%; max-width: 720px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; overflow: hidden; }
+    .settings-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .settings-header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+    .settings-body { flex: 1; overflow-y: auto; padding: 20px; }
+    .settings-category { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .settings-category:last-child { border-bottom: none; }
+    .settings-category-title { font-size: 16px; font-weight: 600; margin: 0 0 10px 0; }
+    .settings-category-desc { font-size: 13px; color: var(--text-muted); margin: 8px 0; line-height: 1.6; }
+    .settings-list { font-size: 13px; color: var(--text-muted); margin: 8px 0; padding-left: 20px; line-height: 1.7; }
+    .settings-list li { margin: 4px 0; }
+    .settings-list strong { color: var(--text); font-family: ui-monospace, monospace; font-size: 12px; }
+    .settings-actions { display: flex; gap: 12px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+    .settings-status { font-size: 13px; color: var(--text-muted); }
+    .settings-status.success { color: var(--status-online); }
+    .settings-status.error { color: var(--status-offline); }
+    @media (max-width: 700px) {
+      .settings-modal { padding: 0; }
+      .settings-card { max-height: 100vh; border-radius: 0; }
+      .settings-header, .settings-body { padding-left: 14px; padding-right: 14px; }
+    }
+
+    .submit-overlay { position: fixed; inset: 0; background: var(--overlay-bg); backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .submit-overlay.visible { display: flex; }
+    .submit-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px 32px; min-width: 280px; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); text-align: center; }
+    .spinner { width: 32px; height: 32px; margin: 0 auto 16px; border: 3px solid var(--bg-elevated); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .submit-status { font-size: 14px; color: var(--text); margin-bottom: 4px; }
+    .submit-substatus { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; min-height: 16px; }
+    .submit-actions { display: flex; gap: 8px; justify-content: center; }
+    .confirm-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 101; }
+    .confirm-modal.visible { display: flex; }
+    .confirm-card { background: var(--bg); border-radius: 12px; padding: 24px; min-width: 320px; max-width: 460px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+    .confirm-card h3 { margin: 0 0 12px 0; font-size: 16px; }
+    .confirm-card p { margin: 0 0 8px 0; font-size: 14px; color: var(--text-muted); }
+    .confirm-detail { background: var(--bg-elevated); border-radius: 6px; padding: 10px 12px; font-size: 13px; margin: 12px 0; font-family: ui-monospace, monospace; }
+    .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .table-container { padding: 20px; overflow-x: auto; position: relative; }
+    table { width: 100%; border-collapse: collapse; background: var(--bg); }
+    thead { background: var(--bg-elevated); border-bottom: 2px solid var(--border); }
+    th { text-align: left; padding: 12px; font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    th.numeric, td.numeric { text-align: right; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s ease; }
+    tbody tr:hover { background: var(--row-hover); }
+    td { padding: 12px; vertical-align: top; overflow-wrap: break-word; word-break: break-word; }
+    td.id-cell { word-break: break-all; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px; }
+    td.qty-negative { color: var(--status-offline); font-weight: 600; }
+    td.qty-zero { color: var(--text-faint); }
+    .state-message { padding: 60px 20px; text-align: center; color: var(--text-muted); }
+    .stock-overlay { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(3px); display: none; align-items: flex-start; justify-content: center; padding-top: 60px; z-index: 5; cursor: not-allowed; }
+    .stock-overlay.visible { display: flex; }
+    .overlay-card { background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px 18px; font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: default; }
+    .overlay-card .mini-spinner { width: 14px; height: 14px; border: 2px solid var(--bg-elevated); border-top-color: var(--text-muted); border-radius: 50%; animation: spin 1s linear infinite; }
+    .activity-section { padding: 20px; border-top: 1px solid var(--border); }
+    .activity-section h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin: 0 0 16px 0; }
+    .activity-list { display: flex; flex-direction: column; gap: 8px; }
+    .activity-row { display: grid; grid-template-columns: auto 2fr 1fr 1fr 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-sale-row); transition: background 0.1s ease; }
+    .activity-row.stockin { background: var(--bg-stockin-row); border-color: var(--border-orange); }
+    .activity-row:hover { background: var(--row-hover); }
+    .activity-row.stockin:hover { background: var(--row-hover-orange); }
+    .activity-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+    .activity-label.sale { background: #dcfce7; color: #166534; }
+    .activity-label.stockin { background: #fed7aa; color: #9a3412; }
+    .activity-product { font-weight: 500; word-break: break-word; }
+    .activity-product .product-id { font-family: ui-monospace, monospace; font-size: 11px; color: var(--text-muted); display: block; }
+    .activity-product .freeform-flag { display: inline-block; font-size: 10px; padding: 1px 5px; background: var(--id-freeform-bg); color: var(--danger); border-radius: 3px; margin-left: 6px; font-weight: 600; vertical-align: middle; }
+    .activity-qty { font-variant-numeric: tabular-nums; font-weight: 500; }
+    .activity-person { font-size: 13px; color: var(--text-muted); }
+    .activity-when { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    .activity-edited-mark { font-size: 10px; color: var(--text-faint); margin-left: 6px; font-style: italic; }
+    .activity-actions { display: flex; gap: 4px; }
+    .activity-row.editing { background: var(--bg-elevated); }
+    .activity-row.editing.stockin { background: var(--bg-panel-alt); }
+    .activity-edit-form { display: grid; grid-template-columns: 1fr 100px 120px auto; gap: 8px; align-items: center; width: 100%; grid-column: 2 / -1; }
+    .activity-edit-form input, .activity-edit-form select { padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; font-size: 13px; font-family: inherit; }
+    .activity-edit-form input:focus, .activity-edit-form select:focus { outline: none; border-color: var(--accent); }
+    .activity-load-more { text-align: center; padding: 16px; color: var(--text-muted); font-size: 13px; }
+    .activity-load-more.loading { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .activity-load-more .mini-spinner { width: 12px; height: 12px; border: 2px solid var(--bg-elevated); border-top-color: var(--text-muted); border-radius: 50%; animation: spin 1s linear infinite; }
+    @media (max-width: 700px) { .activity-row { grid-template-columns: 1fr; gap: 6px; padding: 12px; } .activity-actions { justify-content: flex-end; } .activity-edit-form { grid-template-columns: 1fr; grid-column: 1 / -1; } }
+    @media (max-width: 600px) { .header { padding: 10px 14px; } .header h1 { font-size: 16px; } .table-container { padding: 10px; } th, td { padding: 8px; font-size: 13px; } .panel { padding: 12px 14px; } .activity-section { padding: 12px 14px; } }
+  </style>
+</head>
+<body>
+
+  <!-- ============ Login screen ============ -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <h1>Inventory</h1>
+      <p class="subtitle">Sign in to continue.</p>
+      <form class="login-form" id="loginForm" onsubmit="return false;">
+        <input type="email" id="loginEmail" placeholder="Email" autocomplete="username" required>
+        <div class="password-wrap">
+          <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required>
+          <button type="button" class="password-toggle" id="passwordToggle" aria-label="Show password" title="Show password">
+            <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <button type="submit" id="loginBtn" onclick="window.doLogin()">Sign in</button>
+        <div class="login-error" id="loginError"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ Main app (hidden until logged in) ============ -->
+  <div class="app-shell" id="appShell">
+    <header class="header">
+      <h1>Inventory — Current Stock</h1>
+      <div class="header-right">
+        <span class="user-chip">
+          Signed in as <span class="user-name" id="userName">…</span>
+        </span>
+        <span class="conn-status" id="connStatus" data-status="offline">
+          <span class="conn-dot"></span>
+          <span class="conn-label">Connecting…</span>
+        </span>
+        <span class="last-updated" id="lastUpdated"></span>
+        <button class="btn secondary small" onclick="window.openSettings()">⚙ Settings</button>
+        <button class="btn secondary small" onclick="window.doSignOut()">Sign out</button>
+        <button class="btn" id="refreshBtn" onclick="manualRefresh()">Refresh</button>
+      </div>
+    </header>
+
+    <section class="panel sale-panel">
+      <h2>Log a Sale</h2>
+      <div class="sale-form">
+        <div class="field field-product">
+          <label for="saleProductInput">Product (type to search)</label>
+          <input type="text" id="saleProductInput" autocomplete="off" placeholder="Start typing product name…">
+          <div class="autocomplete-list" id="saleAcList"></div>
+        </div>
+        <div class="field">
+          <label>ID</label>
+          <div class="id-readout" id="saleIdReadout" data-state="empty">—</div>
+        </div>
+        <div class="field">
+          <label for="saleQtyInput">Quantity</label>
+          <input type="number" id="saleQtyInput" min="1" step="1">
+        </div>
+        <div class="field field-submit" style="justify-content: flex-end;">
+          <label style="visibility: hidden;">&nbsp;</label>
+          <button class="btn" id="logSaleBtn" onclick="submitSale()">Log Sale</button>
+        </div>
+      </div>
+      <div class="form-feedback" id="saleFeedback"></div>
+    </section>
+
+    <section class="panel stockin-panel">
+      <h2>Receive Stock</h2>
+      <div class="stockin-form">
+        <div class="field field-product">
+          <label for="stockProductInput">Product (type to search)</label>
+          <input type="text" id="stockProductInput" autocomplete="off" placeholder="Start typing product name…">
+          <div class="autocomplete-list" id="stockAcList"></div>
+        </div>
+        <div class="field">
+          <label>ID</label>
+          <div class="id-readout" id="stockIdReadout" data-state="empty">—</div>
+        </div>
+        <div class="field">
+          <label for="stockQtyInput">Quantity</label>
+          <input type="number" id="stockQtyInput" min="1" step="1">
+        </div>
+        <div class="field">
+          <label for="stockSourceInput">Invoice / source</label>
+          <input type="text" id="stockSourceInput" placeholder="e.g. INV-1234">
+        </div>
+        <div class="field field-submit" style="justify-content: flex-end;">
+          <label style="visibility: hidden;">&nbsp;</label>
+          <button class="btn orange" id="logStockBtn" onclick="submitStockIn()">Receive</button>
+        </div>
+      </div>
+      <div class="form-feedback" id="stockFeedback"></div>
+      <div class="import-row">
+        <input type="file" id="importFile" accept=".csv,.tsv,.xlsx,.xls,.ods" style="display:none">
+        <button class="btn secondary small" id="importBtn" onclick="document.getElementById('importFile').click()">
+          📥 Import from spreadsheet (.csv .xlsx .ods)
+        </button>
+        <span class="import-help">Bulk-add stock from a supplier invoice file</span>
+      </div>
+    </section>
+
+    <!-- ============ Import preview modal ============ -->
+    <div class="import-modal" id="importModal">
+      <div class="import-card">
+        <div class="import-header">
+          <h2 id="importTitle">Review import</h2>
+          <button class="btn secondary small" id="importCloseBtn">✕ Cancel</button>
+        </div>
+        <div class="import-source-row">
+          <label for="importSourceInput">Source / invoice:</label>
+          <input type="text" id="importSourceInput" placeholder="auto-filled from filename">
+        </div>
+        <div class="import-body" id="importBody">
+          <div class="import-section" id="importSecNew" hidden>
+            <h3 class="import-section-title new">🆕 New products <span class="count" id="importSecNewCount"></span></h3>
+            <p class="import-section-help">These codes don't exist yet. They will be created and stock added.</p>
+            <div class="import-table-wrap"><table class="import-table" id="importTblNew"></table></div>
+          </div>
+          <div class="import-section" id="importSecRestock" hidden>
+            <h3 class="import-section-title restock">📦 Restocked items <span class="count" id="importSecRestockCount"></span></h3>
+            <p class="import-section-help">Existing products. Current stock → new stock after import.</p>
+            <div class="import-table-wrap"><table class="import-table" id="importTblRestock"></table></div>
+          </div>
+          <div class="import-section" id="importSecRenames" hidden>
+            <h3 class="import-section-title renames">✏️ Renames <span class="count" id="importSecRenamesCount"></span></h3>
+            <p class="import-section-help">Existing products whose name differs in the file. Old name → new name. Stock is also added (see above).</p>
+            <div class="import-table-wrap"><table class="import-table" id="importTblRenames"></table></div>
+          </div>
+          <div class="import-section" id="importSecSkipped" hidden>
+            <h3 class="import-section-title skipped">⚠️ Skipped <span class="count" id="importSecSkippedCount"></span></h3>
+            <p class="import-section-help">Rows that couldn't be processed (missing data). These will NOT be imported.</p>
+            <div class="import-table-wrap"><table class="import-table" id="importTblSkipped"></table></div>
+          </div>
+        </div>
+        <div class="import-summary" id="importSummary"></div>
+        <div class="import-footer">
+          <button class="btn secondary" id="importCancelBtn">Cancel</button>
+          <button class="btn" id="importConfirmBtn">Confirm Import</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import progress overlay (during actual execution) -->
+    <div class="submit-overlay" id="importProgressOverlay">
+      <div class="submit-card" style="min-width:340px;">
+        <div class="spinner"></div>
+        <div class="submit-status" id="importProgressStatus">Importing…</div>
+        <div class="submit-substatus" id="importProgressSubstatus"></div>
+      </div>
+    </div>
+
+    <!-- ============ Settings modal ============ -->
+    <div class="settings-modal" id="settingsModal">
+      <div class="settings-card">
+        <div class="settings-header">
+          <h2>Settings</h2>
+          <button class="btn secondary small" id="settingsCloseBtn">✕ Close</button>
+        </div>
+        <div class="settings-body">
+          <section class="settings-category">
+            <h3 class="settings-category-title">💾 Backup</h3>
+            <p class="settings-category-desc">
+              Download a snapshot of all your inventory data to your computer. The backup is a ZIP file containing three files:
+            </p>
+            <ul class="settings-list">
+              <li><strong>inventory_backup_FULL_*.json</strong> — complete data including products catalog and all events. Suitable for full disaster recovery.</li>
+              <li><strong>sales_*.csv</strong> — all sales as a flat spreadsheet (opens in Excel, LibreOffice, Google Sheets). Suitable for accounting and analysis.</li>
+              <li><strong>stock_in_*.csv</strong> — all stock receipts as a flat spreadsheet.</li>
+            </ul>
+            <p class="settings-category-desc">
+              Backups are read-only — they don't change anything on the server. Recommended: store the ZIP somewhere safe periodically (your computer, cloud drive, USB stick).
+            </p>
+            <div class="settings-actions">
+              <button class="btn" id="downloadBackupBtn">📦 Download backup (ZIP)</button>
+              <span class="settings-status" id="backupStatus"></span>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div class="submit-overlay" id="submitOverlay">
+      <div class="submit-card">
+        <div class="spinner"></div>
+        <div class="submit-status" id="submitStatus">Sending…</div>
+        <div class="submit-substatus" id="submitSubstatus"></div>
+        <div class="submit-actions" id="submitActions"></div>
+      </div>
+    </div>
+
+    <div class="confirm-modal" id="confirmModal">
+      <div class="confirm-card">
+        <h3 id="confirmTitle">Confirm Delete</h3>
+        <p id="confirmMessage">Are you sure you want to delete this?</p>
+        <div class="confirm-detail" id="confirmDetail"></div>
+        <p style="font-size: 12px;">This will permanently delete the record. Stock counts will update accordingly.</p>
+        <div class="confirm-actions">
+          <button class="btn secondary" id="confirmCancelBtn">Cancel</button>
+          <button class="btn danger" id="confirmDeleteBtn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <main class="table-container" id="mainContent">
+      <div class="state-message" id="loadingState">Loading…</div>
+      <div class="stock-overlay" id="stockOverlay">
+        <div class="overlay-card">
+          <div class="mini-spinner"></div>
+          <span id="stockOverlayMsg">Loading…</span>
+        </div>
+      </div>
+    </main>
+
+    <section class="activity-section">
+      <h2>Recent Activity</h2>
+      <div class="activity-list" id="activityList"></div>
+      <div class="activity-load-more" id="activityLoadMore"></div>
+    </section>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+    import { SUPA_U as SUPABASE_URL, SUPA_K as SUPABASE_KEY } from './config.js'
+
+    // =====================================================================
+    // Display name resolution:
+    // Each sales/stock_in row stores a snapshot of the user's display name
+    // at the moment of insertion (`person_display` in the recent_activity view).
+    // We just read that. For old rows missing the snapshot, fall back to the
+    // raw email/label.
+    // The currently logged-in user is still tracked separately so the header
+    // shows the live name from their auth metadata.
+    // =====================================================================
+
+    const DEBUG = true
+    const AUTO_REFRESH_INTERVAL_MS = 60000
+    const OVERLAY_CLOSE_DELAY_MS = 20000
+    const OVERLAY_UNCERTAIN_DELAY_MS = 30000
+    const OFFLINE_OVERLAY_DELAY_MS = 8000
+    const ACTIVITY_PAGE_SIZE = 30
+
+    function log(category, message, data) {
+      if (!DEBUG) return
+      const time = new Date().toISOString().slice(11, 19)
+      if (data !== undefined) console.log(`[${time}] [${category}]`, message, data)
+      else console.log(`[${time}] [${category}]`, message)
+    }
+    log('init', 'Page loaded')
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    // ============ Auth state ============
+    let currentUser = null  // { id, email } when logged in, null otherwise
+
+    function displayName(emailOrLabel) {
+      // Used only as a fallback for old rows that have no person_display snapshot.
+      // For the currently logged-in user, show their live metadata name.
+      if (!emailOrLabel) return ''
+      if (currentUser && currentUser.email === emailOrLabel && currentUser.display_name) {
+        return currentUser.display_name
+      }
+      // Legacy raw values (e.g., "person1", "person2") from before auth was set up
+      const friendly = { person1: 'Person 1', person2: 'Person 2' }
+      return friendly[emailOrLabel] || emailOrLabel
+    }
+
+    // For activity feed: prefer the snapshotted display name, fall back to displayName()
+    function rowDisplayName(row) {
+      if (row.person_display && row.person_display.trim()) return row.person_display
+      return displayName(row.person)
+    }
+
+    async function checkSession() {
+      const { data } = await supabase.auth.getSession()
+      if (data.session && data.session.user) {
+        const u = data.session.user
+        currentUser = {
+          id: u.id,
+          email: u.email,
+          display_name: (u.user_metadata && u.user_metadata.display_name) || u.email,
+        }
+        log('auth', 'Existing session found', currentUser.email)
+        showApp()
+        return true
+      }
+      log('auth', 'No active session')
+      showLogin()
+      return false
+    }
+
+    function showLogin() {
+      document.getElementById('loginScreen').style.display = 'flex'
+      document.getElementById('appShell').classList.remove('visible')
+    }
+
+    function showApp() {
+      document.getElementById('loginScreen').style.display = 'none'
+      document.getElementById('appShell').classList.add('visible')
+      document.getElementById('userName').textContent = displayName(currentUser.email)
+      // Now that we're authenticated, load the data
+      loadAll(false)
+      setupRealtime()
+    }
+
+    window.doLogin = async function() {
+      const email = document.getElementById('loginEmail').value.trim()
+      const password = document.getElementById('loginPassword').value
+      const errEl = document.getElementById('loginError')
+      const btn = document.getElementById('loginBtn')
+      errEl.textContent = ''
+      if (!email || !password) {
+        errEl.textContent = 'Email and password required.'
+        return
+      }
+      btn.disabled = true
+      btn.textContent = 'Signing in…'
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) throw error
+        const u = data.user
+        currentUser = {
+          id: u.id,
+          email: u.email,
+          display_name: (u.user_metadata && u.user_metadata.display_name) || u.email,
+        }
+        log('auth', 'Sign in success', currentUser.email)
+        document.getElementById('loginPassword').value = ''
+        showApp()
+      } catch (err) {
+        log('error', 'Sign in failed', err)
+        errEl.textContent = err.message === 'Invalid login credentials'
+          ? 'Wrong email or password.'
+          : `Sign in failed: ${err.message || 'unknown error'}`
+      } finally {
+        btn.disabled = false
+        btn.textContent = 'Sign in'
+      }
+    }
+
+    window.doSignOut = async function() {
+      log('auth', 'Sign out')
+      // Clean up realtime
+      if (realtimeChannel) {
+        await supabase.removeChannel(realtimeChannel)
+        realtimeChannel = null
+      }
+      await supabase.auth.signOut()
+      currentUser = null
+      showLogin()
+    }
+
+    // Allow Enter key in login form
+    document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') window.doLogin() })
+    document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') window.doLogin() })
+
+    // Password visibility toggle
+    document.getElementById('passwordToggle').addEventListener('click', () => {
+      const pwInput = document.getElementById('loginPassword')
+      const eye = document.getElementById('eyeIcon')
+      const showing = pwInput.type === 'text'
+      pwInput.type = showing ? 'password' : 'text'
+      document.getElementById('passwordToggle').setAttribute('aria-label', showing ? 'Show password' : 'Hide password')
+      document.getElementById('passwordToggle').setAttribute('title', showing ? 'Show password' : 'Hide password')
+      // Swap icon: open eye when hidden, slashed eye when showing
+      eye.innerHTML = showing
+        ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+        : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+    })
+
+    // ============ App state ============
+    let lastFetchTime = null
+    let productsCache = []
+    let lastGoodStock = null
+    let isOnline = navigator.onLine
+    let offlineOverlayTimer = null
+    let activityRows = []
+    let activityHasMore = true
+    let activityLoading = false
+    let editingRow = null
+    let realtimeChannel = null
+
+    function setConnectionStatus(status, label) {
+      const el = document.getElementById('connStatus')
+      el.setAttribute('data-status', status)
+      el.querySelector('.conn-label').textContent = label
+      log('connection', `→ ${status}`, { label })
+      updateFormButtonsEnabled()
+    }
+    function updateLastUpdatedDisplay() {
+      const el = document.getElementById('lastUpdated')
+      if (!lastFetchTime) { el.textContent = ''; return }
+      const sec = Math.floor((Date.now() - lastFetchTime) / 1000)
+      let txt
+      if (sec < 5) txt = 'just now'
+      else if (sec < 60) txt = `${sec}s ago`
+      else if (sec < 3600) txt = `${Math.floor(sec / 60)}m ago`
+      else txt = `${Math.floor(sec / 3600)}h ago`
+      el.textContent = `Updated ${txt}`
+    }
+    setInterval(updateLastUpdatedDisplay, 1000)
+
+    function showStockOverlay(message) {
+      document.getElementById('stockOverlayMsg').textContent = message
+      document.getElementById('stockOverlay').classList.add('visible')
+    }
+    function hideStockOverlay() {
+      document.getElementById('stockOverlay').classList.remove('visible')
+      if (offlineOverlayTimer) { clearTimeout(offlineOverlayTimer); offlineOverlayTimer = null }
+    }
+    function scheduleOfflineOverlay() {
+      if (offlineOverlayTimer) return
+      offlineOverlayTimer = setTimeout(() => {
+        log('connection', 'Persistent failures → showing offline overlay')
+        showStockOverlay('Connection lost — showing cached data, retrying…')
+      }, OFFLINE_OVERLAY_DELAY_MS)
+    }
+
+    window.manualRefresh = function() {
+      log('refresh', 'Manual refresh requested')
+      showStockOverlay('Refreshing…')
+      loadAll(true)
+    }
+
+    async function loadAll(isManual = false) {
+      if (!currentUser) { log('api', 'Not authenticated, skipping load'); return }
+      log('api', `Loading… (manual=${isManual})`)
+      document.getElementById('refreshBtn').disabled = true
+      setConnectionStatus('reconnecting', 'Loading…')
+      try {
+        const [productsRes, stockRes] = await Promise.all([
+          supabase.from('products').select('id, name').order('name'),
+          supabase.from('current_stock').select('*')
+        ])
+        if (productsRes.error) throw productsRes.error
+        if (stockRes.error) throw stockRes.error
+        productsCache = productsRes.data
+        lastGoodStock = stockRes.data
+        log('api', `Loaded ${productsCache.length} products, ${stockRes.data.length} stock rows`)
+        setConnectionStatus('online', 'Online')
+        lastFetchTime = Date.now()
+        updateLastUpdatedDisplay()
+        renderStock(stockRes.data)
+        hideStockOverlay()
+        await reloadActivity()
+      } catch (err) {
+        log('error', 'Load failed', err)
+        setConnectionStatus('offline', 'Offline')
+        if (lastGoodStock) {
+          renderStock(lastGoodStock)
+          if (isManual) showStockOverlay('Connection lost — showing cached data')
+          else scheduleOfflineOverlay()
+        } else {
+          const loadingState = document.querySelector('#loadingState')
+          if (loadingState) loadingState.textContent = 'Could not connect — click Refresh to retry.'
+        }
+      } finally {
+        document.getElementById('refreshBtn').disabled = false
+      }
+    }
+
+    function renderStock(rows) {
+      const main = document.getElementById('mainContent')
+      const overlay = main.querySelector('#stockOverlay')
+      const loadingState = main.querySelector('#loadingState')
+      if (loadingState) loadingState.remove()
+      // Remove any previously-inserted state-message (prevents duplicates on repeated empty renders)
+      main.querySelectorAll('.state-message').forEach(el => el.remove())
+      const existing = main.querySelector('table')
+      if (!rows || rows.length === 0) {
+        if (existing) existing.remove()
+        const emptyMsg = document.createElement('div')
+        emptyMsg.className = 'state-message'
+        emptyMsg.textContent = 'No products found.'
+        main.insertBefore(emptyMsg, overlay)
+        return
+      }
+      const html = `
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Name</th>
+            <th class="numeric">Received</th>
+            <th class="numeric">Sold</th>
+            <th class="numeric">In stock</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(r => {
+              const qty = Number(r.current_quantity)
+              let cls = ''
+              if (qty < 0) cls = 'qty-negative'
+              else if (qty === 0) cls = 'qty-zero'
+              return `<tr>
+                <td class="id-cell">${escapeHtml(r.id)}</td>
+                <td>${escapeHtml(r.name)}</td>
+                <td class="numeric">${r.total_received}</td>
+                <td class="numeric">${r.total_sold}</td>
+                <td class="numeric ${cls}">${qty}</td>
+              </tr>`
+            }).join('')}
+          </tbody>
+        </table>`
+      if (existing) existing.outerHTML = html
+      else {
+        const wrapper = document.createElement('div')
+        wrapper.innerHTML = html
+        main.insertBefore(wrapper.firstElementChild, overlay)
+      }
+    }
+
+    async function reloadActivity() {
+      activityRows = []
+      activityHasMore = true
+      editingRow = null
+      await loadMoreActivity()
+    }
+
+    async function loadMoreActivity() {
+      if (!currentUser) return
+      if (activityLoading || !activityHasMore) return
+      activityLoading = true
+      const loadMoreEl = document.getElementById('activityLoadMore')
+      loadMoreEl.className = 'activity-load-more loading'
+      loadMoreEl.innerHTML = `<div class="mini-spinner"></div><span>Loading more…</span>`
+      try {
+        const offset = activityRows.length
+        const { data, error } = await supabase
+          .from('recent_activity')
+          .select('*')
+          .order('event_at', { ascending: false })
+          .range(offset, offset + ACTIVITY_PAGE_SIZE - 1)
+        if (error) throw error
+        if (data.length < ACTIVITY_PAGE_SIZE) activityHasMore = false
+        activityRows = activityRows.concat(data)
+        log('activity', `Loaded ${data.length} more, total ${activityRows.length}, hasMore=${activityHasMore}`)
+        renderActivity()
+      } catch (err) {
+        log('error', 'Activity load failed', err)
+        loadMoreEl.className = 'activity-load-more'
+        loadMoreEl.innerHTML = `<span style="color: var(--status-offline);">Could not load activity. <button class="btn small secondary" onclick="window.retryActivity()">Retry</button></span>`
+      } finally {
+        activityLoading = false
+      }
+    }
+    window.retryActivity = () => loadMoreActivity()
+
+    function renderActivity() {
+      const listEl = document.getElementById('activityList')
+      const loadMoreEl = document.getElementById('activityLoadMore')
+      if (activityRows.length === 0) {
+        listEl.innerHTML = `<div class="state-message">No activity yet.</div>`
+        loadMoreEl.className = 'activity-load-more'
+        loadMoreEl.innerHTML = ''
+        return
+      }
+      listEl.innerHTML = activityRows.map(r => renderActivityRow(r)).join('')
+      listEl.querySelectorAll('[data-action="edit"]').forEach(btn => {
+        btn.addEventListener('click', () => startEdit(btn.dataset.eventType, parseInt(btn.dataset.eventId, 10)))
+      })
+      listEl.querySelectorAll('[data-action="delete"]').forEach(btn => {
+        btn.addEventListener('click', () => confirmDelete(btn.dataset.eventType, parseInt(btn.dataset.eventId, 10)))
+      })
+      listEl.querySelectorAll('[data-action="save-edit"]').forEach(btn => {
+        btn.addEventListener('click', () => saveEdit(btn.dataset.eventType, parseInt(btn.dataset.eventId, 10)))
+      })
+      listEl.querySelectorAll('[data-action="cancel-edit"]').forEach(btn => {
+        btn.addEventListener('click', () => { editingRow = null; renderActivity() })
+      })
+      loadMoreEl.className = 'activity-load-more'
+      if (activityHasMore) {
+        loadMoreEl.innerHTML = `<button class="btn secondary small" onclick="window.loadMoreActivityClick()">Load more</button>`
+      } else {
+        loadMoreEl.innerHTML = `<span style="color: var(--text-faint);">— End of activity —</span>`
+      }
+    }
+    window.loadMoreActivityClick = () => loadMoreActivity()
+
+    function renderActivityRow(r) {
+      const isStockIn = r.event_type === 'stock_in'
+      const isEditing = editingRow && editingRow.event_type === r.event_type && editingRow.event_id === r.event_id
+      const rowClass = isStockIn ? 'activity-row stockin' : 'activity-row'
+      if (isEditing) return renderActivityRowEditing(r)
+      const labelClass = isStockIn ? 'activity-label stockin' : 'activity-label sale'
+      const labelText = isStockIn ? 'STOCK IN' : 'SALE'
+      const productHtml = r.product_id
+        ? `${escapeHtml(r.product_name)}<span class="product-id">${escapeHtml(r.product_id)}</span>`
+        : `${escapeHtml(r.freeform_name || '?')}<span class="freeform-flag">freeform</span><span class="product-id">no ID</span>`
+      const editedMark = r.edited ? `<span class="activity-edited-mark">edited</span>` : ''
+      const sourceText = isStockIn && r.source ? ` · ${escapeHtml(r.source)}` : ''
+      return `
+        <div class="${rowClass}">
+          <span class="${labelClass}">${labelText}</span>
+          <div class="activity-product">${productHtml}${editedMark}</div>
+          <div class="activity-qty">${isStockIn ? '+' : '−'}${r.quantity}</div>
+          <div class="activity-person">${escapeHtml(rowDisplayName(r))}${sourceText}</div>
+          <div class="activity-when">${formatTime(r.event_at)}</div>
+          <div class="activity-actions">
+            <button class="btn small secondary" data-action="edit" data-event-type="${r.event_type}" data-event-id="${r.event_id}">Edit</button>
+            <button class="btn small danger" data-action="delete" data-event-type="${r.event_type}" data-event-id="${r.event_id}">Delete</button>
+          </div>
+        </div>`
+    }
+
+    function renderActivityRowEditing(r) {
+      const isStockIn = r.event_type === 'stock_in'
+      const rowClass = isStockIn ? 'activity-row stockin editing' : 'activity-row editing'
+      const labelClass = isStockIn ? 'activity-label stockin' : 'activity-label sale'
+      const labelText = isStockIn ? 'STOCK IN' : 'SALE'
+      const productDisplay = r.product_id
+        ? `${escapeHtml(r.product_name)} (${escapeHtml(r.product_id)})`
+        : escapeHtml(r.freeform_name || '?')
+      const qtyFieldId = `edit-qty-${r.event_id}`
+      const sourceFieldId = `edit-source-${r.event_id}`
+      // Person field is read-only — shows who originally logged it, can't be changed.
+      // (Auth-aware UX: edits don't transfer ownership.)
+      return `
+        <div class="${rowClass}">
+          <span class="${labelClass}">${labelText}</span>
+          <div class="activity-edit-form">
+            <div style="font-size:13px;color:var(--text-muted);">
+              ${productDisplay}
+              <div style="font-size:11px;color:var(--text-faint);">Product cannot be changed here (delete + re-add if needed).</div>
+            </div>
+            <input type="number" min="1" step="1" id="${qtyFieldId}" value="${r.quantity}" placeholder="Qty">
+            <div style="font-size:12px;color:var(--text-muted);">by ${escapeHtml(rowDisplayName(r))}</div>
+            ${isStockIn ? `<input type="text" id="${sourceFieldId}" value="${escapeHtml(r.source || '')}" placeholder="Source/invoice">` : ''}
+            <div style="display:flex;gap:6px;">
+              <button class="btn small" data-action="save-edit" data-event-type="${r.event_type}" data-event-id="${r.event_id}">Save</button>
+              <button class="btn small secondary" data-action="cancel-edit">Cancel</button>
+            </div>
+          </div>
+        </div>`
+    }
+
+    function startEdit(eventType, eventId) {
+      editingRow = { event_type: eventType, event_id: eventId }
+      renderActivity()
+    }
+
+    async function saveEdit(eventType, eventId) {
+      if (!isOnline) { alert('No connection — cannot save edit right now.'); return }
+      const qtyEl = document.getElementById(`edit-qty-${eventId}`)
+      const sourceEl = document.getElementById(`edit-source-${eventId}`)
+      const newQty = parseInt(qtyEl.value, 10)
+      const newSource = sourceEl ? sourceEl.value.trim() : null
+      if (!newQty || newQty < 1) { alert('Quantity must be 1 or more.'); return }
+      log(eventType, `Saving edit for ${eventType} ${eventId}`, { newQty, newSource })
+      showSubmitOverlay('Saving changes…')
+      try {
+        let update = { quantity: newQty }
+        if (eventType === 'sale') {
+          update.edited = true
+        } else {
+          if (newSource !== null) update.source = newSource || null
+        }
+        const { error } = await supabase.from(eventType === 'sale' ? 'sales' : 'stock_in')
+          .update(update).eq('id', eventId)
+        if (error) throw error
+        log(eventType, 'Edit saved')
+        setSubmitOverlaySuccess()
+        editingRow = null
+        await reloadActivity()
+        await loadAll(false)
+      } catch (err) {
+        log('error', 'Edit failed', err)
+        hideSubmitOverlay()
+        alert(`Failed to save edit: ${err.message || 'unknown error'}`)
+      }
+    }
+
+    let pendingDelete = null
+    function confirmDelete(eventType, eventId) {
+      const row = activityRows.find(r => r.event_type === eventType && r.event_id === eventId)
+      if (!row) return
+      pendingDelete = { eventType, eventId }
+      const detailEl = document.getElementById('confirmDetail')
+      const productLabel = row.product_id ? `${row.product_name} (${row.product_id})` : `${row.freeform_name || '?'} (freeform)`
+      const verb = eventType === 'sale' ? 'Sold' : 'Received'
+      detailEl.innerHTML = `
+        <div><strong>${eventType.toUpperCase()}:</strong> ${escapeHtml(productLabel)}</div>
+        <div><strong>${verb}:</strong> ${row.quantity}</div>
+        <div><strong>By:</strong> ${escapeHtml(rowDisplayName(row))}</div>
+        <div><strong>When:</strong> ${formatTime(row.event_at)}</div>
+      `
+      document.getElementById('confirmModal').classList.add('visible')
+    }
+    document.getElementById('confirmCancelBtn').addEventListener('click', () => {
+      pendingDelete = null
+      document.getElementById('confirmModal').classList.remove('visible')
+    })
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+      if (!pendingDelete) return
+      if (!isOnline) { alert('No connection — cannot delete right now.'); return }
+      const { eventType, eventId } = pendingDelete
+      pendingDelete = null
+      document.getElementById('confirmModal').classList.remove('visible')
+      log(eventType, `Deleting ${eventType} ${eventId}`)
+      showSubmitOverlay('Deleting…')
+      try {
+        const { error } = await supabase.from(eventType === 'sale' ? 'sales' : 'stock_in')
+          .delete().eq('id', eventId)
+        if (error) throw error
+        log(eventType, 'Deleted')
+        setSubmitOverlaySuccess()
+        await reloadActivity()
+        await loadAll(false)
+      } catch (err) {
+        log('error', 'Delete failed', err)
+        hideSubmitOverlay()
+        alert(`Failed to delete: ${err.message || 'unknown error'}`)
+      }
+    })
+
+    window.addEventListener('scroll', () => {
+      if (activityLoading || !activityHasMore) return
+      const scrollPos = window.innerHeight + window.scrollY
+      const docHeight = document.documentElement.offsetHeight
+      if (scrollPos >= docHeight - 400) loadMoreActivity()
+    })
+
+    function setupRealtime() {
+      if (realtimeChannel) return  // already subscribed
+      log('realtime', 'Subscribing to changes…')
+      realtimeChannel = supabase
+        .channel('inventory-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' },
+          (p) => { log('realtime', 'sales changed', p.eventType); loadAll(false) })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_in' },
+          (p) => { log('realtime', 'stock_in changed', p.eventType); loadAll(false) })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' },
+          (p) => { log('realtime', 'products changed', p.eventType); loadAll(false) })
+        .subscribe((status) => log('realtime', `status: ${status}`))
+    }
+
+    function createAutocomplete(inputId, listId, readoutId) {
+      const input = document.getElementById(inputId)
+      const list = document.getElementById(listId)
+      const readout = document.getElementById(readoutId)
+      let visibleItems = []
+      let focusedIndex = -1
+      function update() {
+        const query = input.value.trim().toLowerCase()
+        updateReadout(query)
+        if (query.length === 0) { hide(); return }
+        const matches = productsCache.filter(p =>
+          p.name.toLowerCase().includes(query) || p.id.toLowerCase().includes(query)
+        ).slice(0, 20)
+        visibleItems = matches
+        focusedIndex = -1
+        if (matches.length === 0) {
+          list.innerHTML = `<div class="autocomplete-empty">No match — will be saved as freeform</div>`
+        } else {
+          list.innerHTML = matches.map((p, i) =>
+            `<div class="autocomplete-item" data-index="${i}">
+              <span class="ac-id">${escapeHtml(p.id)}</span>${escapeHtml(p.name)}
+            </div>`).join('')
+          list.querySelectorAll('.autocomplete-item').forEach(el => {
+            el.addEventListener('click', () => select(visibleItems[parseInt(el.dataset.index)]))
+          })
+        }
+        list.classList.add('visible')
+      }
+      function select(product) { input.value = product.name; hide(); updateReadout(product.name.toLowerCase()) }
+      function hide() { list.classList.remove('visible'); visibleItems = []; focusedIndex = -1 }
+      function updateReadout(queryLower) {
+        if (!queryLower) { readout.textContent = '—'; readout.setAttribute('data-state', 'empty'); return }
+        const exact = productsCache.find(p => p.name.toLowerCase() === queryLower)
+        if (exact) { readout.textContent = exact.id; readout.setAttribute('data-state', 'matched') }
+        else { readout.textContent = 'Freeform (no match)'; readout.setAttribute('data-state', 'freeform') }
+      }
+      function updateFocus() {
+        list.querySelectorAll('.autocomplete-item').forEach((el, i) => {
+          el.classList.toggle('focused', i === focusedIndex)
+        })
+      }
+      input.addEventListener('input', update)
+      input.addEventListener('focus', update)
+      input.addEventListener('keydown', e => {
+        if (!list.classList.contains('visible') || visibleItems.length === 0) return
+        if (e.key === 'ArrowDown') { e.preventDefault(); focusedIndex = Math.min(focusedIndex + 1, visibleItems.length - 1); updateFocus() }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); focusedIndex = Math.max(focusedIndex - 1, -1); updateFocus() }
+        else if (e.key === 'Enter' && focusedIndex >= 0) { e.preventDefault(); select(visibleItems[focusedIndex]) }
+        else if (e.key === 'Escape') { hide() }
+      })
+      document.addEventListener('click', e => {
+        if (!input.contains(e.target) && !list.contains(e.target)) hide()
+      })
+      return { getValue: () => input.value.trim(), clear: () => { input.value = ''; updateReadout('') } }
+    }
+
+    const saleAc = createAutocomplete('saleProductInput', 'saleAcList', 'saleIdReadout')
+    const stockAc = createAutocomplete('stockProductInput', 'stockAcList', 'stockIdReadout')
+
+    function updateFormButtonsEnabled() {
+      const offline = !isOnline
+      document.getElementById('logSaleBtn').disabled = offline
+      document.getElementById('logStockBtn').disabled = offline
+      document.getElementById('logSaleBtn').title = offline ? 'No connection — cannot log sale right now' : ''
+      document.getElementById('logStockBtn').title = offline ? 'No connection — cannot receive stock right now' : ''
+    }
+    window.addEventListener('online', () => { isOnline = true; log('network', 'online'); updateFormButtonsEnabled(); hideStockOverlay(); if (currentUser) loadAll(false) })
+    window.addEventListener('offline', () => { isOnline = false; log('network', 'offline'); setConnectionStatus('offline', 'No connection'); updateFormButtonsEnabled(); scheduleOfflineOverlay() })
+
+    const overlay = document.getElementById('submitOverlay')
+    const overlayStatus = document.getElementById('submitStatus')
+    const overlaySubstatus = document.getElementById('submitSubstatus')
+    const overlayActions = document.getElementById('submitActions')
+    let overlayTimers = []
+    let activeCancel = null
+
+    function showSubmitOverlay(initialStatus) {
+      overlayStatus.textContent = initialStatus
+      overlayStatus.style.color = ''
+      overlay.querySelector('.spinner').style.display = ''
+      overlaySubstatus.textContent = ''
+      overlayActions.innerHTML = ''
+      overlay.classList.add('visible')
+      overlayTimers.push(setTimeout(() => {
+        overlaySubstatus.textContent = 'Taking longer than usual. Check your connection.'
+        if (activeCancel) {
+          overlayActions.innerHTML = `<button class="btn secondary" id="overlayCloseBtn">Close</button>`
+          document.getElementById('overlayCloseBtn').onclick = () => { if (activeCancel) activeCancel() }
+        }
+      }, OVERLAY_CLOSE_DELAY_MS))
+      overlayTimers.push(setTimeout(() => {
+        overlaySubstatus.textContent = 'Still trying… you can close this and verify in the list below.'
+      }, OVERLAY_UNCERTAIN_DELAY_MS))
+    }
+    function setSubmitOverlaySuccess() {
+      clearSubmitOverlayTimers()
+      overlay.querySelector('.spinner').style.display = 'none'
+      overlayStatus.innerHTML = '✓ Saved'
+      overlayStatus.style.color = 'var(--status-online)'
+      overlaySubstatus.textContent = ''
+      overlayActions.innerHTML = ''
+      setTimeout(hideSubmitOverlay, 800)
+    }
+    function hideSubmitOverlay() {
+      overlay.classList.remove('visible')
+      overlay.querySelector('.spinner').style.display = ''
+      overlayStatus.style.color = ''
+      clearSubmitOverlayTimers()
+      activeCancel = null
+    }
+    function clearSubmitOverlayTimers() { overlayTimers.forEach(clearTimeout); overlayTimers = [] }
+
+    async function submitRow(opts) {
+      const btn = opts.buttonEl
+      const feedback = opts.feedbackEl
+      btn.disabled = true
+      showSubmitOverlay('Sending…')
+      let cancelled = false
+      activeCancel = () => {
+        cancelled = true
+        hideSubmitOverlay()
+        feedback.className = 'form-feedback warning'
+        feedback.textContent = 'Stopped waiting. The entry may still arrive — check the list below. Retry is safe.'
+        btn.disabled = false
+        loadAll(false)
+      }
+      try {
+        const { data, error } = await supabase.from(opts.tableName).insert(opts.row).select()
+        if (cancelled) return
+        if (error) {
+          if (error.code === '23505') {
+            log(opts.tableName, 'UUID conflict → treating as already-saved')
+            setSubmitOverlaySuccess()
+            feedback.className = 'form-feedback success'
+            feedback.textContent = '✓ Already saved (recovered from duplicate attempt).'
+          } else throw error
+        } else {
+          log(opts.tableName, 'Insert succeeded', data)
+          setSubmitOverlaySuccess()
+          feedback.className = 'form-feedback success'
+          feedback.textContent = opts.successMsg || '✓ Saved.'
+        }
+        setTimeout(() => { opts.clearForm(); feedback.textContent = ''; feedback.className = 'form-feedback' }, 1500)
+        loadAll(false)
+      } catch (err) {
+        if (cancelled) return
+        log('error', `Insert to ${opts.tableName} failed`, err)
+        hideSubmitOverlay()
+        feedback.className = 'form-feedback error'
+        feedback.textContent = `✗ Failed: ${err.message || 'unknown error'}. Retry is safe.`
+      } finally {
+        if (!cancelled) btn.disabled = false
+        activeCancel = null
+      }
+    }
+
+    window.submitSale = async function() {
+      if (!currentUser) return
+      const productName = saleAc.getValue()
+      const quantity = parseInt(document.getElementById('saleQtyInput').value, 10)
+      const feedback = document.getElementById('saleFeedback')
+      feedback.className = 'form-feedback'; feedback.textContent = ''
+      if (!productName) { feedback.className = 'form-feedback error'; feedback.textContent = 'Enter a product name first.'; return }
+      if (!quantity || quantity < 1) { feedback.className = 'form-feedback error'; feedback.textContent = 'Enter a quantity of 1 or more.'; return }
+      if (!isOnline) { feedback.className = 'form-feedback warning'; feedback.textContent = 'No connection — cannot log sale right now.'; return }
+      const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
+      const row = {
+        quantity,
+        sold_by: currentUser.email,
+        sold_by_display: currentUser.display_name || currentUser.email,
+        client_uuid: crypto.randomUUID()
+      }
+      if (exact) row.product_id = exact.id
+      else row.freeform_name = productName
+      log('sale', 'Submitting', row)
+      await submitRow({
+        tableName: 'sales', row, buttonEl: document.getElementById('logSaleBtn'),
+        feedbackEl: feedback, successMsg: '✓ Sale logged.',
+        clearForm: () => { saleAc.clear(); document.getElementById('saleQtyInput').value = '' }
+      })
+    }
+
+    window.submitStockIn = async function() {
+      if (!currentUser) return
+      const productName = stockAc.getValue()
+      const quantity = parseInt(document.getElementById('stockQtyInput').value, 10)
+      const source = document.getElementById('stockSourceInput').value.trim()
+      const feedback = document.getElementById('stockFeedback')
+      feedback.className = 'form-feedback'; feedback.textContent = ''
+      if (!productName) { feedback.className = 'form-feedback error'; feedback.textContent = 'Enter a product name first.'; return }
+      if (!quantity || quantity < 1) { feedback.className = 'form-feedback error'; feedback.textContent = 'Enter a quantity of 1 or more.'; return }
+      if (!isOnline) { feedback.className = 'form-feedback warning'; feedback.textContent = 'No connection — cannot receive stock right now.'; return }
+      const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
+      if (!exact) {
+        feedback.className = 'form-feedback error'
+        feedback.textContent = 'Product not in catalog. Add it first before receiving stock for it.'
+        return
+      }
+      const row = {
+        product_id: exact.id,
+        quantity,
+        received_by: currentUser.email,
+        received_by_display: currentUser.display_name || currentUser.email,
+        client_uuid: crypto.randomUUID()
+      }
+      if (source) row.source = source
+      log('stock_in', 'Submitting', row)
+      await submitRow({
+        tableName: 'stock_in', row, buttonEl: document.getElementById('logStockBtn'),
+        feedbackEl: feedback, successMsg: '✓ Stock received.',
+        clearForm: () => { stockAc.clear(); document.getElementById('stockQtyInput').value = ''; document.getElementById('stockSourceInput').value = '' }
+      })
+    }
+
+    function escapeHtml(text) {
+      if (text === null || text === undefined) return ''
+      return String(text)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+    function formatTime(iso) {
+      if (!iso) return ''
+      const d = new Date(iso)
+      const now = new Date()
+      const sameDay = d.toDateString() === now.toDateString()
+      const yest = new Date(now); yest.setDate(now.getDate() - 1)
+      const isYest = d.toDateString() === yest.toDateString()
+      const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      if (sameDay) return time
+      if (isYest) return `yesterday ${time}`
+      return `${d.toLocaleDateString()} ${time}`
+    }
+
+    // Listen for auth state changes (e.g. session expiry, sign-out from another tab)
+    supabase.auth.onAuthStateChange((event, session) => {
+      log('auth', `state changed: ${event}`)
+      if (event === 'SIGNED_OUT' || !session) {
+        currentUser = null
+        if (realtimeChannel) {
+          supabase.removeChannel(realtimeChannel)
+          realtimeChannel = null
+        }
+        showLogin()
+      }
+    })
+
+    // ============================================================
+    // CSV / XLSX / ODS Importer (Stage 7)
+    // ============================================================
+    // State for the current pending import
+    let importPlan = null  // { newRows, restockRows, renameRows, skippedRows, totalRows, sourceText, filename }
+
+    document.getElementById('importFile').addEventListener('change', handleImportFileSelected)
+    document.getElementById('importCloseBtn').addEventListener('click', closeImportModal)
+    document.getElementById('importCancelBtn').addEventListener('click', closeImportModal)
+    document.getElementById('importConfirmBtn').addEventListener('click', executeImport)
+
+    function closeImportModal() {
+      document.getElementById('importModal').classList.remove('visible')
+      document.getElementById('importFile').value = ''  // allow re-selecting same file
+      importPlan = null
+    }
+
+    async function handleImportFileSelected(e) {
+      const file = e.target.files[0]
+      if (!file) return
+      log('import', `File selected: ${file.name} (${file.size} bytes)`)
+
+      try {
+        const rows = await parseSpreadsheetFile(file)
+        if (!rows || rows.length === 0) {
+          alert('The file appears to be empty or could not be read.')
+          document.getElementById('importFile').value = ''
+          return
+        }
+
+        // Build the import plan
+        const filename = file.name
+        const sourceText = filename.replace(/\.[^.]+$/, '')  // strip extension
+        const plan = classifyImportRows(rows, sourceText, filename)
+        importPlan = plan
+
+        renderImportPlan(plan)
+        document.getElementById('importModal').classList.add('visible')
+      } catch (err) {
+        log('error', 'Import parse failed', err)
+        const msg = (err && err.message) || 'Unknown error'
+        if (file.name.toLowerCase().endsWith('.ods')) {
+          alert(`Couldn't parse this ODS file: ${msg}\n\nTip: ODS files vary between tools. If this keeps failing, try saving the file as CSV in LibreOffice or Excel and importing that instead.`)
+        } else {
+          alert(`Couldn't parse this file: ${msg}`)
+        }
+        document.getElementById('importFile').value = ''
+      }
+    }
+
+    // Parse spreadsheet using SheetJS. Returns array-of-arrays (first row = header).
+    async function parseSpreadsheetFile(file) {
+      const arrayBuffer = await file.arrayBuffer()
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw new Error('No sheets in the file')
+      }
+      // Use first sheet
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+      // Get rows as array-of-arrays, treating cells as strings for safety
+      const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '', raw: false })
+      // Drop fully-empty rows
+      return rows.filter(r => r.some(cell => String(cell || '').trim() !== ''))
+    }
+
+    // Classify each data row into NEW / RESTOCK / RENAME / SKIPPED.
+    // Strategy: header row is row[0]. Find columns named "code", "description", "quantity"
+    // (case-insensitive, flexible). Fall back to first 3 columns if header doesn't match.
+    function classifyImportRows(rows, sourceText, filename) {
+      const header = rows[0].map(c => String(c || '').trim().toLowerCase())
+      const codeIdx = findCol(header, ['code', 'id', 'sku', 'product_id', 'артикул'])
+      const nameIdx = findCol(header, ['description', 'name', 'product', 'item', 'наименование'])
+      const qtyIdx = findCol(header, ['quantity', 'qty', 'count', 'amount', 'брой'])
+
+      const usedCols = {
+        code: codeIdx >= 0 ? codeIdx : 0,
+        name: nameIdx >= 0 ? nameIdx : 1,
+        qty: qtyIdx >= 0 ? qtyIdx : 2,
+      }
+
+      log('import', `Column mapping`, usedCols)
+
+      const newRows = []
+      const restockRows = []
+      const renameRows = []
+      const skippedRows = []
+
+      // Build current stock lookup: id → current_quantity (from lastGoodStock)
+      const stockByCode = {}
+      ;(lastGoodStock || []).forEach(s => { stockByCode[s.id] = Number(s.current_quantity) || 0 })
+      // Build product name lookup: id → current name
+      const productByCode = {}
+      productsCache.forEach(p => { productByCode[p.id] = p.name })
+
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i]
+        const code = String(r[usedCols.code] || '').trim()
+        const name = String(r[usedCols.name] || '').trim()
+        const qtyRaw = String(r[usedCols.qty] || '').trim()
+        const qty = parseInt(qtyRaw.replace(/[^\d-]/g, ''), 10)
+
+        const errors = []
+        if (!code) errors.push('missing code')
+        if (!name) errors.push('missing description')
+        if (!qty || qty < 1 || isNaN(qty)) errors.push('missing/invalid quantity')
+
+        if (errors.length > 0) {
+          skippedRows.push({ rowIndex: i + 1, code, name, qty: qtyRaw, errors: errors.join(', ') })
+          continue
+        }
+
+        const existingName = productByCode[code]
+        if (existingName === undefined) {
+          // NEW product
+          newRows.push({ rowIndex: i + 1, code, name, qty })
+        } else {
+          // EXISTING product → restock
+          const currentStock = stockByCode[code] || 0
+          restockRows.push({
+            rowIndex: i + 1, code, currentName: existingName, name, qty,
+            currentStock, newStock: currentStock + qty,
+            nameChanged: existingName !== name,
+          })
+          if (existingName !== name) {
+            renameRows.push({ rowIndex: i + 1, code, oldName: existingName, newName: name })
+          }
+        }
+      }
+
+      return {
+        newRows, restockRows, renameRows, skippedRows,
+        totalRows: rows.length - 1,
+        sourceText, filename,
+      }
+    }
+
+    function findCol(headerLower, candidates) {
+      for (const cand of candidates) {
+        const idx = headerLower.findIndex(h => h === cand || h.includes(cand))
+        if (idx >= 0) return idx
+      }
+      return -1
+    }
+
+    function renderImportPlan(plan) {
+      // Title
+      document.getElementById('importTitle').textContent = `Review import: ${plan.filename}`
+      // Source field
+      document.getElementById('importSourceInput').value = plan.sourceText
+
+      // New products section
+      const secNew = document.getElementById('importSecNew')
+      const secNewCount = document.getElementById('importSecNewCount')
+      const tblNew = document.getElementById('importTblNew')
+      if (plan.newRows.length > 0) {
+        secNew.hidden = false
+        secNewCount.textContent = `(${plan.newRows.length})`
+        tblNew.innerHTML = `
+          <thead><tr><th>Code</th><th>Name</th><th class="numeric">Quantity</th></tr></thead>
+          <tbody>${plan.newRows.map(r => `
+            <tr>
+              <td class="code-cell">${escapeHtml(r.code)}</td>
+              <td>${escapeHtml(r.name)}</td>
+              <td class="numeric">+${r.qty}</td>
+            </tr>`).join('')}
+          </tbody>`
+      } else { secNew.hidden = true }
+
+      // Restock section
+      const secR = document.getElementById('importSecRestock')
+      const secRCount = document.getElementById('importSecRestockCount')
+      const tblR = document.getElementById('importTblRestock')
+      if (plan.restockRows.length > 0) {
+        secR.hidden = false
+        secRCount.textContent = `(${plan.restockRows.length})`
+        tblR.innerHTML = `
+          <thead><tr><th>Code</th><th>Name</th><th class="numeric">Adding</th><th class="numeric">Current</th><th></th><th class="numeric">New</th></tr></thead>
+          <tbody>${plan.restockRows.map(r => `
+            <tr>
+              <td class="code-cell">${escapeHtml(r.code)}</td>
+              <td>${escapeHtml(r.currentName)}${r.nameChanged ? ' <span style="font-size:11px;color:#9a3412;">(renames below)</span>' : ''}</td>
+              <td class="numeric">+${r.qty}</td>
+              <td class="numeric old-val">${r.currentStock}</td>
+              <td class="diff-arrow">→</td>
+              <td class="numeric new-val">${r.newStock}</td>
+            </tr>`).join('')}
+          </tbody>`
+      } else { secR.hidden = true }
+
+      // Renames section
+      const secRn = document.getElementById('importSecRenames')
+      const secRnCount = document.getElementById('importSecRenamesCount')
+      const tblRn = document.getElementById('importTblRenames')
+      if (plan.renameRows.length > 0) {
+        secRn.hidden = false
+        secRnCount.textContent = `(${plan.renameRows.length})`
+        tblRn.innerHTML = `
+          <thead><tr><th>Code</th><th>Old name</th><th>→</th><th>New name</th></tr></thead>
+          <tbody>${plan.renameRows.map(r => `
+            <tr>
+              <td class="code-cell">${escapeHtml(r.code)}</td>
+              <td class="old-val">${escapeHtml(r.oldName)}</td>
+              <td class="diff-arrow">→</td>
+              <td class="new-val">${escapeHtml(r.newName)}</td>
+            </tr>`).join('')}
+          </tbody>`
+      } else { secRn.hidden = true }
+
+      // Skipped section
+      const secSk = document.getElementById('importSecSkipped')
+      const secSkCount = document.getElementById('importSecSkippedCount')
+      const tblSk = document.getElementById('importTblSkipped')
+      if (plan.skippedRows.length > 0) {
+        secSk.hidden = false
+        secSkCount.textContent = `(${plan.skippedRows.length})`
+        tblSk.innerHTML = `
+          <thead><tr><th>Row #</th><th>Code</th><th>Name</th><th>Qty</th><th>Reason</th></tr></thead>
+          <tbody>${plan.skippedRows.map(r => `
+            <tr>
+              <td class="numeric">${r.rowIndex}</td>
+              <td class="code-cell">${escapeHtml(r.code || '—')}</td>
+              <td>${escapeHtml(r.name || '—')}</td>
+              <td>${escapeHtml(r.qty || '—')}</td>
+              <td class="error-cell">${escapeHtml(r.errors)}</td>
+            </tr>`).join('')}
+          </tbody>`
+      } else { secSk.hidden = true }
+
+      // Summary
+      const totalQty = plan.newRows.reduce((s, r) => s + r.qty, 0) +
+                       plan.restockRows.reduce((s, r) => s + r.qty, 0)
+      const sum = document.getElementById('importSummary')
+      sum.innerHTML = `
+        <div><strong>Total rows in file:</strong> ${plan.totalRows}</div>
+        <div><strong>New products to create:</strong> ${plan.newRows.length}</div>
+        <div><strong>Restocked items:</strong> ${plan.restockRows.length} (total <strong>+${totalQty}</strong> units)</div>
+        <div><strong>Renames:</strong> ${plan.renameRows.length}</div>
+        <div><strong>Skipped:</strong> ${plan.skippedRows.length}</div>
+      `
+
+      // Enable/disable confirm
+      const confirmBtn = document.getElementById('importConfirmBtn')
+      const hasActions = plan.newRows.length + plan.restockRows.length > 0
+      confirmBtn.disabled = !hasActions
+      confirmBtn.textContent = hasActions
+        ? `Confirm Import (${plan.newRows.length + plan.restockRows.length} actions)`
+        : 'Nothing to import'
+    }
+
+    async function executeImport() {
+      if (!importPlan) return
+      if (!isOnline) { alert('No connection — cannot import right now.'); return }
+
+      const plan = importPlan
+      const sourceText = document.getElementById('importSourceInput').value.trim() || plan.sourceText
+
+      // Hide preview, show progress
+      document.getElementById('importModal').classList.remove('visible')
+      const overlay = document.getElementById('importProgressOverlay')
+      const status = document.getElementById('importProgressStatus')
+      const substatus = document.getElementById('importProgressSubstatus')
+      overlay.classList.add('visible')
+      status.textContent = 'Importing…'
+
+      let successCount = 0
+      let failCount = 0
+      const failures = []
+      const displayName = currentUser.display_name || currentUser.email
+
+      try {
+        // 1. Insert new products
+        if (plan.newRows.length > 0) {
+          status.textContent = 'Creating new products…'
+          substatus.textContent = `0 / ${plan.newRows.length}`
+          for (let i = 0; i < plan.newRows.length; i++) {
+            const r = plan.newRows[i]
+            substatus.textContent = `${i + 1} / ${plan.newRows.length} — ${r.code}`
+            try {
+              const { error } = await supabase.from('products').insert({ id: r.code, name: r.name })
+              if (error && error.code !== '23505') throw error  // ignore "already exists" (race condition)
+            } catch (err) {
+              failures.push(`Create product ${r.code}: ${err.message}`)
+              failCount++
+              continue
+            }
+          }
+        }
+
+        // 2. Apply rename updates
+        if (plan.renameRows.length > 0) {
+          status.textContent = 'Updating product names…'
+          substatus.textContent = `0 / ${plan.renameRows.length}`
+          for (let i = 0; i < plan.renameRows.length; i++) {
+            const r = plan.renameRows[i]
+            substatus.textContent = `${i + 1} / ${plan.renameRows.length} — ${r.code}`
+            try {
+              const { error } = await supabase.from('products').update({ name: r.newName }).eq('id', r.code)
+              if (error) throw error
+            } catch (err) {
+              failures.push(`Rename ${r.code}: ${err.message}`)
+              failCount++
+            }
+          }
+        }
+
+        // 3. Insert stock_in rows for both new and existing products
+        const allStockIns = [
+          ...plan.newRows.map(r => ({ product_id: r.code, quantity: r.qty, name: r.name })),
+          ...plan.restockRows.map(r => ({ product_id: r.code, quantity: r.qty, name: r.name })),
+        ]
+        if (allStockIns.length > 0) {
+          status.textContent = 'Adding stock receipts…'
+          substatus.textContent = `0 / ${allStockIns.length}`
+          for (let i = 0; i < allStockIns.length; i++) {
+            const r = allStockIns[i]
+            substatus.textContent = `${i + 1} / ${allStockIns.length} — ${r.product_id}`
+            try {
+              const { error } = await supabase.from('stock_in').insert({
+                product_id: r.product_id,
+                quantity: r.quantity,
+                received_by: currentUser.email,
+                received_by_display: displayName,
+                source: sourceText || null,
+                client_uuid: crypto.randomUUID(),
+              })
+              if (error && error.code !== '23505') throw error
+              successCount++
+            } catch (err) {
+              failures.push(`Stock-in ${r.product_id}: ${err.message}`)
+              failCount++
+            }
+          }
+        }
+
+        // Show results
+        overlay.classList.remove('visible')
+        if (failures.length === 0) {
+          alert(`✓ Import complete.\n\n` +
+            `${plan.newRows.length} new product(s) created\n` +
+            `${plan.renameRows.length} rename(s) applied\n` +
+            `${successCount} stock receipt(s) added`)
+        } else {
+          alert(`Import finished with ${failures.length} error(s):\n\n` + failures.slice(0, 10).join('\n') +
+            (failures.length > 10 ? `\n…and ${failures.length - 10} more` : '') +
+            `\n\nSuccessful: ${successCount} stock receipts.\n` +
+            `Note: retrying is safe (UUID dedup protects against duplicates).`)
+        }
+
+        // Refresh data
+        await loadAll(false)
+        closeImportModal()
+      } catch (err) {
+        log('error', 'Import execute failed', err)
+        overlay.classList.remove('visible')
+        alert(`Import failed: ${err.message || 'unknown error'}\n\nSome rows may have been imported. Check the stock list. Retrying is safe.`)
+      }
+    }
+
+    // ============================================================
+    // Settings modal + Backup download (Stage 8)
+    // ============================================================
+    window.openSettings = function() {
+      document.getElementById('settingsModal').classList.add('visible')
+      // Reset any previous status
+      const status = document.getElementById('backupStatus')
+      status.textContent = ''
+      status.className = 'settings-status'
+    }
+    document.getElementById('settingsCloseBtn').addEventListener('click', () => {
+      document.getElementById('settingsModal').classList.remove('visible')
+    })
+
+    document.getElementById('downloadBackupBtn').addEventListener('click', async () => {
+      if (!isOnline) {
+        const status = document.getElementById('backupStatus')
+        status.textContent = 'No connection — cannot fetch data for backup.'
+        status.className = 'settings-status error'
+        return
+      }
+      const btn = document.getElementById('downloadBackupBtn')
+      const status = document.getElementById('backupStatus')
+      btn.disabled = true
+      status.className = 'settings-status'
+      status.textContent = 'Fetching data…'
+      try {
+        const result = await buildAndDownloadBackup()
+        status.textContent = `✓ Saved ${result.filename} (${formatBytes(result.size)})`
+        status.className = 'settings-status success'
+      } catch (err) {
+        log('error', 'Backup failed', err)
+        status.textContent = `✗ Backup failed: ${err.message || 'unknown error'}`
+        status.className = 'settings-status error'
+      } finally {
+        btn.disabled = false
+      }
+    })
+
+    async function buildAndDownloadBackup() {
+      // Fetch all data in parallel. For larger datasets we'd paginate;
+      // at current scale single SELECTs are fine.
+      log('backup', 'Fetching products, sales, stock_in, current_stock…')
+      const [productsRes, salesRes, stockInRes, currentStockRes] = await Promise.all([
+        supabase.from('products').select('*').order('id'),
+        supabase.from('sales').select('*').order('id'),
+        supabase.from('stock_in').select('*').order('id'),
+        supabase.from('current_stock').select('*').order('id'),
+      ])
+      if (productsRes.error) throw productsRes.error
+      if (salesRes.error) throw salesRes.error
+      if (stockInRes.error) throw stockInRes.error
+      if (currentStockRes.error) throw currentStockRes.error
+
+      const products = productsRes.data || []
+      const sales = salesRes.data || []
+      const stockIn = stockInRes.data || []
+      const currentStock = currentStockRes.data || []
+      log('backup', `Fetched products=${products.length} sales=${sales.length} stock_in=${stockIn.length} current_stock=${currentStock.length}`)
+
+      // Build product name lookup for the CSV joins
+      const productNames = {}
+      products.forEach(p => { productNames[p.id] = p.name })
+
+      const today = new Date().toISOString().slice(0, 10)  // YYYY-MM-DD
+      const timestampIso = new Date().toISOString()
+
+      // === Full JSON ===
+      const fullBackup = {
+        format: 'inventory-app-backup',
+        schema_version: 1,
+        backup_at: timestampIso,
+        backed_up_by: currentUser.email,
+        counts: {
+          products: products.length,
+          sales: sales.length,
+          stock_in: stockIn.length,
+          current_stock: currentStock.length,
+        },
+        data: { products, sales, stock_in: stockIn, current_stock: currentStock },
+      }
+      const fullJsonText = JSON.stringify(fullBackup, null, 2)
+
+      // === Products CSV ===
+      const productsCsv = buildCsv([
+        'id', 'name', 'notes', 'created_at', 'updated_at'
+      ], products.map(p => [
+        p.id, p.name, p.notes || '', p.created_at || '', p.updated_at || ''
+      ]))
+
+      // === Current stock CSV (calculated view) ===
+      const currentStockCsv = buildCsv([
+        'id', 'name', 'total_received', 'total_sold', 'current_quantity'
+      ], currentStock.map(s => [
+        s.id, s.name, s.total_received, s.total_sold, s.current_quantity
+      ]))
+
+      // === Sales CSV ===
+      const salesCsv = buildCsv([
+        'id', 'sold_at', 'product_id', 'product_name_current', 'freeform_name',
+        'quantity', 'sold_by', 'sold_by_display', 'source', 'external_ref',
+        'notes', 'edited', 'client_uuid', 'created_at', 'updated_at'
+      ], sales.map(s => [
+        s.id, s.sold_at, s.product_id || '', productNames[s.product_id] || '',
+        s.freeform_name || '', s.quantity, s.sold_by || '', s.sold_by_display || '',
+        s.source || '', s.external_ref || '', s.notes || '',
+        s.edited ? 'true' : 'false', s.client_uuid || '', s.created_at, s.updated_at
+      ]))
+
+      // === Stock_in CSV ===
+      const stockInCsv = buildCsv([
+        'id', 'received_at', 'product_id', 'product_name_current', 'quantity',
+        'received_by', 'received_by_display', 'source', 'notes',
+        'client_uuid', 'created_at', 'updated_at'
+      ], stockIn.map(s => [
+        s.id, s.received_at, s.product_id || '', productNames[s.product_id] || '',
+        s.quantity, s.received_by || '', s.received_by_display || '',
+        s.source || '', s.notes || '',
+        s.client_uuid || '', s.created_at, s.updated_at
+      ]))
+
+      // === Build ZIP ===
+      log('backup', 'Building ZIP…')
+      const zip = new JSZip()
+      zip.file(`inventory_backup_FULL_${today}.json`, fullJsonText)
+      zip.file(`products_${today}.csv`, productsCsv)
+      zip.file(`current_stock_${today}.csv`, currentStockCsv)
+      zip.file(`sales_${today}.csv`, salesCsv)
+      zip.file(`stock_in_${today}.csv`, stockInCsv)
+      // README so anyone opening the ZIP later knows what each file is
+      const readmeText =
+`Inventory App — Backup
+Created: ${timestampIso}
+Created by: ${currentUser.email}
+
+Files in this archive:
+
+  inventory_backup_FULL_${today}.json
+    Complete database snapshot. Contains the products catalog, all sales,
+    all stock_in events, and the current_stock summary, with all columns.
+    JSON format suitable for full disaster recovery (restore feature not
+    yet built in the app; manual re-import via SQL would be needed).
+
+  products_${today}.csv
+    The product catalog as a flat spreadsheet. One row per product with
+    its current name and notes.
+
+  current_stock_${today}.csv
+    Calculated current stock per product. Shows total received, total sold,
+    and the resulting in-stock quantity. This is a derived view, not raw
+    data — recomputable from sales and stock_in.
+
+  sales_${today}.csv
+    Sales as a flat spreadsheet. Includes the current product name joined
+    in for readability. Suitable for accounting, tax reports, or analysis
+    in Excel / LibreOffice / Google Sheets.
+
+  stock_in_${today}.csv
+    Stock receipts as a flat spreadsheet, same format as sales.
+
+Counts at backup time:
+  Products:      ${products.length}
+  Sales:         ${sales.length}
+  Stock_in:      ${stockIn.length}
+  Current_stock: ${currentStock.length} (computed view rows)
+
+This backup is a snapshot. If you continue using the app after this backup,
+new events will not be in this file. Re-download periodically.
+`
+      zip.file('README.txt', readmeText)
+
+      const blob = await zip.generateAsync({
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      })
+
+      const filename = `inventory_backup_${today}.zip`
+      triggerBrowserDownload(blob, filename)
+      log('backup', `Wrote ${filename} (${blob.size} bytes)`)
+      return { filename, size: blob.size }
+    }
+
+    // Build a CSV string from a header array and an array of row arrays.
+    // Handles quoting for cells containing commas, quotes, or newlines.
+    function buildCsv(headers, rows) {
+      const escape = v => {
+        if (v === null || v === undefined) return ''
+        const s = String(v)
+        if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+          return '"' + s.replace(/"/g, '""') + '"'
+        }
+        return s
+      }
+      const lines = [headers.map(escape).join(',')]
+      for (const row of rows) {
+        lines.push(row.map(escape).join(','))
+      }
+      return lines.join('\n')
+    }
+
+    // Trigger a download in the browser by creating a temporary anchor tag.
+    function triggerBrowserDownload(blob, filename) {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      // Free up the object URL after the browser has had time to start the download
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return `${bytes} bytes`
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+      return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+    }
+
+    // Periodic safety-net poll
+    setInterval(() => { if (currentUser) { log('auto-refresh', 'tick'); loadAll(false) } }, AUTO_REFRESH_INTERVAL_MS)
+
+    // Boot
+    checkSession()
+  </script>
+</body>
+</html>
