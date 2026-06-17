@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inventory — Stage 8</title>
+  <title>Inventory — V2.3</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
@@ -39,6 +39,12 @@
     }
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; }
+    /* Scroll lock: when any modal/overlay/drawer is visible, prevent the page from scrolling underneath. */
+    body:has(.confirm-modal.visible),
+    body:has(.import-modal.visible),
+    body:has(.settings-modal.visible),
+    body:has(.submit-overlay.visible),
+    body:has(#drawer.visible) { overflow: hidden; }
 
     /* ============ Login screen ============ */
     .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: var(--bg-elevated); }
@@ -54,9 +60,9 @@
     .login-error { color: var(--status-offline); font-size: 13px; min-height: 18px; }
     .password-wrap { position: relative; display: flex; }
     .password-wrap input { flex: 1; padding-right: 40px; }
-    .password-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: transparent !important; background-color: transparent !important; border: none !important; cursor: pointer; padding: 4px; margin: 0; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; line-height: 0; box-shadow: none !important; outline: none; }
+    .password-toggle { position: absolute; right: 1px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; background: transparent !important; background-color: transparent !important; border: none !important; cursor: pointer; padding: 0; margin: 0; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; line-height: 0; box-shadow: none !important; outline: none; }
     .password-toggle:hover, .password-toggle:focus, .password-toggle:active { color: var(--text); background: transparent !important; background-color: transparent !important; box-shadow: none !important; }
-    .password-toggle svg { width: 18px; height: 18px; display: block; }
+    .password-toggle svg { width: 20px; height: 20px; display: block; flex-shrink: 0; }
 
     /* ============ Main app ============ */
     .app-shell { display: none; }
@@ -64,7 +70,34 @@
 
     .header { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; z-index: 10; }
     .header h1 { font-size: 18px; font-weight: 600; margin: 0; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
     .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+    /* Hamburger button */
+    .hamburger-btn { background: transparent; border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 8px; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s ease; }
+    .hamburger-btn:hover { background: var(--bg-elevated); }
+    .hamburger-btn:focus { outline: none; box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.3); }
+    .hamburger-btn svg { width: 20px; height: 20px; display: block; }
+
+    /* Side drawer */
+    .drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 199; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+    .drawer-backdrop.visible { opacity: 1; pointer-events: auto; }
+    .drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 280px; max-width: 80vw; background: var(--bg); border-right: 1px solid var(--border); box-shadow: 2px 0 12px rgba(0,0,0,0.1); transform: translateX(-100%); transition: transform 0.25s ease; z-index: 200; display: flex; flex-direction: column; }
+    .drawer.visible { transform: translateX(0); }
+    .drawer-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .drawer-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+    .drawer-nav { display: flex; flex-direction: column; padding: 8px; gap: 2px; }
+    .drawer-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: transparent; border: none; border-radius: 8px; cursor: pointer; text-align: left; font-size: 15px; color: var(--text); transition: background 0.1s ease; font-family: inherit; }
+    .drawer-item:hover { background: var(--bg-elevated); }
+    .drawer-item.active { background: var(--id-matched-bg); color: var(--text); font-weight: 500; }
+    .drawer-item.active .drawer-label { color: #166534; }
+    .drawer-icon { font-size: 18px; line-height: 1; flex-shrink: 0; width: 24px; text-align: center; }
+    .drawer-label { flex: 1; }
+
+    /* Workspace containers */
+    .workspace { display: none; }
+    .workspace.active { display: block; }
+
     .user-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); padding: 4px 10px; background: var(--bg-elevated); border-radius: 16px; }
     .user-chip .user-name { color: var(--text); font-weight: 500; }
     .conn-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
@@ -88,10 +121,214 @@
     .panel.sale-panel { background: var(--bg-panel); }
     .panel.stockin-panel { background: var(--bg-panel-alt); border-bottom: 1px solid var(--border-orange); }
     .panel h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin: 0 0 12px 0; }
-    .sale-form { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 12px; align-items: start; }
-    .stockin-form { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr auto; gap: 12px; align-items: start; }
-    @media (max-width: 900px) { .stockin-form { grid-template-columns: 1fr 1fr; } .stockin-form .field-product { grid-column: span 2; } .stockin-form .field-submit { grid-column: span 2; } }
-    @media (max-width: 700px) { .sale-form { grid-template-columns: 1fr 1fr; } .sale-form .field-product { grid-column: span 2; } .sale-form .field-submit { grid-column: span 2; } }
+    /* ===== Form bubble (Log a Sale) — same card structure as history bubbles ===== */
+    .bubble.form-sale { max-width: 600px; margin: 0 auto; }
+    .bubble.form-sale::after { display: none; }
+    /* The saleRowsContainer wraps the dynamic rows in the DOM but must be
+       transparent to the grid layout so that .sale-row children participate
+       in the bubble-card's subgrid (grid-column: 1 / -1 won't work otherwise). */
+    .bubble.form-sale #saleRowsContainer { display: contents; }
+    .bubble.form-sale .bubble-card {
+      display: grid;
+      grid-template-columns: 72px 1fr 56px 70px 32px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 0.5px solid #c8c8c8;
+      width: 100%;
+      background: #ffffff;
+    }
+    .bubble.form-sale .bubble-row {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+    }
+    .bubble.form-sale .row-body { border-top: 0.5px solid #e8e8e8; }
+
+    /* Header row: gray gradient with black bold text */
+    .bubble.form-sale .row-header .bubble-cell {
+      background: linear-gradient(to right, #d8d8d8, #ececec);
+      color: #000 !important;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 4px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    /* Body rows: each is a sale-row with subgrid */
+    .bubble.form-sale .sale-row {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+      border-top: 0.5px solid #e8e8e8;
+    }
+    .bubble.form-sale .sale-row > * {
+      min-height: 38px;
+      display: flex;
+      align-items: stretch;
+    }
+
+    /* ID cell: color-coded by match state */
+    .bubble.form-sale .col-form-id {
+      background: #f8f8f8;
+      color: var(--text-faint);
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 11px;
+      align-items: center !important;
+      justify-content: center;
+      padding: 6px 4px;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      text-align: center;
+    }
+    .bubble.form-sale .col-form-id[data-state="matched"] {
+      background: var(--id-matched-bg);
+      color: var(--text);
+    }
+    .bubble.form-sale .col-form-id[data-state="freeform"] {
+      background: var(--id-freeform-bg);
+      color: var(--text);
+    }
+
+    /* Product input cell */
+    .bubble.form-sale .col-form-product {
+      position: relative;
+      padding: 0;
+      background: #ffffff;
+    }
+    .bubble.form-sale .col-form-product input {
+      width: 100%;
+      border: none;
+      background: transparent;
+      padding: 8px 10px;
+      font-size: 14px;
+      font-family: inherit;
+      color: inherit;
+      box-shadow: none;
+      outline: none;
+    }
+    .bubble.form-sale .col-form-product input::placeholder { font-style: italic; color: var(--text-faint); }
+    .bubble.form-sale .col-form-product input:focus { background: #fffef0; }
+
+    /* Stock readout cell: gray, italic, centered */
+    .bubble.form-sale .col-form-stock {
+      background: #fafafa;
+      color: var(--text-muted);
+      font-style: italic;
+      font-size: 13px;
+      align-items: center !important;
+      justify-content: center;
+      padding: 0 4px;
+      font-variant-numeric: tabular-nums;
+      user-select: none;
+    }
+
+    /* Qty input cell */
+    .bubble.form-sale .col-form-qty {
+      padding: 0;
+      background: #ffffff;
+    }
+    .bubble.form-sale .col-form-qty input {
+      width: 100%;
+      border: none;
+      background: transparent;
+      padding: 8px 4px;
+      font-size: 14px;
+      font-family: inherit;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      box-shadow: none;
+      outline: none;
+    }
+    .bubble.form-sale .col-form-qty input:focus { background: #fffef0; }
+    .bubble.form-sale .col-form-qty input::-webkit-outer-spin-button,
+    .bubble.form-sale .col-form-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .bubble.form-sale .col-form-qty input { -moz-appearance: textfield; }
+
+    /* X button cell */
+    .bubble.form-sale .col-form-x {
+      background: #fafafa;
+      align-items: center !important;
+      justify-content: center;
+      padding: 0;
+    }
+    .bubble.form-sale .remove-row-btn {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid #dc2626;
+      background: transparent;
+      color: #dc2626;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 600;
+    }
+    .bubble.form-sale .remove-row-btn:hover {
+      background: #dc2626;
+      color: #ffffff;
+      border-color: #dc2626;
+    }
+
+    /* + Add another product row */
+    .bubble.form-sale .row-add-button {
+      grid-column: 1 / -1 !important;
+      display: block !important;
+      border-top: 0.5px solid #e8e8e8;
+    }
+    .bubble.form-sale .add-row-btn {
+      width: 100%;
+      padding: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-family: inherit;
+      border-radius: 0;
+    }
+    .bubble.form-sale .add-row-btn:hover { background: #f5f5f5; color: var(--text); }
+    .bubble.form-sale .add-row-btn .plus-sign { font-size: 14px; line-height: 1; }
+
+    /* Feedback row */
+    .bubble.form-sale .row-feedback {
+      grid-column: 1 / -1 !important;
+      display: block !important;
+    }
+    .bubble.form-sale .row-feedback .form-feedback {
+      padding: 6px 14px;
+      margin: 0;
+      font-size: 12px;
+      min-height: 0;
+    }
+    .bubble.form-sale .row-feedback .form-feedback:empty { display: none; }
+
+    /* Footer row with Cancel + Submit */
+    .bubble.form-sale .row-form-footer {
+      grid-column: 1 / -1 !important;
+      display: flex !important;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 10px 12px;
+      background: #fafafa;
+      border-top: 0.5px solid #e8e8e8;
+      gap: 8px;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 600px) {
+      .bubble.form-sale .bubble-card { grid-template-columns: 60px 1fr 48px 56px 28px; }
+      .bubble.form-sale .col-form-id { font-size: 10px; }
+      .bubble.form-sale .col-form-stock { font-size: 12px; }
+    }
     .field { display: flex; flex-direction: column; gap: 4px; position: relative; }
     .field label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 500; }
     .field input, .field select { padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 14px; background: var(--bg); color: var(--text); font-family: inherit; }
@@ -101,6 +338,8 @@
     .id-readout { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--bg-elevated); color: var(--text-faint); min-height: 36px; display: flex; align-items: center; word-break: break-all; }
     .id-readout[data-state="matched"] { background: var(--id-matched-bg); border-color: var(--id-matched-border); color: var(--text); }
     .id-readout[data-state="freeform"] { background: var(--id-freeform-bg); border-color: var(--id-freeform-border); color: var(--text); }
+    .stock-readout { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--bg-elevated); color: var(--text-muted); min-height: 36px; display: flex; align-items: center; justify-content: flex-end; font-variant-numeric: tabular-nums; cursor: not-allowed; user-select: none; }
+    .stock-readout[data-state="empty"] { color: var(--text-faint); }
     .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; max-height: 240px; overflow-y: auto; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 6px; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 20; display: none; }
     .autocomplete-list.visible { display: block; }
     .autocomplete-item { padding: 8px 10px; cursor: pointer; font-size: 14px; border-bottom: 1px solid var(--bg-elevated); }
@@ -215,31 +454,150 @@
     .overlay-card .mini-spinner { width: 14px; height: 14px; border: 2px solid var(--bg-elevated); border-top-color: var(--text-muted); border-radius: 50%; animation: spin 1s linear infinite; }
     .activity-section { padding: 20px; border-top: 1px solid var(--border); }
     .activity-section h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin: 0 0 16px 0; }
-    .activity-list { display: flex; flex-direction: column; gap: 8px; }
-    .activity-row { display: grid; grid-template-columns: auto 2fr 1fr 1fr 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-sale-row); transition: background 0.1s ease; }
-    .activity-row.stockin { background: var(--bg-stockin-row); border-color: var(--border-orange); }
-    .activity-row:hover { background: var(--row-hover); }
-    .activity-row.stockin:hover { background: var(--row-hover-orange); }
-    .activity-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
-    .activity-label.sale { background: #dcfce7; color: #166534; }
-    .activity-label.stockin { background: #fed7aa; color: #9a3412; }
-    .activity-product { font-weight: 500; word-break: break-word; }
-    .activity-product .product-id { font-family: ui-monospace, monospace; font-size: 11px; color: var(--text-muted); display: block; }
-    .activity-product .freeform-flag { display: inline-block; font-size: 10px; padding: 1px 5px; background: var(--id-freeform-bg); color: var(--danger); border-radius: 3px; margin-left: 6px; font-weight: 600; vertical-align: middle; }
-    .activity-qty { font-variant-numeric: tabular-nums; font-weight: 500; }
-    .activity-person { font-size: 13px; color: var(--text-muted); }
-    .activity-when { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-    .activity-edited-mark { font-size: 10px; color: var(--text-faint); margin-left: 6px; font-style: italic; }
-    .activity-actions { display: flex; gap: 4px; }
-    .activity-row.editing { background: var(--bg-elevated); }
-    .activity-row.editing.stockin { background: var(--bg-panel-alt); }
-    .activity-edit-form { display: grid; grid-template-columns: 1fr 100px 120px auto; gap: 8px; align-items: center; width: 100%; grid-column: 2 / -1; }
-    .activity-edit-form input, .activity-edit-form select { padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; font-size: 13px; font-family: inherit; }
-    .activity-edit-form input:focus, .activity-edit-form select:focus { outline: none; border-color: var(--accent); }
+
+    /* Activity feed: centered linear feed of bubble-cards */
+    .activity-feed { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+
+    /* Day separator */
+    .day-separator { display: flex; align-items: center; gap: 12px; margin: 10px 0 6px; }
+    .day-separator .line { flex: 1; height: 0.5px; background: var(--border-strong); }
+    .day-separator .label { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Bubble card: subgrid layout with header / body / footer rows */
+    .bubble { position: relative; }
+    .bubble-card {
+      display: grid;
+      grid-template-columns: 72px minmax(160px, 1fr) 64px;
+      border-radius: 14px;
+      overflow: hidden;
+      width: 100%;
+      border: 0.5px solid;
+    }
+    @media (max-width: 600px) {
+      .bubble-card { grid-template-columns: 60px minmax(120px, 1fr) 56px; }
+    }
+    .bubble-row {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+    }
+    .bubble-row.row-body { border-top: 0.5px solid; }
+    .bubble-row.row-footer { grid-template-columns: 1fr; padding: 6px 14px; font-size: 12px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 0.5px solid; }
+    .bubble-cell { padding: 10px 14px; word-break: break-word; overflow-wrap: break-word; hyphens: auto; }
+    .bubble-cell.col-id { text-align: center; display: flex; align-items: center; justify-content: center; padding-left: 4px; padding-right: 4px; }
+    .bubble-cell.col-name { text-align: left; }
+    .bubble-cell.col-qty { text-align: center; display: flex; align-items: center; justify-content: center; padding-left: 4px; padding-right: 4px; }
+
+    /* Header row styling — pure black, regardless of bubble type */
+    .row-header .bubble-cell { font-size: 13px; font-weight: 600; padding-top: 8px; padding-bottom: 8px; white-space: nowrap; color: #000 !important; }
+
+    /* Body row content */
+    .row-body .bubble-cell.col-id span { font-size: 11px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; line-height: 1.4; overflow-wrap: anywhere; }
+    .row-body .bubble-cell.col-name span { font-size: 14px; color: #1a1a1a; line-height: 1.45; }
+    .row-body .bubble-cell.col-qty span { font-size: 14px; color: #1a1a1a; font-variant-numeric: tabular-nums; line-height: 1.45; }
+
+    /* Sale (green) coloring — slightly desaturated */
+    .bubble.sale .bubble-card { border-color: #b8d8c0; }
+    .bubble.sale .row-header .bubble-cell { background: linear-gradient(to right, #a3d4b3, #c5e1ce); }
+    .bubble.sale .row-body { border-top-color: #c5e1ce; }
+    .bubble.sale .row-body .bubble-cell { background: linear-gradient(to right, #e3efe8, #f3f9f5); }
+    .bubble.sale .row-body .col-id span { color: #4d7050; }
+    .bubble.sale .row-footer { border-top-color: #c5e1ce; background: linear-gradient(to right, #eef5f0, #ffffff); color: #5d8868; }
+
+    /* Stock-in (amber) coloring — slightly desaturated */
+    .bubble.stockin .bubble-card { border-color: #ebc499; }
+    .bubble.stockin .row-header .bubble-cell { background: linear-gradient(to right, #e3ad7d, #ebc7a0); }
+    .bubble.stockin .row-body { border-top-color: #ebc7a0; }
+    .bubble.stockin .row-body .bubble-cell { background: linear-gradient(to right, #f6e2cb, #fbf2e2); }
+    .bubble.stockin .row-body .col-id span { color: #94522a; }
+    .bubble.stockin .row-footer { border-top-color: #ebc7a0; background: linear-gradient(to right, #f7eddc, #ffffff); color: #a85f30; }
+
+    /* Footer */
+    .row-footer .meta-left { display: inline-flex; align-items: baseline; gap: 6px; }
+    .row-footer .person-name { font-weight: 700; color: #111827; }
+    .row-footer .meta-right { color: var(--text-muted); }
+    .row-footer .meta-right.edited { font-style: italic; }
+    .row-footer .meta-right.invoice { font-family: ui-monospace, monospace; }
+    .row-footer .freeform-flag { display: inline-block; font-size: 10px; padding: 1px 6px; background: var(--id-freeform-bg); color: var(--danger); border-radius: 3px; font-weight: 600; }
+
+    /* Action dropdown menu — opens via right-click (desktop) or long-press (mobile) */
+    .bubble-menu { position: absolute; background: #ffffff; border: 0.5px solid var(--border-strong); border-radius: 8px; padding: 4px; min-width: 140px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; display: none; }
+    .bubble-menu.visible { display: block; }
+    .bubble-menu-item { padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 8px; color: var(--text); white-space: nowrap; }
+    .bubble-menu-item:hover { background: var(--bg-elevated); }
+    .bubble-menu-item.danger { color: var(--danger); }
+
+    /* Long-press selected state (mobile) — WhatsApp-style outer highlight */
+    .bubble.selected::before { content: ''; position: absolute; inset: -8px -10px; background: rgba(59, 130, 246, 0.12); border-radius: 18px; z-index: -1; }
+
+    /* ===== Inline edit mode for history bubbles ===== */
+    /* Marching-ants animated dashed border around bubble in edit mode */
+    .bubble.editing { z-index: 2; }
+    .bubble.editing::before {
+      content: '';
+      position: absolute;
+      inset: -5px;
+      border-radius: 17px;
+      pointer-events: none;
+      background-image:
+        linear-gradient(90deg, #3b82f6 50%, transparent 50%),
+        linear-gradient(90deg, #3b82f6 50%, transparent 50%),
+        linear-gradient(0deg, #3b82f6 50%, transparent 50%),
+        linear-gradient(0deg, #3b82f6 50%, transparent 50%);
+      background-position: 0 0, 0 100%, 0 0, 100% 0;
+      background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+      background-size: 14px 2px, 14px 2px, 2px 14px, 2px 14px;
+      animation: marching-ants 0.6s infinite linear;
+    }
+    @keyframes marching-ants {
+      to { background-position: 14px 0, -14px 100%, 0 -14px, 100% 14px; }
+    }
+    /* Editable cell inputs */
+    .bubble.editing .row-body .col-qty input.cell-edit-input {
+      width: 100%;
+      max-width: 60px;
+      padding: 4px 2px;
+      border: 1px solid #3b82f6;
+      border-radius: 4px;
+      background: #ffffff;
+      font-size: 14px;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+      outline: none;
+    }
+    .bubble.editing .row-body .col-qty input.cell-edit-input::-webkit-outer-spin-button,
+    .bubble.editing .row-body .col-qty input.cell-edit-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .bubble.editing .row-footer input.cell-edit-input {
+      padding: 3px 6px;
+      border: 1px solid #3b82f6;
+      border-radius: 4px;
+      background: #ffffff;
+      font-size: 12px;
+      font-family: ui-monospace, monospace;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+      outline: none;
+      min-width: 100px;
+    }
+    /* Save/Cancel row at bottom of bubble during edit */
+    .bubble-row.row-edit-actions {
+      grid-column: 1 / -1 !important;
+      display: flex !important;
+      justify-content: flex-end !important;
+      gap: 8px;
+      padding: 8px 14px;
+      background: #ffffff;
+      border-top: 0.5px solid var(--border);
+    }
+    .bubble-row.row-edit-actions .btn { font-size: 13px; padding: 6px 14px; }
+
+    /* Inline edit form */
+    /* Empty + load-more */
     .activity-load-more { text-align: center; padding: 16px; color: var(--text-muted); font-size: 13px; }
     .activity-load-more.loading { display: flex; align-items: center; justify-content: center; gap: 8px; }
     .activity-load-more .mini-spinner { width: 12px; height: 12px; border: 2px solid var(--bg-elevated); border-top-color: var(--text-muted); border-radius: 50%; animation: spin 1s linear infinite; }
-    @media (max-width: 700px) { .activity-row { grid-template-columns: 1fr; gap: 6px; padding: 12px; } .activity-actions { justify-content: flex-end; } .activity-edit-form { grid-template-columns: 1fr; grid-column: 1 / -1; } }
+
     @media (max-width: 600px) { .header { padding: 10px 14px; } .header h1 { font-size: 16px; } .table-container { padding: 10px; } th, td { padding: 8px; font-size: 13px; } .panel { padding: 12px 14px; } .activity-section { padding: 12px 14px; } }
   </style>
 </head>
@@ -248,14 +606,12 @@
   <!-- ============ Login screen ============ -->
   <div class="login-screen" id="loginScreen">
     <div class="login-card">
-      <h1>Inventory</h1>
-      <p class="subtitle">Sign in to continue.</p>
       <form class="login-form" id="loginForm" onsubmit="return false;">
         <input type="email" id="loginEmail" placeholder="Email" autocomplete="username" required>
         <div class="password-wrap">
           <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required>
           <button type="button" class="password-toggle" id="passwordToggle" aria-label="Show password" title="Show password">
-            <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg id="eyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
@@ -270,7 +626,12 @@
   <!-- ============ Main app (hidden until logged in) ============ -->
   <div class="app-shell" id="appShell">
     <header class="header">
-      <h1>Inventory — Current Stock</h1>
+      <div class="header-left">
+        <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu" onclick="window.openDrawer()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 id="workspaceTitle">New Sale</h1>
+      </div>
       <div class="header-right">
         <span class="user-chip">
           Signed in as <span class="user-name" id="userName">…</span>
@@ -286,64 +647,121 @@
       </div>
     </header>
 
-    <section class="panel sale-panel">
-      <h2>Log a Sale</h2>
-      <div class="sale-form">
-        <div class="field field-product">
-          <label for="saleProductInput">Product (type to search)</label>
-          <input type="text" id="saleProductInput" autocomplete="off" placeholder="Start typing product name…">
-          <div class="autocomplete-list" id="saleAcList"></div>
+    <!-- ============ Workspace: New Sale ============ -->
+    <div class="workspace" data-workspace="newsale">
+      <section class="activity-section">
+        <div class="bubble form-sale">
+          <div class="bubble-card">
+            <div class="bubble-row row-header">
+              <div class="bubble-cell">ID</div>
+              <div class="bubble-cell">Product</div>
+              <div class="bubble-cell">Stock</div>
+              <div class="bubble-cell">Qty</div>
+              <div class="bubble-cell"></div>
+            </div>
+            <div id="saleRowsContainer"></div>
+            <div class="row-add-button">
+              <button class="add-row-btn" id="addSaleRowBtn" type="button">
+                <span class="plus-sign">+</span> Add another product
+              </button>
+            </div>
+            <div class="row-feedback">
+              <div class="form-feedback" id="saleFeedback"></div>
+            </div>
+            <div class="row-form-footer">
+              <button class="btn secondary" id="cancelSaleBtn" type="button">Cancel</button>
+              <button class="btn" id="logSaleBtn" onclick="submitSale()">Log Sale</button>
+            </div>
+          </div>
         </div>
-        <div class="field">
-          <label>ID</label>
-          <div class="id-readout" id="saleIdReadout" data-state="empty">—</div>
-        </div>
-        <div class="field">
-          <label for="saleQtyInput">Quantity</label>
-          <input type="number" id="saleQtyInput" min="1" step="1">
-        </div>
-        <div class="field field-submit" style="justify-content: flex-end;">
-          <label style="visibility: hidden;">&nbsp;</label>
-          <button class="btn" id="logSaleBtn" onclick="submitSale()">Log Sale</button>
-        </div>
-      </div>
-      <div class="form-feedback" id="saleFeedback"></div>
-    </section>
+      </section>
+    </div>
 
-    <section class="panel stockin-panel">
-      <h2>Receive Stock</h2>
-      <div class="stockin-form">
-        <div class="field field-product">
-          <label for="stockProductInput">Product (type to search)</label>
-          <input type="text" id="stockProductInput" autocomplete="off" placeholder="Start typing product name…">
-          <div class="autocomplete-list" id="stockAcList"></div>
+    <!-- ============ Workspace: Current Stock ============ -->
+    <div class="workspace" data-workspace="stock">
+      <main class="table-container" id="mainContent">
+        <div class="state-message" id="loadingState">Loading…</div>
+        <div class="stock-overlay" id="stockOverlay">
+          <div class="overlay-card">
+            <div class="mini-spinner"></div>
+            <span id="stockOverlayMsg">Loading…</span>
+          </div>
         </div>
-        <div class="field">
-          <label>ID</label>
-          <div class="id-readout" id="stockIdReadout" data-state="empty">—</div>
+      </main>
+    </div>
+
+    <!-- ============ Workspace: Sales History ============ -->
+    <div class="workspace" data-workspace="history">
+      <section class="activity-section">
+        <div class="activity-load-more" id="activityLoadMore"></div>
+        <div class="activity-feed" id="activityFeed"></div>
+      </section>
+    </div>
+
+    <!-- ============ Workspace: Actions ============ -->
+    <div class="workspace" data-workspace="actions">
+      <section class="panel stockin-panel">
+        <h2>Receive Stock</h2>
+        <div class="stockin-form">
+          <div class="field field-product">
+            <label for="stockProductInput">Product (type to search)</label>
+            <input type="text" id="stockProductInput" autocomplete="off" placeholder="Start typing product name…">
+            <div class="autocomplete-list" id="stockAcList"></div>
+          </div>
+          <div class="field">
+            <label>ID</label>
+            <div class="id-readout" id="stockIdReadout" data-state="empty">—</div>
+          </div>
+          <div class="field">
+            <label for="stockQtyInput">Quantity</label>
+            <input type="number" id="stockQtyInput" min="1" step="1">
+          </div>
+          <div class="field">
+            <label for="stockSourceInput">Invoice / source</label>
+            <input type="text" id="stockSourceInput" placeholder="e.g. INV-1234">
+          </div>
+          <div class="field field-submit" style="justify-content: flex-end;">
+            <label style="visibility: hidden;">&nbsp;</label>
+            <button class="btn orange" id="logStockBtn" onclick="submitStockIn()">Receive</button>
+          </div>
         </div>
-        <div class="field">
-          <label for="stockQtyInput">Quantity</label>
-          <input type="number" id="stockQtyInput" min="1" step="1">
+        <div class="form-feedback" id="stockFeedback"></div>
+        <div class="import-row">
+          <input type="file" id="importFile" accept=".csv,.tsv,.xlsx,.xls,.ods" style="display:none">
+          <button class="btn secondary small" id="importBtn" onclick="document.getElementById('importFile').click()">
+            📥 Import from spreadsheet (.csv .xlsx .ods)
+          </button>
+          <span class="import-help">Bulk-add stock from a supplier invoice file</span>
         </div>
-        <div class="field">
-          <label for="stockSourceInput">Invoice / source</label>
-          <input type="text" id="stockSourceInput" placeholder="e.g. INV-1234">
-        </div>
-        <div class="field field-submit" style="justify-content: flex-end;">
-          <label style="visibility: hidden;">&nbsp;</label>
-          <button class="btn orange" id="logStockBtn" onclick="submitStockIn()">Receive</button>
-        </div>
+      </section>
+    </div>
+
+    <!-- ============ Side drawer (workspace nav) ============ -->
+    <div class="drawer-backdrop" id="drawerBackdrop" onclick="window.closeDrawer()"></div>
+    <aside class="drawer" id="drawer" aria-label="Workspace navigation">
+      <div class="drawer-header">
+        <span class="drawer-title">Workspaces</span>
+        <button class="btn secondary small" onclick="window.closeDrawer()" aria-label="Close menu">✕</button>
       </div>
-      <div class="form-feedback" id="stockFeedback"></div>
-      <div class="import-row">
-        <input type="file" id="importFile" accept=".csv,.tsv,.xlsx,.xls,.ods" style="display:none">
-        <button class="btn secondary small" id="importBtn" onclick="document.getElementById('importFile').click()">
-          📥 Import from spreadsheet (.csv .xlsx .ods)
+      <nav class="drawer-nav">
+        <button class="drawer-item" data-workspace="newsale" onclick="window.switchWorkspace('newsale')">
+          <span class="drawer-icon">🛒</span>
+          <span class="drawer-label">New Sale</span>
         </button>
-        <span class="import-help">Bulk-add stock from a supplier invoice file</span>
-      </div>
-    </section>
+        <button class="drawer-item" data-workspace="stock" onclick="window.switchWorkspace('stock')">
+          <span class="drawer-icon">📊</span>
+          <span class="drawer-label">Current Stock</span>
+        </button>
+        <button class="drawer-item" data-workspace="history" onclick="window.switchWorkspace('history')">
+          <span class="drawer-icon">🕒</span>
+          <span class="drawer-label">Sales History</span>
+        </button>
+        <button class="drawer-item" data-workspace="actions" onclick="window.switchWorkspace('actions')">
+          <span class="drawer-icon">⚙️</span>
+          <span class="drawer-label">Actions</span>
+        </button>
+      </nav>
+    </aside>
 
     <!-- ============ Import preview modal ============ -->
     <div class="import-modal" id="importModal">
@@ -447,21 +865,16 @@
       </div>
     </div>
 
-    <main class="table-container" id="mainContent">
-      <div class="state-message" id="loadingState">Loading…</div>
-      <div class="stock-overlay" id="stockOverlay">
-        <div class="overlay-card">
-          <div class="mini-spinner"></div>
-          <span id="stockOverlayMsg">Loading…</span>
+    <div class="confirm-modal" id="confirmYesNoModal">
+      <div class="confirm-card">
+        <h3 id="confirmYesNoTitle">Confirm?</h3>
+        <p id="confirmYesNoMessage">Are you sure?</p>
+        <div class="confirm-actions">
+          <button class="btn secondary" id="confirmYesNoNoBtn">No</button>
+          <button class="btn" id="confirmYesNoYesBtn">Yes</button>
         </div>
       </div>
-    </main>
-
-    <section class="activity-section">
-      <h2>Recent Activity</h2>
-      <div class="activity-list" id="activityList"></div>
-      <div class="activity-load-more" id="activityLoadMore"></div>
-    </section>
+    </div>
   </div>
 
   <script type="module">
@@ -543,6 +956,8 @@
       document.getElementById('loginScreen').style.display = 'none'
       document.getElementById('appShell').classList.add('visible')
       document.getElementById('userName').textContent = displayName(currentUser.email)
+      // Initialize workspace navigation
+      initWorkspace()
       // Now that we're authenticated, load the data
       loadAll(false)
       setupRealtime()
@@ -687,6 +1102,11 @@
         updateLastUpdatedDisplay()
         renderStock(stockRes.data)
         hideStockOverlay()
+        // If any product is currently selected on any sale-form row, refresh its stock readout
+        // to reflect changes from other users (Realtime) or background polls.
+        Object.values(saleRowAutocompletes).forEach(ac => {
+          if (ac && ac.refreshStock) ac.refreshStock()
+        })
         await reloadActivity()
       } catch (err) {
         log('error', 'Load failed', err)
@@ -753,19 +1173,37 @@
     }
 
     async function reloadActivity() {
+      // Don't disturb an active edit — if user is mid-edit, skip this refresh
+      // so their typed input isn't wiped. Will refresh after they save/cancel.
+      if (editingRow !== null) {
+        log('activity', 'reloadActivity skipped — edit in progress')
+        return
+      }
+      // Determine whether user is currently at/near the bottom of the feed.
+      // If so, we'll auto-scroll to the new bottom after reloading.
+      const wasAtBottom = isNearBottom()
       activityRows = []
       activityHasMore = true
       editingRow = null
-      await loadMoreActivity()
+      await loadMoreActivity({ initial: true, scrollToBottom: wasAtBottom })
     }
 
-    async function loadMoreActivity() {
+    function isNearBottom() {
+      const scrollFromBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight
+      return scrollFromBottom < 100
+    }
+
+    // Pagination: API gives newest first (DESC). We store in activityRows ordered newest-first too.
+    // For rendering we reverse so display is oldest-first (latest at bottom).
+    async function loadMoreActivity({ initial = false, scrollToBottom = true } = {}) {
       if (!currentUser) return
       if (activityLoading || !activityHasMore) return
       activityLoading = true
       const loadMoreEl = document.getElementById('activityLoadMore')
       loadMoreEl.className = 'activity-load-more loading'
       loadMoreEl.innerHTML = `<div class="mini-spinner"></div><span>Loading more…</span>`
+      // Remember scroll position before adding older items so we can restore visual position
+      const prevScrollHeight = document.documentElement.scrollHeight
       try {
         const offset = activityRows.length
         const { data, error } = await supabase
@@ -778,6 +1216,18 @@
         activityRows = activityRows.concat(data)
         log('activity', `Loaded ${data.length} more, total ${activityRows.length}, hasMore=${activityHasMore}`)
         renderActivity()
+        // After first/reload load: scroll to bottom if user wants to follow (was at bottom)
+        // After older-load: maintain scroll position relative to newly-prepended content
+        if (initial) {
+          if (scrollToBottom) {
+            requestAnimationFrame(() => { window.scrollTo({ top: document.documentElement.scrollHeight }) })
+          }
+        } else {
+          requestAnimationFrame(() => {
+            const newScrollHeight = document.documentElement.scrollHeight
+            window.scrollBy({ top: newScrollHeight - prevScrollHeight })
+          })
+        }
       } catch (err) {
         log('error', 'Activity load failed', err)
         loadMoreEl.className = 'activity-load-more'
@@ -787,120 +1237,337 @@
       }
     }
     window.retryActivity = () => loadMoreActivity()
+    window.loadMoreActivityClick = () => loadMoreActivity()
+
+    // Date helpers
+    function dayKey(iso) {
+      const d = new Date(iso)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    function dayLabel(iso) {
+      const d = new Date(iso)
+      const now = new Date()
+      const sameDay = d.toDateString() === now.toDateString()
+      const yest = new Date(now); yest.setDate(now.getDate() - 1)
+      const isYest = d.toDateString() === yest.toDateString()
+      const month = d.toLocaleString('en', { month: 'long' })
+      const day = d.getDate()
+      const sameYear = d.getFullYear() === now.getFullYear()
+      // Year first when not current year, e.g. "2025 June 15"
+      const dateStr = sameYear ? `${month} ${day}` : `${d.getFullYear()} ${month} ${day}`
+      if (sameDay) return `Today · ${dateStr}`
+      if (isYest) return `Yesterday · ${dateStr}`
+      return dateStr
+    }
+    function formatHM(iso) {
+      const d = new Date(iso)
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+    // Insert <wbr> tags after natural break characters in an ID.
+    // The browser prefers these break points before falling back to
+    // mid-string breaks via overflow-wrap: anywhere.
+    // Safe vs XSS: escapeHtml first, then add literal <wbr> tags.
+    function softBreakId(id) {
+      if (!id) return ''
+      return escapeHtml(id).replace(/([-/._\\])/g, '$1<wbr>')
+    }
+    function formatDateLong(iso) {
+      const d = new Date(iso)
+      const now = new Date()
+      const month = d.toLocaleString('en', { month: 'long' })
+      const day = d.getDate()
+      const sameYear = d.getFullYear() === now.getFullYear()
+      // Year first when not current year
+      return sameYear ? `${month} ${day}` : `${d.getFullYear()} ${month} ${day}`
+    }
+    // QTY column shows just numbers — no suffix (header label already says "Qty")
+    const QTY_SUFFIX = ''
 
     function renderActivity() {
-      const listEl = document.getElementById('activityList')
+      const feedEl = document.getElementById('activityFeed')
       const loadMoreEl = document.getElementById('activityLoadMore')
       if (activityRows.length === 0) {
-        listEl.innerHTML = `<div class="state-message">No activity yet.</div>`
+        feedEl.innerHTML = `<div class="state-message">No activity yet.</div>`
         loadMoreEl.className = 'activity-load-more'
         loadMoreEl.innerHTML = ''
         return
       }
-      listEl.innerHTML = activityRows.map(r => renderActivityRow(r)).join('')
-      listEl.querySelectorAll('[data-action="edit"]').forEach(btn => {
-        btn.addEventListener('click', () => startEdit(btn.dataset.eventType, parseInt(btn.dataset.eventId, 10)))
-      })
-      listEl.querySelectorAll('[data-action="delete"]').forEach(btn => {
-        btn.addEventListener('click', () => confirmDelete(btn.dataset.eventType, parseInt(btn.dataset.eventId, 10)))
-      })
-      listEl.querySelectorAll('[data-action="save-edit"]').forEach(btn => {
-        btn.addEventListener('click', () => saveEdit(btn.dataset.eventType, parseInt(btn.dataset.eventId, 10)))
-      })
-      listEl.querySelectorAll('[data-action="cancel-edit"]').forEach(btn => {
-        btn.addEventListener('click', () => { editingRow = null; renderActivity() })
-      })
+      // Reverse to oldest-first for display (latest at bottom)
+      const ordered = activityRows.slice().reverse()
+      // Group by day
+      const days = []
+      let currentDay = null
+      for (const r of ordered) {
+        const k = dayKey(r.event_at)
+        if (!currentDay || currentDay.key !== k) {
+          currentDay = { key: k, label: dayLabel(r.event_at), rows: [] }
+          days.push(currentDay)
+        }
+        currentDay.rows.push(r)
+      }
+      // Render
+      const html = days.map(d => `
+        <div class="day-separator">
+          <div class="line"></div>
+          <span class="label">${escapeHtml(d.label)}</span>
+          <div class="line"></div>
+        </div>
+        ${d.rows.map(r => renderBubble(r)).join('')}
+      `).join('')
+      feedEl.innerHTML = html
+      attachBubbleHandlers()
+      // Load-more / end-marker label at the TOP
       loadMoreEl.className = 'activity-load-more'
       if (activityHasMore) {
-        loadMoreEl.innerHTML = `<button class="btn secondary small" onclick="window.loadMoreActivityClick()">Load more</button>`
+        loadMoreEl.innerHTML = `<button class="btn secondary small" onclick="window.loadMoreActivityClick()">Load older</button>`
       } else {
-        loadMoreEl.innerHTML = `<span style="color: var(--text-faint);">— End of activity —</span>`
+        loadMoreEl.innerHTML = `<span style="color: var(--text-faint);">— Beginning of history —</span>`
       }
     }
-    window.loadMoreActivityClick = () => loadMoreActivity()
 
-    function renderActivityRow(r) {
+    function renderBubble(r) {
       const isStockIn = r.event_type === 'stock_in'
-      const isEditing = editingRow && editingRow.event_type === r.event_type && editingRow.event_id === r.event_id
-      const rowClass = isStockIn ? 'activity-row stockin' : 'activity-row'
-      if (isEditing) return renderActivityRowEditing(r)
-      const labelClass = isStockIn ? 'activity-label stockin' : 'activity-label sale'
-      const labelText = isStockIn ? 'STOCK IN' : 'SALE'
-      const productHtml = r.product_id
-        ? `${escapeHtml(r.product_name)}<span class="product-id">${escapeHtml(r.product_id)}</span>`
-        : `${escapeHtml(r.freeform_name || '?')}<span class="freeform-flag">freeform</span><span class="product-id">no ID</span>`
-      const editedMark = r.edited ? `<span class="activity-edited-mark">edited</span>` : ''
-      const sourceText = isStockIn && r.source ? ` · ${escapeHtml(r.source)}` : ''
+      const isEditing = editingRow && editingRow.group_id === r.group_id
+      let klass = isStockIn ? 'bubble stockin' : 'bubble sale'
+      if (isEditing) klass += ' editing'
+      const qtyPrefix = isStockIn ? '+' : ''
+      const personName = rowDisplayName(r) || ''
+      const eventTime = formatHM(r.event_at)
+      const eventDate = formatDateLong(r.event_at)
+      let metaRight = ''
+      if (isStockIn) {
+        if (isEditing) {
+          // Source becomes editable in edit mode
+          metaRight = `<input type="text" class="cell-edit-input" data-edit-source value="${escapeHtml(r.source || '')}" placeholder="Source / invoice">`
+        } else if (r.source) {
+          metaRight = `<span class="meta-right invoice">${escapeHtml(r.source)}</span>`
+        }
+      } else {
+        // Sale: show "edited" indicator if any item has been edited
+        const editedItem = (r.items || []).find(it => it.edited && it.updated_at)
+        if (editedItem) {
+          const editTime = formatHM(editedItem.updated_at)
+          const editDate = formatDateLong(editedItem.updated_at)
+          metaRight = `<span class="meta-right edited">edited · ${editTime} — ${editDate}</span>`
+        }
+      }
+      const items = r.items || []
+      const bodyRows = items.length > 0
+        ? items.map(item => renderItemBodyRow(item, isEditing, qtyPrefix)).join('')
+        : `<div class="bubble-row row-body bubble-row-empty"><div class="bubble-cell" style="grid-column: 1 / -1; text-align: center; color: var(--text-faint); font-style: italic; padding: 14px;">(empty bubble)</div></div>`
+      // Edit-action buttons appear at the bottom of the bubble in edit mode
+      const editActions = isEditing
+        ? `<div class="bubble-row row-edit-actions">
+            <button class="btn secondary small" data-action="cancel-edit">Cancel</button>
+            <button class="btn small" data-action="save-edit" data-group-id="${escapeHtml(r.group_id)}">Save</button>
+          </div>`
+        : ''
       return `
-        <div class="${rowClass}">
-          <span class="${labelClass}">${labelText}</span>
-          <div class="activity-product">${productHtml}${editedMark}</div>
-          <div class="activity-qty">${isStockIn ? '+' : '−'}${r.quantity}</div>
-          <div class="activity-person">${escapeHtml(rowDisplayName(r))}${sourceText}</div>
-          <div class="activity-when">${formatTime(r.event_at)}</div>
-          <div class="activity-actions">
-            <button class="btn small secondary" data-action="edit" data-event-type="${r.event_type}" data-event-id="${r.event_id}">Edit</button>
-            <button class="btn small danger" data-action="delete" data-event-type="${r.event_type}" data-event-id="${r.event_id}">Delete</button>
+        <div class="${klass}" data-group-id="${escapeHtml(r.group_id)}" data-event-type="${r.event_type}" data-legacy-event-id="${r.legacy_event_id || ''}">
+          <div class="bubble-card">
+            <div class="bubble-row row-header">
+              <div class="bubble-cell col-id">ID</div>
+              <div class="bubble-cell col-name">Name</div>
+              <div class="bubble-cell col-qty">Qty</div>
+            </div>
+            ${bodyRows}
+            <div class="bubble-row row-footer">
+              <span class="meta-left">
+                <span class="person-name">${escapeHtml(personName)}</span>
+                <span>${eventTime} — ${eventDate}</span>
+              </span>
+              ${metaRight}
+            </div>
+            ${editActions}
           </div>
         </div>`
     }
 
-    function renderActivityRowEditing(r) {
-      const isStockIn = r.event_type === 'stock_in'
-      const rowClass = isStockIn ? 'activity-row stockin editing' : 'activity-row editing'
-      const labelClass = isStockIn ? 'activity-label stockin' : 'activity-label sale'
-      const labelText = isStockIn ? 'STOCK IN' : 'SALE'
-      const productDisplay = r.product_id
-        ? `${escapeHtml(r.product_name)} (${escapeHtml(r.product_id)})`
-        : escapeHtml(r.freeform_name || '?')
-      const qtyFieldId = `edit-qty-${r.event_id}`
-      const sourceFieldId = `edit-source-${r.event_id}`
-      // Person field is read-only — shows who originally logged it, can't be changed.
-      // (Auth-aware UX: edits don't transfer ownership.)
+    // Renders ONE body row inside a bubble for a single line item.
+    // When isEditing is true, the qty cell becomes an editable input.
+    function renderItemBodyRow(item, isEditing, qtyPrefix) {
+      const idDisplay = item.product_id || ''
+      const nameDisplay = item.product_id
+        ? escapeHtml(item.product_name)
+        : `${escapeHtml(item.freeform_name || '?')} <span class="freeform-flag">freeform</span>`
+      const qtyCellContent = isEditing
+        ? `<input type="number" class="cell-edit-input" data-edit-qty data-row-id="${item.row_id}" min="0" step="1" value="${item.quantity}">`
+        : `<span>${qtyPrefix}${escapeHtml(String(item.quantity))}</span>`
       return `
-        <div class="${rowClass}">
-          <span class="${labelClass}">${labelText}</span>
-          <div class="activity-edit-form">
-            <div style="font-size:13px;color:var(--text-muted);">
-              ${productDisplay}
-              <div style="font-size:11px;color:var(--text-faint);">Product cannot be changed here (delete + re-add if needed).</div>
-            </div>
-            <input type="number" min="1" step="1" id="${qtyFieldId}" value="${r.quantity}" placeholder="Qty">
-            <div style="font-size:12px;color:var(--text-muted);">by ${escapeHtml(rowDisplayName(r))}</div>
-            ${isStockIn ? `<input type="text" id="${sourceFieldId}" value="${escapeHtml(r.source || '')}" placeholder="Source/invoice">` : ''}
-            <div style="display:flex;gap:6px;">
-              <button class="btn small" data-action="save-edit" data-event-type="${r.event_type}" data-event-id="${r.event_id}">Save</button>
-              <button class="btn small secondary" data-action="cancel-edit">Cancel</button>
-            </div>
-          </div>
+        <div class="bubble-row row-body" data-row-id="${item.row_id}">
+          <div class="bubble-cell col-id"><span>${softBreakId(idDisplay) || '—'}</span></div>
+          <div class="bubble-cell col-name"><span>${nameDisplay}</span></div>
+          <div class="bubble-cell col-qty">${qtyCellContent}</div>
         </div>`
     }
 
-    function startEdit(eventType, eventId) {
-      editingRow = { event_type: eventType, event_id: eventId }
+    // ===== Bubble interactions: hover-3-dot (desktop) + long-press (mobile) =====
+    let openMenu = null  // { bubbleEl, menuEl }
+    let longPressTimer = null
+    let longPressFired = false
+    const LONG_PRESS_MS = 500
+
+    function closeBubbleMenu() {
+      if (openMenu) {
+        if (openMenu.menuEl && openMenu.menuEl.parentElement) openMenu.menuEl.parentElement.removeChild(openMenu.menuEl)
+        if (openMenu.bubbleEl) openMenu.bubbleEl.classList.remove('selected', 'menu-open')
+        openMenu = null
+      }
+    }
+
+    function openBubbleMenu(bubbleEl, anchor) {
+      closeBubbleMenu()
+      const groupId = bubbleEl.dataset.groupId
+      const eventType = bubbleEl.dataset.eventType
+      const menu = document.createElement('div')
+      menu.className = 'bubble-menu visible'
+      menu.innerHTML = `
+        <div class="bubble-menu-item" data-action="edit"><i style="font-style:normal;">✏️</i> Edit</div>
+        <div class="bubble-menu-item danger" data-action="delete"><i style="font-style:normal;">🗑️</i> Delete</div>
+      `
+      // Position relative to bubble: place near the anchor (point coords or element rect)
+      let top, left
+      if (anchor && typeof anchor.x === 'number') {
+        top = anchor.y + 4
+        left = anchor.x
+      } else if (anchor instanceof HTMLElement) {
+        const rect = anchor.getBoundingClientRect()
+        top = rect.bottom + 4
+        left = rect.left
+      } else {
+        const rect = bubbleEl.getBoundingClientRect()
+        top = rect.bottom + 4
+        left = rect.left
+      }
+      menu.style.position = 'fixed'
+      menu.style.top = `${Math.min(top, window.innerHeight - 100)}px`
+      menu.style.left = `${Math.min(left, window.innerWidth - 160)}px`
+      document.body.appendChild(menu)
+      bubbleEl.classList.add('menu-open', 'selected')
+      openMenu = { bubbleEl, menuEl: menu }
+      menu.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
+        e.stopPropagation()
+        closeBubbleMenu()
+        startEdit(groupId)
+      })
+      menu.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+        e.stopPropagation()
+        closeBubbleMenu()
+        confirmDelete(groupId)
+      })
+    }
+
+    function attachBubbleHandlers() {
+      const feedEl = document.getElementById('activityFeed')
+      feedEl.querySelectorAll('.bubble').forEach(bubble => {
+        bubble.addEventListener('contextmenu', (e) => {
+          e.preventDefault()
+          openBubbleMenu(bubble, { x: e.clientX, y: e.clientY })
+        })
+        bubble.addEventListener('touchstart', (e) => {
+          longPressFired = false
+          clearTimeout(longPressTimer)
+          const touch = e.touches[0]
+          const touchX = touch.clientX
+          const touchY = touch.clientY
+          longPressTimer = setTimeout(() => {
+            longPressFired = true
+            if (navigator.vibrate) try { navigator.vibrate(15) } catch (_) {}
+            openBubbleMenu(bubble, { x: touchX, y: touchY })
+          }, LONG_PRESS_MS)
+        }, { passive: true })
+        bubble.addEventListener('touchend', () => { clearTimeout(longPressTimer) }, { passive: true })
+        bubble.addEventListener('touchmove', () => { clearTimeout(longPressTimer) }, { passive: true })
+        bubble.addEventListener('touchcancel', () => { clearTimeout(longPressTimer) }, { passive: true })
+      })
+      feedEl.querySelectorAll('[data-action="save-edit"]').forEach(btn => {
+        btn.addEventListener('click', () => saveEdit(btn.dataset.groupId))
+      })
+      feedEl.querySelectorAll('[data-action="cancel-edit"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const ok = await confirmYesNo('Discard your changes to this bubble?', {
+            title: 'Discard changes?', okLabel: 'Discard', cancelLabel: 'Keep editing'
+          })
+          if (!ok) return
+          editingRow = null
+          renderActivity()
+        })
+      })
+    }
+    // Global click handler: close any open bubble menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (openMenu && !e.target.closest('.bubble-menu')) {
+        closeBubbleMenu()
+      }
+    })
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && openMenu) closeBubbleMenu()
+    })
+
+    function startEdit(groupId) {
+      editingRow = { group_id: groupId }
       renderActivity()
     }
 
-    async function saveEdit(eventType, eventId) {
+    // Find a bubble (group) in activityRows by its group_id.
+    function findBubble(groupId) {
+      return activityRows.find(r => r.group_id === groupId)
+    }
+    // Determine if a group_id is a virtual legacy one (pre-V2.3) or a real group.
+    function isLegacyGroupId(groupId) {
+      return typeof groupId === 'string' && groupId.startsWith('legacy-')
+    }
+
+    async function saveEdit(groupId) {
       if (!isOnline) { alert('No connection — cannot save edit right now.'); return }
-      const qtyEl = document.getElementById(`edit-qty-${eventId}`)
-      const sourceEl = document.getElementById(`edit-source-${eventId}`)
-      const newQty = parseInt(qtyEl.value, 10)
-      const newSource = sourceEl ? sourceEl.value.trim() : null
-      if (!newQty || newQty < 1) { alert('Quantity must be 1 or more.'); return }
-      log(eventType, `Saving edit for ${eventType} ${eventId}`, { newQty, newSource })
+      const bubble = findBubble(groupId)
+      if (!bubble) { alert('Could not find this bubble in the current view.'); return }
+      // Read inputs directly from the bubble's inline edit cells.
+      const bubbleEl = document.querySelector(`.bubble[data-group-id="${CSS.escape(groupId)}"]`)
+      if (!bubbleEl) { alert('Bubble element not found.'); return }
+      const qtyInputs = bubbleEl.querySelectorAll('[data-edit-qty]')
+      const newQtyByRow = {}
+      for (const inp of qtyInputs) {
+        const rowId = parseInt(inp.dataset.rowId, 10)
+        const q = parseInt(inp.value, 10)
+        if (isNaN(q) || q < 0) { alert('Quantity must be 0 or more.'); return }
+        newQtyByRow[rowId] = q
+      }
+      // Source (stock-in only)
+      const sourceInp = bubbleEl.querySelector('[data-edit-source]')
+      const newSource = sourceInp ? sourceInp.value.trim() : null
+      const isStockIn = bubble.event_type === 'stock_in'
+      const isLegacy = isLegacyGroupId(groupId)
+      log(bubble.event_type, `Saving edit for ${bubble.event_type} bubble ${groupId}`, { newQtyByRow, newSource, isLegacy })
       showSubmitOverlay('Saving changes…')
       try {
-        let update = { quantity: newQty }
-        if (eventType === 'sale') {
-          update.edited = true
-        } else {
-          if (newSource !== null) update.source = newSource || null
+        // 1) Update each line-item row's quantity
+        const rowTable = isStockIn ? 'stock_in' : 'sales'
+        for (const [rowIdStr, newQty] of Object.entries(newQtyByRow)) {
+          const rowId = parseInt(rowIdStr, 10)
+          const update = { quantity: newQty }
+          // Mark the sale row as edited (sales has this field; stock_in does not)
+          if (!isStockIn) update.edited = true
+          const { error } = await supabase.from(rowTable).update(update).eq('id', rowId)
+          if (error) throw error
         }
-        const { error } = await supabase.from(eventType === 'sale' ? 'sales' : 'stock_in')
-          .update(update).eq('id', eventId)
-        if (error) throw error
-        log(eventType, 'Edit saved')
+        // 2) Update source on stock-in: either on the group (if real group) or on the row (if legacy)
+        if (isStockIn && sourceInp) {
+          const srcValue = newSource || null
+          if (isLegacy) {
+            // Legacy single row: source lives on stock_in row itself
+            const rowId = bubble.legacy_event_id
+            if (rowId) {
+              const { error } = await supabase.from('stock_in').update({ source: srcValue }).eq('id', rowId)
+              if (error) throw error
+            }
+          } else {
+            // Real group: source lives on stock_in_groups
+            const { error } = await supabase.from('stock_in_groups').update({ source: srcValue }).eq('id', groupId)
+            if (error) throw error
+          }
+        }
+        log(bubble.event_type, 'Edit saved')
         setSubmitOverlaySuccess()
         editingRow = null
         await reloadActivity()
@@ -913,18 +1580,24 @@
     }
 
     let pendingDelete = null
-    function confirmDelete(eventType, eventId) {
-      const row = activityRows.find(r => r.event_type === eventType && r.event_id === eventId)
-      if (!row) return
-      pendingDelete = { eventType, eventId }
+    function confirmDelete(groupId) {
+      const bubble = findBubble(groupId)
+      if (!bubble) return
+      pendingDelete = { groupId }
       const detailEl = document.getElementById('confirmDetail')
-      const productLabel = row.product_id ? `${row.product_name} (${row.product_id})` : `${row.freeform_name || '?'} (freeform)`
-      const verb = eventType === 'sale' ? 'Sold' : 'Received'
+      const items = bubble.items || []
+      const isStockIn = bubble.event_type === 'stock_in'
+      const verb = isStockIn ? 'Received' : 'Sold'
+      const itemLines = items.map(it => {
+        const label = it.product_id ? `${it.product_name} (${it.product_id})` : `${it.freeform_name || '?'} (freeform)`
+        return `<div>${verb}: ${it.quantity} of <strong>${escapeHtml(label)}</strong></div>`
+      }).join('')
+      const itemsHtml = items.length > 0 ? itemLines : `<div style="color: var(--text-muted); font-style: italic;">(empty bubble)</div>`
       detailEl.innerHTML = `
-        <div><strong>${eventType.toUpperCase()}:</strong> ${escapeHtml(productLabel)}</div>
-        <div><strong>${verb}:</strong> ${row.quantity}</div>
-        <div><strong>By:</strong> ${escapeHtml(rowDisplayName(row))}</div>
-        <div><strong>When:</strong> ${formatTime(row.event_at)}</div>
+        <div><strong>${bubble.event_type.toUpperCase()}:</strong></div>
+        ${itemsHtml}
+        <div><strong>By:</strong> ${escapeHtml(rowDisplayName(bubble))}</div>
+        <div><strong>When:</strong> ${formatHM(bubble.event_at)} — ${formatDateLong(bubble.event_at)}</div>
       `
       document.getElementById('confirmModal').classList.add('visible')
     }
@@ -935,16 +1608,33 @@
     document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
       if (!pendingDelete) return
       if (!isOnline) { alert('No connection — cannot delete right now.'); return }
-      const { eventType, eventId } = pendingDelete
+      const { groupId } = pendingDelete
       pendingDelete = null
       document.getElementById('confirmModal').classList.remove('visible')
-      log(eventType, `Deleting ${eventType} ${eventId}`)
+      const bubble = findBubble(groupId)
+      if (!bubble) return
+      const isStockIn = bubble.event_type === 'stock_in'
+      const isLegacy = isLegacyGroupId(groupId)
+      log(bubble.event_type, `Deleting bubble ${groupId}`, { isLegacy, itemCount: (bubble.items || []).length })
       showSubmitOverlay('Deleting…')
       try {
-        const { error } = await supabase.from(eventType === 'sale' ? 'sales' : 'stock_in')
-          .delete().eq('id', eventId)
-        if (error) throw error
-        log(eventType, 'Deleted')
+        if (isLegacy) {
+          // Legacy: delete the single row from sales or stock_in by id
+          const rowId = bubble.legacy_event_id
+          const table = isStockIn ? 'stock_in' : 'sales'
+          const { error } = await supabase.from(table).delete().eq('id', rowId)
+          if (error) throw error
+        } else {
+          // Real group: delete all line-item rows referencing the group, then delete the group row
+          const itemTable = isStockIn ? 'stock_in' : 'sales'
+          const itemFK = isStockIn ? 'stock_in_group_id' : 'sale_group_id'
+          const groupTable = isStockIn ? 'stock_in_groups' : 'sale_groups'
+          const { error: itemsErr } = await supabase.from(itemTable).delete().eq(itemFK, groupId)
+          if (itemsErr) throw itemsErr
+          const { error: groupErr } = await supabase.from(groupTable).delete().eq('id', groupId)
+          if (groupErr) throw groupErr
+        }
+        log(bubble.event_type, 'Deleted')
         setSubmitOverlaySuccess()
         await reloadActivity()
         await loadAll(false)
@@ -955,11 +1645,12 @@
       }
     })
 
+    // Infinite scroll: when scrolling near TOP, load older items
     window.addEventListener('scroll', () => {
       if (activityLoading || !activityHasMore) return
-      const scrollPos = window.innerHeight + window.scrollY
-      const docHeight = document.documentElement.offsetHeight
-      if (scrollPos >= docHeight - 400) loadMoreActivity()
+      // Only trigger when History workspace is active
+      if (currentWorkspace !== 'history') return
+      if (window.scrollY < 200) loadMoreActivity()
     })
 
     function setupRealtime() {
@@ -971,15 +1662,29 @@
           (p) => { log('realtime', 'sales changed', p.eventType); loadAll(false) })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_in' },
           (p) => { log('realtime', 'stock_in changed', p.eventType); loadAll(false) })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sale_groups' },
+          (p) => { log('realtime', 'sale_groups changed', p.eventType); loadAll(false) })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_in_groups' },
+          (p) => { log('realtime', 'stock_in_groups changed', p.eventType); loadAll(false) })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' },
           (p) => { log('realtime', 'products changed', p.eventType); loadAll(false) })
         .subscribe((status) => log('realtime', `status: ${status}`))
     }
 
-    function createAutocomplete(inputId, listId, readoutId) {
+    // Helper: look up the current stock quantity for a product id (from lastGoodStock view).
+    // Returns the number, or null if product not found in stock view.
+    function getCurrentStockById(productId) {
+      if (!productId || !lastGoodStock) return null
+      const row = lastGoodStock.find(s => s.id === productId)
+      if (!row) return null
+      return Number(row.current_quantity) || 0
+    }
+
+    function createAutocomplete(inputId, listId, readoutId, stockReadoutId) {
       const input = document.getElementById(inputId)
       const list = document.getElementById(listId)
       const readout = document.getElementById(readoutId)
+      const stockReadout = stockReadoutId ? document.getElementById(stockReadoutId) : null
       let visibleItems = []
       let focusedIndex = -1
       function update() {
@@ -1007,10 +1712,30 @@
       function select(product) { input.value = product.name; hide(); updateReadout(product.name.toLowerCase()) }
       function hide() { list.classList.remove('visible'); visibleItems = []; focusedIndex = -1 }
       function updateReadout(queryLower) {
-        if (!queryLower) { readout.textContent = '—'; readout.setAttribute('data-state', 'empty'); return }
+        if (!queryLower) {
+          readout.textContent = '—'; readout.setAttribute('data-state', 'empty')
+          updateStockReadout(null)
+          return
+        }
         const exact = productsCache.find(p => p.name.toLowerCase() === queryLower)
-        if (exact) { readout.textContent = exact.id; readout.setAttribute('data-state', 'matched') }
-        else { readout.textContent = 'Freeform (no match)'; readout.setAttribute('data-state', 'freeform') }
+        if (exact) {
+          readout.textContent = exact.id; readout.setAttribute('data-state', 'matched')
+          updateStockReadout(exact.id)
+        } else {
+          readout.textContent = '?'; readout.setAttribute('data-state', 'freeform')
+          updateStockReadout(null)
+        }
+      }
+      function updateStockReadout(productId) {
+        if (!stockReadout) return
+        const qty = getCurrentStockById(productId)
+        if (qty === null) {
+          stockReadout.textContent = '—'
+          stockReadout.setAttribute('data-state', 'empty')
+        } else {
+          stockReadout.textContent = String(qty)
+          stockReadout.setAttribute('data-state', 'filled')
+        }
       }
       function updateFocus() {
         list.querySelectorAll('.autocomplete-item').forEach((el, i) => {
@@ -1029,10 +1754,109 @@
       document.addEventListener('click', e => {
         if (!input.contains(e.target) && !list.contains(e.target)) hide()
       })
-      return { getValue: () => input.value.trim(), clear: () => { input.value = ''; updateReadout('') } }
+      return {
+        getValue: () => input.value.trim(),
+        clear: () => { input.value = ''; updateReadout('') },
+        // Allow external triggers to refresh the stock readout (called after fresh data loads)
+        refreshStock: () => {
+          const query = input.value.trim().toLowerCase()
+          if (!query) { updateStockReadout(null); return }
+          const exact = productsCache.find(p => p.name.toLowerCase() === query)
+          updateStockReadout(exact ? exact.id : null)
+        }
+      }
     }
 
-    const saleAc = createAutocomplete('saleProductInput', 'saleAcList', 'saleIdReadout')
+    // ===== Sale form: multi-row state =====
+    // Each row has its own autocomplete instance keyed by row id.
+    const saleRowAutocompletes = {}  // rowId -> autocomplete returned by createAutocomplete
+    let nextSaleRowId = 0
+
+    function addSaleRow() {
+      const rowId = nextSaleRowId++
+      const container = document.getElementById('saleRowsContainer')
+      const row = document.createElement('div')
+      row.className = 'sale-row'
+      row.setAttribute('data-row-id', rowId)
+      row.innerHTML = `
+        <div class="bubble-cell col-form-id" id="saleIdReadout-${rowId}" data-state="empty">—</div>
+        <div class="bubble-cell col-form-product">
+          <input type="text" id="saleProductInput-${rowId}" autocomplete="off" placeholder="Start typing product name…">
+          <div class="autocomplete-list" id="saleAcList-${rowId}"></div>
+        </div>
+        <div class="bubble-cell col-form-stock" id="saleStockReadout-${rowId}" data-state="empty" title="Current stock for the selected product (read-only)">—</div>
+        <div class="bubble-cell col-form-qty">
+          <input type="number" id="saleQtyInput-${rowId}" min="0" step="1">
+        </div>
+        <div class="bubble-cell col-form-x">
+          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" aria-label="Remove row" title="Remove this product">×</button>
+        </div>
+      `
+      // Insert the row at the end of the container (before the add-row button block which lives outside this container)
+      container.appendChild(row)
+      // Wire up an autocomplete instance for this row
+      const ac = createAutocomplete(
+        `saleProductInput-${rowId}`,
+        `saleAcList-${rowId}`,
+        `saleIdReadout-${rowId}`,
+        `saleStockReadout-${rowId}`
+      )
+      saleRowAutocompletes[rowId] = ac
+      // Wire up the remove button
+      row.querySelector('[data-remove-row]').addEventListener('click', () => removeSaleRow(rowId))
+      // Refresh stock in case product is already in cache
+      ac.refreshStock()
+      // Focus the product input on newly added rows (but not the very first one)
+      if (Object.keys(saleRowAutocompletes).length > 1) {
+        document.getElementById(`saleProductInput-${rowId}`).focus()
+      }
+    }
+
+    function removeSaleRow(rowId) {
+      const row = document.querySelector(`.sale-row[data-row-id="${rowId}"]`)
+      if (row) row.remove()
+      delete saleRowAutocompletes[rowId]
+      // Note: zero rows is allowed. + button is always present so user can re-add.
+    }
+
+    function clearAllSaleRows() {
+      document.getElementById('saleRowsContainer').innerHTML = ''
+      Object.keys(saleRowAutocompletes).forEach(k => delete saleRowAutocompletes[k])
+    }
+
+    function resetSaleForm() {
+      clearAllSaleRows()
+      addSaleRow()  // start with one fresh row
+      const feedback = document.getElementById('saleFeedback')
+      feedback.className = 'form-feedback'
+      feedback.textContent = ''
+    }
+
+    // Wire up Add and Cancel buttons (the buttons exist by now in DOM)
+    document.getElementById('addSaleRowBtn').addEventListener('click', () => addSaleRow())
+    document.getElementById('cancelSaleBtn').addEventListener('click', async () => {
+      // Only ask for confirmation if any row has any data
+      const allRows = document.querySelectorAll('#saleRowsContainer .sale-row')
+      let hasAnyData = false
+      for (const rowEl of allRows) {
+        const rowId = parseInt(rowEl.dataset.rowId, 10)
+        const ac = saleRowAutocompletes[rowId]
+        const productName = ac ? ac.getValue() : ''
+        const qty = document.getElementById(`saleQtyInput-${rowId}`)?.value || ''
+        if (productName || qty) { hasAnyData = true; break }
+      }
+      if (hasAnyData) {
+        const ok = await confirmYesNo('Discard everything you have entered?', {
+          title: 'Discard sale?', okLabel: 'Discard', cancelLabel: 'Keep editing'
+        })
+        if (!ok) return
+      }
+      resetSaleForm()
+    })
+
+    // Initial state: one empty row
+    addSaleRow()
+
     const stockAc = createAutocomplete('stockProductInput', 'stockAcList', 'stockIdReadout')
 
     function updateFormButtonsEnabled() {
@@ -1088,6 +1912,35 @@
     }
     function clearSubmitOverlayTimers() { overlayTimers.forEach(clearTimeout); overlayTimers = [] }
 
+    // Generic Yes/No confirmation modal. Returns a Promise that resolves to true/false.
+    // Usage: const ok = await confirmYesNo('Discard changes?', { title: 'Discard?', okLabel: 'Discard', cancelLabel: 'Keep' })
+    function confirmYesNo(message, options = {}) {
+      return new Promise(resolve => {
+        const modal = document.getElementById('confirmYesNoModal')
+        const titleEl = document.getElementById('confirmYesNoTitle')
+        const msgEl = document.getElementById('confirmYesNoMessage')
+        const yesBtn = document.getElementById('confirmYesNoYesBtn')
+        const noBtn = document.getElementById('confirmYesNoNoBtn')
+        titleEl.textContent = options.title || 'Confirm?'
+        msgEl.textContent = message || 'Are you sure?'
+        yesBtn.textContent = options.okLabel || 'Yes'
+        noBtn.textContent = options.cancelLabel || 'No'
+        const onYes = () => { cleanup(); resolve(true) }
+        const onNo = () => { cleanup(); resolve(false) }
+        const onKey = (e) => { if (e.key === 'Escape') onNo() }
+        const cleanup = () => {
+          modal.classList.remove('visible')
+          yesBtn.removeEventListener('click', onYes)
+          noBtn.removeEventListener('click', onNo)
+          document.removeEventListener('keydown', onKey)
+        }
+        yesBtn.addEventListener('click', onYes)
+        noBtn.addEventListener('click', onNo)
+        document.addEventListener('keydown', onKey)
+        modal.classList.add('visible')
+      })
+    }
+
     async function submitRow(opts) {
       const btn = opts.buttonEl
       const feedback = opts.feedbackEl
@@ -1134,28 +1987,91 @@
 
     window.submitSale = async function() {
       if (!currentUser) return
-      const productName = saleAc.getValue()
-      const quantity = parseInt(document.getElementById('saleQtyInput').value, 10)
       const feedback = document.getElementById('saleFeedback')
       feedback.className = 'form-feedback'; feedback.textContent = ''
-      if (!productName) { feedback.className = 'form-feedback error'; feedback.textContent = 'Enter a product name first.'; return }
-      if (!quantity || quantity < 1) { feedback.className = 'form-feedback error'; feedback.textContent = 'Enter a quantity of 1 or more.'; return }
-      if (!isOnline) { feedback.className = 'form-feedback warning'; feedback.textContent = 'No connection — cannot log sale right now.'; return }
-      const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
-      const row = {
-        quantity,
-        sold_by: currentUser.email,
-        sold_by_display: currentUser.display_name || currentUser.email,
-        client_uuid: crypto.randomUUID()
+      // Collect all rows. Skip fully-empty rows; error on partial rows.
+      const allRows = document.querySelectorAll('#saleRowsContainer .sale-row')
+      const collected = []  // { productName, quantity, exact }
+      let visualIdx = 0
+      for (const rowEl of allRows) {
+        visualIdx++
+        const rowId = parseInt(rowEl.dataset.rowId, 10)
+        const ac = saleRowAutocompletes[rowId]
+        if (!ac) continue
+        const productName = ac.getValue()
+        const qtyEl = document.getElementById(`saleQtyInput-${rowId}`)
+        const qtyStr = qtyEl.value
+        if (!productName && !qtyStr) continue  // fully empty row → drop silently
+        if (!productName) {
+          feedback.className = 'form-feedback error'
+          feedback.textContent = `Row ${visualIdx}: enter a product first.`
+          return
+        }
+        const quantity = parseInt(qtyStr, 10)
+        if (isNaN(quantity) || quantity < 0) {
+          feedback.className = 'form-feedback error'
+          feedback.textContent = `Row ${visualIdx}: quantity must be 0 or more.`
+          return
+        }
+        const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
+        collected.push({ productName, quantity, exact })
       }
-      if (exact) row.product_id = exact.id
-      else row.freeform_name = productName
-      log('sale', 'Submitting', row)
-      await submitRow({
-        tableName: 'sales', row, buttonEl: document.getElementById('logSaleBtn'),
-        feedbackEl: feedback, successMsg: '✓ Sale logged.',
-        clearForm: () => { saleAc.clear(); document.getElementById('saleQtyInput').value = '' }
-      })
+      if (collected.length === 0) {
+        feedback.className = 'form-feedback error'
+        feedback.textContent = 'No products to log. Add at least one product first.'
+        return
+      }
+      if (!isOnline) {
+        feedback.className = 'form-feedback warning'
+        feedback.textContent = 'No connection — cannot log sale right now.'
+        return
+      }
+      log('sale', `Submitting sale (group + ${collected.length} item${collected.length>1?'s':''})`, collected.map(c => ({ product: c.productName, qty: c.quantity })))
+      const btn = document.getElementById('logSaleBtn')
+      btn.disabled = true
+      showSubmitOverlay('Sending…')
+      try {
+        // Step 1: create the group
+        const groupRow = {
+          sold_by: currentUser.email,
+          sold_by_display: currentUser.display_name || currentUser.email,
+          client_uuid: crypto.randomUUID(),
+        }
+        const { data: groupData, error: groupErr } = await supabase
+          .from('sale_groups').insert(groupRow).select().single()
+        if (groupErr && groupErr.code !== '23505') throw groupErr
+        const groupId = groupData?.id
+        if (!groupId) throw new Error('Could not retrieve sale_group id after insert')
+        // Step 2: insert each line item referencing the group
+        for (const c of collected) {
+          const itemRow = {
+            quantity: c.quantity,
+            sold_by: currentUser.email,
+            sold_by_display: currentUser.display_name || currentUser.email,
+            client_uuid: crypto.randomUUID(),
+            sale_group_id: groupId,
+          }
+          if (c.exact) itemRow.product_id = c.exact.id
+          else itemRow.freeform_name = c.productName
+          const { error: itemErr } = await supabase.from('sales').insert(itemRow)
+          if (itemErr && itemErr.code !== '23505') throw itemErr
+        }
+        log('sale', `Sale inserted: ${collected.length} item(s) in group ${groupId}`)
+        setSubmitOverlaySuccess()
+        feedback.className = 'form-feedback success'
+        feedback.textContent = `✓ Sale logged with ${collected.length} product${collected.length>1?'s':''}.`
+        setTimeout(() => {
+          resetSaleForm()
+        }, 1500)
+        loadAll(false)
+      } catch (err) {
+        log('error', 'Sale submit failed', err)
+        hideSubmitOverlay()
+        feedback.className = 'form-feedback error'
+        feedback.textContent = `✗ Failed: ${err.message || 'unknown error'}. Retry is safe.`
+      } finally {
+        btn.disabled = false
+      }
     }
 
     window.submitStockIn = async function() {
@@ -1174,20 +2090,51 @@
         feedback.textContent = 'Product not in catalog. Add it first before receiving stock for it.'
         return
       }
-      const row = {
+      const groupRow = {
+        received_by: currentUser.email,
+        received_by_display: currentUser.display_name || currentUser.email,
+        client_uuid: crypto.randomUUID(),
+      }
+      if (source) groupRow.source = source
+      const itemRow = {
         product_id: exact.id,
         quantity,
         received_by: currentUser.email,
         received_by_display: currentUser.display_name || currentUser.email,
-        client_uuid: crypto.randomUUID()
+        client_uuid: crypto.randomUUID(),
       }
-      if (source) row.source = source
-      log('stock_in', 'Submitting', row)
-      await submitRow({
-        tableName: 'stock_in', row, buttonEl: document.getElementById('logStockBtn'),
-        feedbackEl: feedback, successMsg: '✓ Stock received.',
-        clearForm: () => { stockAc.clear(); document.getElementById('stockQtyInput').value = ''; document.getElementById('stockSourceInput').value = '' }
-      })
+      log('stock_in', 'Submitting stock_in (group + item)', { groupRow, itemRow })
+      const btn = document.getElementById('logStockBtn')
+      btn.disabled = true
+      showSubmitOverlay('Sending…')
+      try {
+        const { data: groupData, error: groupErr } = await supabase
+          .from('stock_in_groups').insert(groupRow).select().single()
+        if (groupErr && groupErr.code !== '23505') throw groupErr
+        const groupId = groupData?.id
+        if (!groupId) throw new Error('Could not retrieve stock_in_group id after insert')
+        itemRow.stock_in_group_id = groupId
+        const { error: itemErr } = await supabase.from('stock_in').insert(itemRow)
+        if (itemErr && itemErr.code !== '23505') throw itemErr
+        log('stock_in', 'Stock_in inserted', { groupId })
+        setSubmitOverlaySuccess()
+        feedback.className = 'form-feedback success'
+        feedback.textContent = '✓ Stock received.'
+        setTimeout(() => {
+          stockAc.clear()
+          document.getElementById('stockQtyInput').value = ''
+          document.getElementById('stockSourceInput').value = ''
+          feedback.textContent = ''; feedback.className = 'form-feedback'
+        }, 1500)
+        loadAll(false)
+      } catch (err) {
+        log('error', 'StockIn submit failed', err)
+        hideSubmitOverlay()
+        feedback.className = 'form-feedback error'
+        feedback.textContent = `✗ Failed: ${err.message || 'unknown error'}. Retry is safe.`
+      } finally {
+        btn.disabled = false
+      }
     }
 
     function escapeHtml(text) {
@@ -1799,6 +2746,119 @@ new events will not be in this file. Re-download periodically.
       if (bytes < 1024) return `${bytes} bytes`
       if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
       return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+    }
+
+    // ============================================================
+    // Workspace navigation (V2.1)
+    // ============================================================
+    const WORKSPACE_TITLES = {
+      newsale: 'New Sale',
+      stock: 'Current Stock',
+      history: 'Sales History',
+      actions: 'Actions',
+    }
+    const DEFAULT_WORKSPACE = 'newsale'
+    const WORKSPACE_STORAGE_KEY = 'inv_last_workspace'
+
+    let currentWorkspace = null
+
+    function getStoredWorkspace() {
+      try {
+        const v = localStorage.getItem(WORKSPACE_STORAGE_KEY)
+        if (v && WORKSPACE_TITLES[v]) return v
+      } catch (e) { /* localStorage may be blocked */ }
+      return DEFAULT_WORKSPACE
+    }
+
+    function storeWorkspace(name) {
+      try { localStorage.setItem(WORKSPACE_STORAGE_KEY, name) } catch (e) { /* ignore */ }
+    }
+
+    window.switchWorkspace = function(name) {
+      if (!WORKSPACE_TITLES[name]) {
+        log('nav', `Unknown workspace: ${name}, falling back to default`)
+        name = DEFAULT_WORKSPACE
+      }
+      log('nav', `Switching to workspace: ${name}`)
+      currentWorkspace = name
+
+      // Show/hide workspace bodies
+      document.querySelectorAll('.workspace').forEach(el => {
+        el.classList.toggle('active', el.dataset.workspace === name)
+      })
+
+      // Update active state in drawer
+      document.querySelectorAll('.drawer-item').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.workspace === name)
+      })
+
+      // Update header title
+      document.getElementById('workspaceTitle').textContent = WORKSPACE_TITLES[name]
+
+      // History workspace: jump to bottom so latest bubbles are visible
+      if (name === 'history') {
+        requestAnimationFrame(() => { window.scrollTo({ top: document.documentElement.scrollHeight }) })
+      } else {
+        // Other workspaces: scroll to top of page
+        requestAnimationFrame(() => { window.scrollTo({ top: 0 }) })
+      }
+
+      storeWorkspace(name)
+      closeDrawer()
+    }
+
+    window.openDrawer = function() {
+      document.getElementById('drawer').classList.add('visible')
+      document.getElementById('drawerBackdrop').classList.add('visible')
+    }
+    window.closeDrawer = function() {
+      document.getElementById('drawer').classList.remove('visible')
+      document.getElementById('drawerBackdrop').classList.remove('visible')
+    }
+
+    // Close drawer on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('drawer').classList.contains('visible')) {
+        closeDrawer()
+      }
+    })
+
+    // Mobile: swipe from left edge to right opens drawer
+    let swipeStartX = null
+    let swipeStartY = null
+    let swipeStartTime = 0
+    const SWIPE_EDGE_PX = 30           // touch must start within this distance of the left edge
+    const SWIPE_MIN_DIST_PX = 60       // total rightward distance to count as swipe
+    const SWIPE_MAX_VERT_PX = 50       // ignore if too much vertical drift
+    const SWIPE_MAX_DURATION_MS = 600  // gesture must complete in this time
+    document.addEventListener('touchstart', (e) => {
+      if (!e.touches || e.touches.length !== 1) return
+      const t = e.touches[0]
+      // Only arm swipe when drawer is closed and the touch starts near the left edge
+      if (document.getElementById('drawer').classList.contains('visible')) return
+      if (t.clientX > SWIPE_EDGE_PX) return
+      swipeStartX = t.clientX
+      swipeStartY = t.clientY
+      swipeStartTime = Date.now()
+    }, { passive: true })
+    document.addEventListener('touchend', (e) => {
+      if (swipeStartX === null) return
+      const t = e.changedTouches && e.changedTouches[0]
+      if (!t) { swipeStartX = null; return }
+      const dx = t.clientX - swipeStartX
+      const dy = Math.abs(t.clientY - swipeStartY)
+      const dt = Date.now() - swipeStartTime
+      swipeStartX = null
+      if (dt > SWIPE_MAX_DURATION_MS) return
+      if (dy > SWIPE_MAX_VERT_PX) return
+      if (dx >= SWIPE_MIN_DIST_PX) openDrawer()
+    }, { passive: true })
+
+    // Initialize workspace on app load (called from showApp)
+    function initWorkspace() {
+      // Restore last visited; falls back to default if not stored or invalid
+      const target = getStoredWorkspace()
+      switchWorkspace(target)
     }
 
     // Periodic safety-net poll
