@@ -132,11 +132,25 @@
       display: grid;
       grid-template-columns: 72px 1fr 56px 70px 32px;
       border-radius: 14px;
-      overflow: hidden;
+      overflow: visible;
       border: 0.5px solid #c8c8c8;
       width: 100%;
       background: #ffffff;
+      position: relative;
     }
+    /* With overflow:visible we round the corner cells so they match the card's rounded corners */
+    .bubble.form-sale .row-header .bubble-cell:first-child { border-top-left-radius: 14px; }
+    .bubble.form-sale .row-header .bubble-cell:last-child  { border-top-right-radius: 14px; }
+    .bubble.form-sale .row-form-footer { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
+    /* Autocomplete dropdown inside the form bubble: extend rightward past cell width, escape card overflow */
+    .bubble.form-sale .col-form-product .autocomplete-list {
+      right: auto !important;
+      width: max-content;
+      min-width: 100%;
+      max-width: min(360px, calc(100vw - 30px));
+      z-index: 30;
+    }
+    .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-item { white-space: nowrap; }
     .bubble.form-sale .bubble-row {
       display: grid;
       grid-column: 1 / -1;
@@ -325,9 +339,13 @@
 
     /* Mobile adjustments */
     @media (max-width: 600px) {
-      .bubble.form-sale .bubble-card { grid-template-columns: 60px 1fr 48px 56px 28px; }
+      .bubble.form-sale .bubble-card { grid-template-columns: 60px 1fr 48px 56px 28px; border-width: 1.5px; }
       .bubble.form-sale .col-form-id { font-size: 10px; }
       .bubble.form-sale .col-form-stock { font-size: 12px; }
+      .bubble.form-sale .row-body,
+      .bubble.form-sale .sale-row,
+      .bubble.form-sale .row-add-button,
+      .bubble.form-sale .row-form-footer { border-top-width: 1.5px; }
     }
     .field { display: flex; flex-direction: column; gap: 4px; position: relative; }
     .field label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 500; }
@@ -474,7 +492,8 @@
       border: 0.5px solid;
     }
     @media (max-width: 600px) {
-      .bubble-card { grid-template-columns: 60px minmax(120px, 1fr) 56px; }
+      .bubble-card { grid-template-columns: 60px minmax(120px, 1fr) 56px; border-width: 1.5px; }
+      .bubble-row.row-body, .bubble-row.row-footer { border-top-width: 1.5px; }
     }
     .bubble-row {
       display: grid;
@@ -669,7 +688,7 @@
               <div class="form-feedback" id="saleFeedback"></div>
             </div>
             <div class="row-form-footer">
-              <button class="btn secondary" id="cancelSaleBtn" type="button">Cancel</button>
+              <button class="btn danger" id="cancelSaleBtn" type="button">Cancel</button>
               <button class="btn" id="logSaleBtn" onclick="submitSale()">Log Sale</button>
             </div>
           </div>
@@ -1358,7 +1377,7 @@
       // Edit-action buttons appear at the bottom of the bubble in edit mode
       const editActions = isEditing
         ? `<div class="bubble-row row-edit-actions">
-            <button class="btn secondary small" data-action="cancel-edit">Cancel</button>
+            <button class="btn danger small" data-action="cancel-edit">Cancel</button>
             <button class="btn small" data-action="save-edit" data-group-id="${escapeHtml(r.group_id)}">Save</button>
           </div>`
         : ''
@@ -1486,7 +1505,7 @@
       feedEl.querySelectorAll('[data-action="cancel-edit"]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const ok = await confirmYesNo('Discard your changes to this bubble?', {
-            title: 'Discard changes?', okLabel: 'Discard', cancelLabel: 'Keep editing'
+            title: 'Discard changes?', okLabel: 'Discard', cancelLabel: 'Keep editing', okStyle: 'danger'
           })
           if (!ok) return
           editingRow = null
@@ -1504,7 +1523,15 @@
       if (e.key === 'Escape' && openMenu) closeBubbleMenu()
     })
 
-    function startEdit(groupId) {
+    async function startEdit(groupId) {
+      // If user is already editing a different bubble, ask before discarding those changes
+      if (editingRow !== null && editingRow.group_id !== groupId) {
+        const ok = await confirmYesNo(
+          'You are already editing another bubble. Discard those changes and edit this one instead?',
+          { title: 'Switch edits?', okLabel: 'Discard & switch', cancelLabel: 'Keep editing', okStyle: 'danger' }
+        )
+        if (!ok) return
+      }
       editingRow = { group_id: groupId }
       renderActivity()
     }
@@ -1847,7 +1874,7 @@
       }
       if (hasAnyData) {
         const ok = await confirmYesNo('Discard everything you have entered?', {
-          title: 'Discard sale?', okLabel: 'Discard', cancelLabel: 'Keep editing'
+          title: 'Discard sale?', okLabel: 'Discard', cancelLabel: 'Keep editing', okStyle: 'danger'
         })
         if (!ok) return
       }
@@ -1913,7 +1940,7 @@
     function clearSubmitOverlayTimers() { overlayTimers.forEach(clearTimeout); overlayTimers = [] }
 
     // Generic Yes/No confirmation modal. Returns a Promise that resolves to true/false.
-    // Usage: const ok = await confirmYesNo('Discard changes?', { title: 'Discard?', okLabel: 'Discard', cancelLabel: 'Keep' })
+    // Usage: const ok = await confirmYesNo('Discard changes?', { title: 'Discard?', okLabel: 'Discard', cancelLabel: 'Keep', okStyle: 'danger' })
     function confirmYesNo(message, options = {}) {
       return new Promise(resolve => {
         const modal = document.getElementById('confirmYesNoModal')
@@ -1925,6 +1952,7 @@
         msgEl.textContent = message || 'Are you sure?'
         yesBtn.textContent = options.okLabel || 'Yes'
         noBtn.textContent = options.cancelLabel || 'No'
+        yesBtn.className = (options.okStyle === 'danger') ? 'btn danger' : 'btn'
         const onYes = () => { cleanup(); resolve(true) }
         const onNo = () => { cleanup(); resolve(false) }
         const onKey = (e) => { if (e.key === 'Escape') onNo() }
