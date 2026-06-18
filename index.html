@@ -130,7 +130,7 @@
     .bubble.form-sale #saleRowsContainer { display: contents; }
     .bubble.form-sale .bubble-card {
       display: grid;
-      grid-template-columns: 72px 1fr 56px 70px 32px;
+      grid-template-columns: 72px 1fr 56px 60px 32px;
       border-radius: 14px;
       overflow: visible;
       border: 0.5px solid #c8c8c8;
@@ -142,15 +142,56 @@
     .bubble.form-sale .row-header .bubble-cell:first-child { border-top-left-radius: 14px; }
     .bubble.form-sale .row-header .bubble-cell:last-child  { border-top-right-radius: 14px; }
     .bubble.form-sale .row-form-footer { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
-    /* Autocomplete dropdown inside the form bubble: extend rightward past cell width, escape card overflow */
+    /* Autocomplete dropdown inside the form bubble: spans full bubble width,
+       contained horizontally to the bubble's edges but can extend below vertically. */
     .bubble.form-sale .col-form-product .autocomplete-list {
-      right: auto !important;
-      width: max-content;
-      min-width: 100%;
-      max-width: min(360px, calc(100vw - 30px));
+      left: -72px;             /* offset back to bubble left edge (ID col is 72px wide) */
+      right: -148px;           /* offset to bubble right edge (Stock 56 + Qty 60 + X 32 = 148) */
+      width: auto;
+      min-width: auto;
+      max-width: none;
       z-index: 30;
     }
-    .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-item { white-space: nowrap; }
+    /* Each dropdown item is a 2-column grid mirroring the bubble's ID + Name columns,
+       with a thin divider and word-wrapping on both columns */
+    .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-item {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      align-items: center;
+      padding: 0;
+      gap: 0;
+    }
+    .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-item .ac-id {
+      display: block;
+      padding: 8px 4px;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+      border-right: 1px solid var(--border);
+      margin: 0;
+      letter-spacing: -0.1px;
+    }
+    .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-item .ac-name {
+      padding: 8px 10px;
+      font-size: 14px;
+      white-space: normal;            /* allow wrapping */
+      word-break: break-word;
+    }
+    .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-empty {
+      padding: 8px 10px;
+    }
+    @media (max-width: 600px) {
+      .bubble.form-sale .col-form-product .autocomplete-list {
+        left: -60px;          /* mobile ID col is 60px */
+        right: -126px;        /* Stock 48 + Qty 50 + X 28 = 126 */
+      }
+      .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-item {
+        grid-template-columns: 60px 1fr;
+      }
+    }
     .bubble.form-sale .bubble-row {
       display: grid;
       grid-column: 1 / -1;
@@ -339,13 +380,13 @@
 
     /* Mobile adjustments */
     @media (max-width: 600px) {
-      .bubble.form-sale .bubble-card { grid-template-columns: 60px 1fr 48px 56px 28px; border-width: 1.5px; }
-      .bubble.form-sale .col-form-id { font-size: 10px; }
+      .bubble.form-sale .bubble-card { grid-template-columns: 60px 1fr 48px 50px 28px; border-width: 1.5px; border-color: #9ca3af; }
+      .bubble.form-sale .col-form-id { font-size: 9.5px; letter-spacing: -0.3px; }
       .bubble.form-sale .col-form-stock { font-size: 12px; }
       .bubble.form-sale .row-body,
       .bubble.form-sale .sale-row,
       .bubble.form-sale .row-add-button,
-      .bubble.form-sale .row-form-footer { border-top-width: 1.5px; }
+      .bubble.form-sale .row-form-footer { border-top-width: 1.5px; border-top-color: #cbd0d4; }
     }
     .field { display: flex; flex-direction: column; gap: 4px; position: relative; }
     .field label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 500; }
@@ -483,17 +524,38 @@
 
     /* Bubble card: subgrid layout with header / body / footer rows */
     .bubble { position: relative; }
+    /* On touch devices, disable text selection + iOS "Look up / Search" callout on bubbles.
+       Inputs are explicitly re-enabled so editable cells still work normally. */
+    @media (hover: none) {
+      .bubble {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      .bubble input, .bubble textarea {
+        -webkit-user-select: auto;
+        user-select: auto;
+        -webkit-touch-callout: default;
+      }
+    }
     .bubble-card {
       display: grid;
-      grid-template-columns: 72px minmax(160px, 1fr) 64px;
+      grid-template-columns: 72px minmax(160px, 1fr) 54px;
       border-radius: 14px;
       overflow: hidden;
       width: 100%;
       border: 0.5px solid;
     }
     @media (max-width: 600px) {
-      .bubble-card { grid-template-columns: 60px minmax(120px, 1fr) 56px; border-width: 1.5px; }
+      .bubble-card { grid-template-columns: 60px minmax(120px, 1fr) 50px; border-width: 1.5px; }
       .bubble-row.row-body, .bubble-row.row-footer { border-top-width: 1.5px; }
+      .row-body .bubble-cell.col-id span { font-size: 9.5px; letter-spacing: -0.3px; }
+      .row-header .bubble-cell { font-size: 11px; }
+      /* Darker border colors on mobile so they don't blend into the bubble's body gradient */
+      .bubble.sale .bubble-card { border-color: #79bf90; }
+      .bubble.sale .row-body, .bubble.sale .row-footer { border-top-color: #a3d4b3; }
+      .bubble.stockin .bubble-card { border-color: #d4974a; }
+      .bubble.stockin .row-body, .bubble.stockin .row-footer { border-top-color: #e3ad7d; }
     }
     .bubble-row {
       display: grid;
@@ -1728,7 +1790,7 @@
         } else {
           list.innerHTML = matches.map((p, i) =>
             `<div class="autocomplete-item" data-index="${i}">
-              <span class="ac-id">${escapeHtml(p.id)}</span>${escapeHtml(p.name)}
+              <span class="ac-id">${escapeHtml(p.id)}</span><span class="ac-name">${escapeHtml(p.name)}</span>
             </div>`).join('')
           list.querySelectorAll('.autocomplete-item').forEach(el => {
             el.addEventListener('click', () => select(visibleItems[parseInt(el.dataset.index)]))
