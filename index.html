@@ -441,6 +441,51 @@
 
     /* ===== Add Products (stock-in) bubble form — orange/amber variant ===== */
     .bubble.form-stockin .bubble-card { border-color: #d4974a; }
+    /* Editable ID cell: the input fills the cell and visually matches the static div in matched/empty states. */
+    .bubble.form-sale .col-form-id-editable { padding: 0; }
+    .bubble.form-sale .col-form-id-editable input {
+      width: 100%;
+      height: 100%;
+      min-height: 38px;
+      border: none;
+      background: transparent;
+      padding: 6px 4px;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 11px;
+      color: inherit;
+      text-align: center;
+      box-shadow: none;
+      outline: none;
+      letter-spacing: -0.1px;
+    }
+    .bubble.form-sale .col-form-id-editable input::placeholder {
+      color: var(--text-faint);
+      font-style: normal;
+    }
+    /* Match the visual states defined for the .col-form-id parent — the parent already gets
+       the green/red/empty background via [data-state] on the parent. But the input itself
+       has data-state too (set by setIdReadoutState). Use it for placeholder size in empty state. */
+    .bubble.form-sale .col-form-id-editable input[data-state="empty"]::placeholder {
+      font-size: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .bubble.form-sale .col-form-id-editable input[data-state="matched"] {
+      background: var(--id-matched-bg);
+      color: var(--text);
+    }
+    .bubble.form-sale .col-form-id-editable input[data-state="freeform"] {
+      background: var(--id-freeform-bg);
+      font-style: normal;
+    }
+    .bubble.form-sale .col-form-id-editable input[data-state="freeform"]::placeholder {
+      font-size: 15px;
+      color: var(--danger);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .bubble.form-sale .col-form-id-editable input[data-state="freeform"]:focus {
+      background: #ffffff;
+    }
+    /* When the input is the readout: don't let it inherit parent's overall data-state styling */
     .bubble.form-stockin .row-header .bubble-cell { background: linear-gradient(to right, #e3ad7d, #ebc7a0); color: #000; }
     .bubble.form-stockin .col-form-id { background: #fff7ed; }
     .bubble.form-stockin .col-form-stock { background: #fff8ef; }
@@ -723,6 +768,29 @@
        Uses an SVG overlay so the dashes follow the bubble's ROUNDED corners
        (the previous 4-gradient hack drew straight lines and corners were eaten). */
     .bubble.editing { z-index: 2; }
+    /* Sale bubble in edit mode adds a Stock column so user can sanity-check qty against current stock.
+       The new column slots between Name and Qty. Disappears on save/cancel. */
+    .bubble.sale.editing .bubble-card { grid-template-columns: 72px minmax(140px, 1fr) 50px 54px; }
+    @media (max-width: 600px) {
+      .bubble.sale.editing .bubble-card { grid-template-columns: 60px minmax(100px, 1fr) 44px 50px; }
+    }
+    .bubble.sale.editing .col-stock-edit {
+      text-align: center;
+      align-items: center !important;
+      justify-content: center;
+      color: #4d7050;
+      font-style: italic;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      padding: 8px 4px;
+    }
+    .bubble.sale.editing .row-header .col-stock-edit {
+      font-style: normal;
+      font-weight: 600;
+      color: #000;
+    }
+    /* Empty bubble row spans all columns including the temp Stock col */
+    .bubble.sale.editing .bubble-row-empty > div { grid-column: 1 / -1; }
     .bubble.editing .marching-ants-svg {
       position: absolute;
       inset: -3px;
@@ -1572,12 +1640,23 @@
           // Source becomes editable in edit mode
           metaRight = `<input type="text" class="cell-edit-input" data-edit-source value="${escapeHtml(r.source || '')}" placeholder="Source / invoice">`
         } else {
-          // Show "edited · DATE" prefix in front of source if any item edited
-          const editedItem = (r.items || []).find(it => it.edited && it.updated_at)
+          // Stock-in has no `edited` flag (only sales does), so detect edits via updated_at vs created_at:
+          // either on the group (source was edited) or any item (qty was edited). Use a small threshold
+          // to avoid false positives from trigger timing.
+          let latestEditTs = null
+          const wasUpdated = (ts1, ts0) => ts1 && ts0 && (new Date(ts1) - new Date(ts0) > 1500)
+          if (wasUpdated(r.updated_at, r.created_at)) latestEditTs = r.updated_at
+          for (const it of (r.items || [])) {
+            if (wasUpdated(it.updated_at, it.created_at)) {
+              if (!latestEditTs || new Date(it.updated_at) > new Date(latestEditTs)) {
+                latestEditTs = it.updated_at
+              }
+            }
+          }
           let editedPrefix = ''
-          if (editedItem) {
-            const editTime = formatHM(editedItem.updated_at)
-            const editDate = formatDateLong(editedItem.updated_at)
+          if (latestEditTs) {
+            const editTime = formatHM(latestEditTs)
+            const editDate = formatDateLong(latestEditTs)
             editedPrefix = `<span class="edited-prefix">edited · ${editTime} — ${editDate}</span>`
           }
           const sourceSpan = r.source ? `<span class="meta-right invoice">${escapeHtml(r.source)}</span>` : ''
@@ -1594,9 +1673,10 @@
           metaRight = `<span class="meta-right edited">edited · ${editTime} — ${editDate}</span>`
         }
       }
+      const showStockColumn = isEditing && !isStockIn  // Only sales get the temp Stock column in edit
       const items = r.items || []
       const bodyRows = items.length > 0
-        ? items.map(item => renderItemBodyRow(item, isEditing, qtyPrefix)).join('')
+        ? items.map(item => renderItemBodyRow(item, isEditing, qtyPrefix, showStockColumn)).join('')
         : `<div class="bubble-row row-body bubble-row-empty"><div class="bubble-cell" style="grid-column: 1 / -1; text-align: center; color: var(--text-faint); font-style: italic; padding: 14px;">(empty bubble)</div></div>`
       // Edit-action buttons appear at the bottom of the bubble in edit mode
       const editActions = isEditing
@@ -1616,6 +1696,7 @@
             <div class="bubble-row row-header">
               <div class="bubble-cell col-id">ID</div>
               <div class="bubble-cell col-name">Name</div>
+              ${showStockColumn ? '<div class="bubble-cell col-stock-edit">Stock</div>' : ''}
               <div class="bubble-cell col-qty">Qty</div>
             </div>
             ${bodyRows}
@@ -1633,7 +1714,8 @@
 
     // Renders ONE body row inside a bubble for a single line item.
     // When isEditing is true, the qty cell becomes an editable input.
-    function renderItemBodyRow(item, isEditing, qtyPrefix) {
+    // When isEditing + isSale, a Stock column is also rendered showing current stock.
+    function renderItemBodyRow(item, isEditing, qtyPrefix, showStockColumn) {
       const idDisplay = item.product_id || ''
       const nameDisplay = item.product_id
         ? escapeHtml(item.product_name)
@@ -1641,10 +1723,21 @@
       const qtyCellContent = isEditing
         ? `<input type="number" class="cell-edit-input" data-edit-qty data-row-id="${item.row_id}" min="0" step="1" value="${item.quantity}">`
         : `<span>${qtyPrefix}${escapeHtml(String(item.quantity))}</span>`
+      // Stock cell (only when editing sales) — read from lastGoodStock
+      let stockCell = ''
+      if (showStockColumn) {
+        let stockVal = '—'
+        if (item.product_id) {
+          const s = getCurrentStockById(item.product_id)
+          if (s !== null) stockVal = String(s)
+        }
+        stockCell = `<div class="bubble-cell col-stock-edit"><span>${stockVal}</span></div>`
+      }
       return `
         <div class="bubble-row row-body" data-row-id="${item.row_id}">
           <div class="bubble-cell col-id"><span>${softBreakId(idDisplay) || '—'}</span></div>
           <div class="bubble-cell col-name"><span>${nameDisplay}</span></div>
+          ${stockCell}
           <div class="bubble-cell col-qty">${qtyCellContent}</div>
         </div>`
     }
@@ -1936,6 +2029,33 @@
       return Number(row.current_quantity) || 0
     }
 
+    // Helper used by createAutocomplete: sets the ID readout's visual state.
+    // Works for both <div> readouts (sale form) and <input> readouts (stock-in form, where the
+    // ID cell becomes editable when state is "freeform" so the user can type a new product ID).
+    function setIdReadoutState(el, state, text) {
+      el.setAttribute('data-state', state)
+      if (el.tagName === 'INPUT') {
+        if (state === 'matched') {
+          el.value = text || ''
+          el.placeholder = ''
+          el.readOnly = true
+        } else if (state === 'empty') {
+          el.value = ''
+          el.placeholder = text || '—'
+          el.readOnly = true
+        } else { // freeform
+          // Don't overwrite value if user already typed something (allows them to enter a new ID).
+          // But if transitioning FROM matched (last value was a real product ID), clear it.
+          if (el.dataset.lastState === 'matched') el.value = ''
+          el.placeholder = text || '?'
+          el.readOnly = false
+        }
+        el.dataset.lastState = state
+      } else {
+        el.textContent = text || ''
+      }
+    }
+
     function createAutocomplete(inputId, listId, readoutId, stockReadoutId) {
       const input = document.getElementById(inputId)
       const list = document.getElementById(listId)
@@ -1969,16 +2089,16 @@
       function hide() { list.classList.remove('visible'); visibleItems = []; focusedIndex = -1 }
       function updateReadout(queryLower) {
         if (!queryLower) {
-          readout.textContent = '—'; readout.setAttribute('data-state', 'empty')
+          setIdReadoutState(readout, 'empty', '—')
           updateStockReadout(null)
           return
         }
         const exact = productsCache.find(p => p.name.toLowerCase() === queryLower)
         if (exact) {
-          readout.textContent = exact.id; readout.setAttribute('data-state', 'matched')
+          setIdReadoutState(readout, 'matched', exact.id)
           updateStockReadout(exact.id)
         } else {
-          readout.textContent = '?'; readout.setAttribute('data-state', 'freeform')
+          setIdReadoutState(readout, 'freeform', '?')
           updateStockReadout(null)
         }
       }
@@ -2133,7 +2253,9 @@
       row.className = 'sale-row'
       row.setAttribute('data-row-id', rowId)
       row.innerHTML = `
-        <div class="bubble-cell col-form-id" id="stockIdReadout-${rowId}" data-state="empty">—</div>
+        <div class="bubble-cell col-form-id col-form-id-editable">
+          <input type="text" id="stockIdReadout-${rowId}" data-state="empty" placeholder="—" readonly autocomplete="off" maxlength="50" aria-label="Product ID">
+        </div>
         <div class="bubble-cell col-form-product">
           <input type="text" id="stockProductInput-${rowId}" autocomplete="off" placeholder="Start typing product name…">
           <div class="autocomplete-list" id="stockAcList-${rowId}"></div>
@@ -2452,12 +2574,26 @@
           return
         }
         const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
-        if (!exact) {
-          feedback.className = 'form-feedback error'
-          feedback.textContent = `Row ${visualIdx}: "${productName}" is not in the catalog. Add the product first.`
-          return
+        if (exact) {
+          collected.push({ productName, quantity, exact, isNew: false })
+        } else {
+          // Freeform: read the typed ID from the editable ID input
+          const idInput = document.getElementById(`stockIdReadout-${rowId}`)
+          const newId = (idInput?.value || '').trim()
+          if (!newId) {
+            feedback.className = 'form-feedback error'
+            feedback.textContent = `Row ${visualIdx}: "${productName}" is not in the catalog — type a new ID in the red ID cell.`
+            return
+          }
+          // Check ID doesn't collide with existing product
+          const idCollide = productsCache.find(p => p.id.toLowerCase() === newId.toLowerCase())
+          if (idCollide) {
+            feedback.className = 'form-feedback error'
+            feedback.textContent = `Row ${visualIdx}: ID "${newId}" is already used by "${idCollide.name}". Pick a different ID.`
+            return
+          }
+          collected.push({ productName, quantity, exact: null, isNew: true, newId })
         }
-        collected.push({ productName, quantity, exact })
       }
       if (collected.length === 0) {
         feedback.className = 'form-feedback error'
@@ -2469,11 +2605,24 @@
         feedback.textContent = 'No connection — cannot receive stock right now.'
         return
       }
-      log('stock_in', `Submitting stock_in (group + ${collected.length} item${collected.length>1?'s':''})`, { source, items: collected.map(c => ({ product: c.productName, qty: c.quantity })) })
+      log('stock_in', `Submitting stock_in (group + ${collected.length} item${collected.length>1?'s':''})`, { source, items: collected.map(c => ({ product: c.productName, qty: c.quantity, isNew: c.isNew })) })
       const btn = document.getElementById('logStockBtn')
       btn.disabled = true
       showSubmitOverlay('Sending…')
       try {
+        // Step 0: create any new products first
+        for (const c of collected) {
+          if (c.isNew) {
+            const { error: prodErr } = await supabase.from('products').insert({
+              id: c.newId,
+              name: c.productName,
+            })
+            // 23505 = unique violation. Could happen if another user just added the same product.
+            // Continue — the existing product is fine to use.
+            if (prodErr && prodErr.code !== '23505') throw prodErr
+            log('stock_in', `Created new product: ${c.newId} / ${c.productName}`)
+          }
+        }
         // Step 1: create the group
         const groupRow = {
           received_by: currentUser.email,
@@ -2488,8 +2637,9 @@
         if (!groupId) throw new Error('Could not retrieve stock_in_group id after insert')
         // Step 2: insert each line item referencing the group
         for (const c of collected) {
+          const productId = c.isNew ? c.newId : c.exact.id
           const itemRow = {
-            product_id: c.exact.id,
+            product_id: productId,
             quantity: c.quantity,
             received_by: currentUser.email,
             received_by_display: currentUser.display_name || currentUser.email,
