@@ -86,13 +86,19 @@
     .drawer.visible { transform: translateX(0); }
     .drawer-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); }
     .drawer-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
-    .drawer-nav { display: flex; flex-direction: column; padding: 8px; gap: 2px; }
-    .drawer-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: transparent; border: none; border-radius: 8px; cursor: pointer; text-align: left; font-size: 15px; color: var(--text); transition: background 0.1s ease; font-family: inherit; }
+    .drawer-nav { display: flex; flex-direction: column; padding: 8px; gap: 2px; flex: 1; overflow-y: auto; }
+    .drawer-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: transparent; border: none; border-radius: 8px; cursor: pointer; text-align: left; font-size: 15px; color: var(--text); transition: background 0.1s ease; font-family: inherit; width: 100%; }
     .drawer-item:hover { background: var(--bg-elevated); }
     .drawer-item.active { background: var(--id-matched-bg); color: var(--text); font-weight: 500; }
     .drawer-item.active .drawer-label { color: #166534; }
     .drawer-icon { font-size: 18px; line-height: 1; flex-shrink: 0; width: 24px; text-align: center; }
     .drawer-label { flex: 1; }
+    .drawer-divider { height: 1px; background: var(--border); margin: 8px 6px; }
+    .drawer-footer { padding: 12px 14px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; background: var(--bg-elevated); }
+    .drawer-user { flex: 1; min-width: 0; }
+    .drawer-user-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .drawer-user-name { font-size: 13px; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .drawer-signout-btn { flex-shrink: 0; }
 
     /* Workspace containers */
     .workspace { display: none; }
@@ -130,10 +136,10 @@
     .bubble.form-sale #saleRowsContainer { display: contents; }
     .bubble.form-sale .bubble-card {
       display: grid;
-      grid-template-columns: 72px 1fr 56px 60px 32px;
+      grid-template-columns: 72px 1fr 44px 44px 32px;
       border-radius: 14px;
       overflow: visible;
-      border: 0.5px solid #c8c8c8;
+      border: 0.5px solid #9ca3af;
       width: 100%;
       background: #ffffff;
       position: relative;
@@ -146,7 +152,7 @@
        contained horizontally to the bubble's edges but can extend below vertically. */
     .bubble.form-sale .col-form-product .autocomplete-list {
       left: -72px;             /* offset back to bubble left edge (ID col is 72px wide) */
-      right: -148px;           /* offset to bubble right edge (Stock 56 + Qty 60 + X 32 = 148) */
+      right: -120px;           /* offset to bubble right edge (Stock 44 + Qty 44 + X 32 = 120) */
       width: auto;
       min-width: auto;
       max-width: none;
@@ -168,8 +174,8 @@
       font-size: 11px;
       color: var(--text-muted);
       text-align: center;
-      word-break: break-all;
-      overflow-wrap: anywhere;
+      word-break: normal;
+      overflow-wrap: break-word;
       border-right: 1px solid var(--border);
       margin: 0;
       letter-spacing: -0.1px;
@@ -186,7 +192,7 @@
     @media (max-width: 600px) {
       .bubble.form-sale .col-form-product .autocomplete-list {
         left: -60px;          /* mobile ID col is 60px */
-        right: -126px;        /* Stock 48 + Qty 50 + X 28 = 126 */
+        right: -108px;        /* Stock 40 + Qty 40 + X 28 = 108 */
       }
       .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-item {
         grid-template-columns: 60px 1fr;
@@ -232,8 +238,8 @@
       align-items: center !important;
       justify-content: center;
       padding: 6px 4px;
-      overflow-wrap: anywhere;
-      word-break: break-all;
+      overflow-wrap: break-word;
+      word-break: normal;
       text-align: center;
     }
     .bubble.form-sale .col-form-id[data-state="matched"] {
@@ -334,24 +340,29 @@
       grid-column: 1 / -1 !important;
       display: block !important;
       border-top: 0.5px solid #e8e8e8;
+      padding: 14px 12px;
     }
     .bubble.form-sale .add-row-btn {
-      width: 100%;
-      padding: 8px;
+      display: inline-flex;
+      margin: 0 auto;
+      padding: 8px 18px;
       background: transparent;
-      border: none;
-      color: var(--text-muted);
+      border: 1px solid var(--success);
+      border-radius: 8px;
+      color: var(--success);
       font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
-      display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
       font-family: inherit;
-      border-radius: 0;
+      width: auto;
     }
-    .bubble.form-sale .add-row-btn:hover { background: #f5f5f5; color: var(--text); }
+    .bubble.form-sale .add-row-btn:hover { background: rgba(34, 197, 94, 0.08); }
     .bubble.form-sale .add-row-btn .plus-sign { font-size: 14px; line-height: 1; }
+    /* Center the button inside its row */
+    .bubble.form-sale .row-add-button { text-align: center; }
 
     /* Feedback row */
     .bubble.form-sale .row-feedback {
@@ -380,7 +391,7 @@
 
     /* Mobile adjustments */
     @media (max-width: 600px) {
-      .bubble.form-sale .bubble-card { grid-template-columns: 60px 1fr 48px 50px 28px; border-width: 1.5px; border-color: #9ca3af; }
+      .bubble.form-sale .bubble-card { grid-template-columns: 60px 1fr 40px 40px 28px; border-width: 1.5px; border-color: #9ca3af; }
       .bubble.form-sale .col-form-id { font-size: 9.5px; letter-spacing: -0.3px; }
       .bubble.form-sale .col-form-stock { font-size: 12px; }
       .bubble.form-sale .row-body,
@@ -573,25 +584,25 @@
     .row-header .bubble-cell { font-size: 13px; font-weight: 600; padding-top: 8px; padding-bottom: 8px; white-space: nowrap; color: #000 !important; }
 
     /* Body row content */
-    .row-body .bubble-cell.col-id span { font-size: 11px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; line-height: 1.4; overflow-wrap: anywhere; }
+    .row-body .bubble-cell.col-id span { font-size: 11px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; line-height: 1.4; overflow-wrap: break-word; word-break: normal; }
     .row-body .bubble-cell.col-name span { font-size: 14px; color: #1a1a1a; line-height: 1.45; }
     .row-body .bubble-cell.col-qty span { font-size: 14px; color: #1a1a1a; font-variant-numeric: tabular-nums; line-height: 1.45; }
 
-    /* Sale (green) coloring — slightly desaturated */
-    .bubble.sale .bubble-card { border-color: #b8d8c0; }
+    /* Sale (green) coloring — slightly desaturated. Darker borders for visibility across all viewports. */
+    .bubble.sale .bubble-card { border-color: #79bf90; }
     .bubble.sale .row-header .bubble-cell { background: linear-gradient(to right, #a3d4b3, #c5e1ce); }
-    .bubble.sale .row-body { border-top-color: #c5e1ce; }
+    .bubble.sale .row-body { border-top-color: #a3d4b3; }
     .bubble.sale .row-body .bubble-cell { background: linear-gradient(to right, #e3efe8, #f3f9f5); }
     .bubble.sale .row-body .col-id span { color: #4d7050; }
-    .bubble.sale .row-footer { border-top-color: #c5e1ce; background: linear-gradient(to right, #eef5f0, #ffffff); color: #5d8868; }
+    .bubble.sale .row-footer { border-top-color: #a3d4b3; background: linear-gradient(to right, #eef5f0, #ffffff); color: #5d8868; }
 
-    /* Stock-in (amber) coloring — slightly desaturated */
-    .bubble.stockin .bubble-card { border-color: #ebc499; }
+    /* Stock-in (amber) coloring — slightly desaturated. Darker borders for visibility across all viewports. */
+    .bubble.stockin .bubble-card { border-color: #d4974a; }
     .bubble.stockin .row-header .bubble-cell { background: linear-gradient(to right, #e3ad7d, #ebc7a0); }
-    .bubble.stockin .row-body { border-top-color: #ebc7a0; }
+    .bubble.stockin .row-body { border-top-color: #e3ad7d; }
     .bubble.stockin .row-body .bubble-cell { background: linear-gradient(to right, #f6e2cb, #fbf2e2); }
     .bubble.stockin .row-body .col-id span { color: #94522a; }
-    .bubble.stockin .row-footer { border-top-color: #ebc7a0; background: linear-gradient(to right, #f7eddc, #ffffff); color: #a85f30; }
+    .bubble.stockin .row-footer { border-top-color: #e3ad7d; background: linear-gradient(to right, #f7eddc, #ffffff); color: #a85f30; }
 
     /* Footer */
     .row-footer .meta-left { display: inline-flex; align-items: baseline; gap: 6px; }
@@ -714,16 +725,11 @@
         <h1 id="workspaceTitle">New Sale</h1>
       </div>
       <div class="header-right">
-        <span class="user-chip">
-          Signed in as <span class="user-name" id="userName">…</span>
-        </span>
         <span class="conn-status" id="connStatus" data-status="offline">
           <span class="conn-dot"></span>
           <span class="conn-label">Connecting…</span>
         </span>
         <span class="last-updated" id="lastUpdated"></span>
-        <button class="btn secondary small" onclick="window.openSettings()">⚙ Settings</button>
-        <button class="btn secondary small" onclick="window.doSignOut()">Sign out</button>
         <button class="btn" id="refreshBtn" onclick="manualRefresh()">Refresh</button>
       </div>
     </header>
@@ -821,7 +827,7 @@
     <div class="drawer-backdrop" id="drawerBackdrop" onclick="window.closeDrawer()"></div>
     <aside class="drawer" id="drawer" aria-label="Workspace navigation">
       <div class="drawer-header">
-        <span class="drawer-title">Workspaces</span>
+        <span class="drawer-title">Menu</span>
         <button class="btn secondary small" onclick="window.closeDrawer()" aria-label="Close menu">✕</button>
       </div>
       <nav class="drawer-nav">
@@ -838,10 +844,22 @@
           <span class="drawer-label">Sales History</span>
         </button>
         <button class="drawer-item" data-workspace="actions" onclick="window.switchWorkspace('actions')">
-          <span class="drawer-icon">⚙️</span>
+          <span class="drawer-icon">📦</span>
           <span class="drawer-label">Actions</span>
         </button>
+        <div class="drawer-divider"></div>
+        <button class="drawer-item" onclick="window.openSettings()">
+          <span class="drawer-icon">⚙️</span>
+          <span class="drawer-label">Settings</span>
+        </button>
       </nav>
+      <div class="drawer-footer">
+        <div class="drawer-user">
+          <div class="drawer-user-label">Signed in as</div>
+          <div class="drawer-user-name" id="drawerUserName">…</div>
+        </div>
+        <button class="btn secondary small drawer-signout-btn" onclick="window.doSignOut()">Sign out</button>
+      </div>
     </aside>
 
     <!-- ============ Import preview modal ============ -->
@@ -1036,7 +1054,7 @@
     function showApp() {
       document.getElementById('loginScreen').style.display = 'none'
       document.getElementById('appShell').classList.add('visible')
-      document.getElementById('userName').textContent = displayName(currentUser.email)
+      document.getElementById('drawerUserName').textContent = displayName(currentUser.email)
       // Initialize workspace navigation
       initWorkspace()
       // Now that we're authenticated, load the data
@@ -1920,6 +1938,15 @@
       feedback.className = 'form-feedback'
       feedback.textContent = ''
     }
+
+    // Auto-select all text in number inputs when they receive focus.
+    // Delegated on document so it covers dynamically-added inputs (sale rows, edit cells).
+    document.addEventListener('focusin', (e) => {
+      if (e.target && e.target.tagName === 'INPUT' && e.target.type === 'number') {
+        // Defer to next tick so browser focus completes first
+        setTimeout(() => { try { e.target.select() } catch (_) {} }, 0)
+      }
+    })
 
     // Wire up Add and Cancel buttons (the buttons exist by now in DOM)
     document.getElementById('addSaleRowBtn').addEventListener('click', () => addSaleRow())
