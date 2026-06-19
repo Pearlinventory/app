@@ -161,7 +161,8 @@
     /* The saleRowsContainer wraps the dynamic rows in the DOM but must be
        transparent to the grid layout so that .sale-row children participate
        in the bubble-card's subgrid (grid-column: 1 / -1 won't work otherwise). */
-    .bubble.form-sale #saleRowsContainer { display: contents; }
+    .bubble.form-sale #saleRowsContainer,
+    .bubble.form-sale #stockRowsContainer { display: contents; }
     .bubble.form-sale .bubble-card {
       display: grid;
       grid-template-columns: 72px 1fr 44px 44px 32px;
@@ -278,13 +279,15 @@
       background: var(--id-freeform-bg);
       color: var(--text);
     }
-    /* When empty: bigger em-dash, faint gray, no letter-spacing compression so it's clearly visible */
+    /* When empty: bigger em-dash, faint gray, no letter-spacing compression so it's clearly visible.
+       Force same font-family on both cells (ID is normally monospace) so dashes render identically. */
     .bubble.form-sale .col-form-id[data-state="empty"],
     .bubble.form-sale .col-form-stock[data-state="empty"] {
       font-size: 15px;
       letter-spacing: 0;
       color: var(--text-faint);
       font-style: normal;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
     /* Product input cell */
@@ -383,9 +386,9 @@
       margin: 0 auto;
       padding: 9px 22px;
       background: transparent;
-      border: 1.5px solid var(--success);
+      border: 1.5px solid var(--accent);
       border-radius: 8px;
-      color: var(--success);
+      color: var(--accent);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
@@ -395,7 +398,7 @@
       font-family: inherit;
       width: auto;
     }
-    .bubble.form-sale .add-row-btn:hover { background: rgba(34, 197, 94, 0.10); border-color: #16a34a; color: #16a34a; }
+    .bubble.form-sale .add-row-btn:hover { background: rgba(62, 207, 142, 0.10); border-color: var(--accent-hover); color: var(--accent-hover); }
     .bubble.form-sale .add-row-btn .plus-sign { font-size: 14px; line-height: 1; }
     /* Center the button inside its row */
     .bubble.form-sale .row-add-button { text-align: center; }
@@ -434,6 +437,61 @@
       .bubble.form-sale .sale-row,
       .bubble.form-sale .row-add-button,
       .bubble.form-sale .row-form-footer { border-top-width: 1.5px; border-top-color: #cbd0d4; }
+    }
+
+    /* ===== Add Products (stock-in) bubble form — orange/amber variant ===== */
+    .bubble.form-stockin .bubble-card { border-color: #d4974a; }
+    .bubble.form-stockin .row-header .bubble-cell { background: linear-gradient(to right, #e3ad7d, #ebc7a0); color: #000; }
+    .bubble.form-stockin .col-form-id { background: #fff7ed; }
+    .bubble.form-stockin .col-form-stock { background: #fff8ef; }
+    .bubble.form-stockin .col-form-x { background: #fff7ed; }
+    .bubble.form-stockin .row-form-footer { background: #fff7ed; border-top-color: #e3ad7d; }
+    .bubble.form-stockin .row-add-button { border-top-color: #e3ad7d; }
+    .bubble.form-stockin .add-row-btn { border-color: #d4974a; color: #b87a2a; }
+    .bubble.form-stockin .add-row-btn:hover { background: rgba(212, 151, 74, 0.10); border-color: #b87a2a; color: #8a4d1e; }
+    .bubble.form-stockin .row-body { border-top-color: #f0d2a8; }
+    .bubble.form-stockin .sale-row { border-top-color: #f0d2a8; }
+    .bubble.form-stockin .row-feedback .form-feedback.error { color: #b87a2a; }
+    /* Source/Invoice row */
+    .bubble.form-stockin .row-source {
+      grid-column: 1 / -1 !important;
+      display: flex !important;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #fdf0dc;
+      border-bottom: 0.5px solid #e3ad7d;
+      border-top-left-radius: 14px;
+      border-top-right-radius: 14px;
+    }
+    .bubble.form-stockin .row-source label {
+      font-size: 11px;
+      color: #8a4d1e;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      flex-shrink: 0;
+    }
+    .bubble.form-stockin .row-source input {
+      flex: 1;
+      border: 1px solid #e3ad7d;
+      background: #ffffff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      min-width: 0;
+    }
+    .bubble.form-stockin .row-source input:focus { outline: none; border-color: #d4974a; box-shadow: 0 0 0 2px rgba(212, 151, 74, 0.2); }
+    /* When the row-header is the first child (no source row above), round its corners.
+       But when row-source IS above, the source row takes the top corners instead. */
+    .bubble.form-stockin .row-header .bubble-cell:first-child { border-top-left-radius: 0; }
+    .bubble.form-stockin .row-header .bubble-cell:last-child { border-top-right-radius: 0; }
+    @media (max-width: 600px) {
+      .bubble.form-stockin .bubble-card { border-color: #b87a2a; }
+      .bubble.form-stockin .row-source { padding: 8px 10px; }
+      .bubble.form-stockin .row-source label { font-size: 10px; }
     }
     .field { display: flex; flex-direction: column; gap: 4px; position: relative; }
     .field label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 500; }
@@ -646,6 +704,8 @@
     .row-footer .meta-right { color: var(--text-muted); }
     .row-footer .meta-right.edited { font-style: italic; }
     .row-footer .meta-right.invoice { font-family: ui-monospace, monospace; }
+    .row-footer .meta-right-group { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .row-footer .edited-prefix { font-style: italic; font-size: 11px; color: var(--text-muted); }
     .row-footer .freeform-flag { display: inline-block; font-size: 10px; padding: 1px 6px; background: var(--id-freeform-bg); color: var(--danger); border-radius: 3px; font-weight: 600; }
 
     /* Action dropdown menu — opens via right-click (desktop) or long-press (mobile) */
@@ -659,26 +719,30 @@
     .bubble.selected::before { content: ''; position: absolute; inset: -8px -10px; background: rgba(59, 130, 246, 0.12); border-radius: 18px; z-index: -1; }
 
     /* ===== Inline edit mode for history bubbles ===== */
-    /* Marching-ants animated dashed border around bubble in edit mode */
+    /* Marching-ants animated dashed border around bubble in edit mode.
+       Uses an SVG overlay so the dashes follow the bubble's ROUNDED corners
+       (the previous 4-gradient hack drew straight lines and corners were eaten). */
     .bubble.editing { z-index: 2; }
-    .bubble.editing::before {
-      content: '';
+    .bubble.editing .marching-ants-svg {
       position: absolute;
-      inset: -5px;
-      border-radius: 17px;
+      inset: -3px;
+      width: calc(100% + 6px);
+      height: calc(100% + 6px);
       pointer-events: none;
-      background-image:
-        linear-gradient(90deg, #3b82f6 75%, transparent 75%),
-        linear-gradient(90deg, #3b82f6 75%, transparent 75%),
-        linear-gradient(0deg, #3b82f6 75%, transparent 75%),
-        linear-gradient(0deg, #3b82f6 75%, transparent 75%);
-      background-position: 0 0, 0 100%, 0 0, 100% 0;
-      background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
-      background-size: 8px 2px, 8px 2px, 2px 8px, 2px 8px;
-      animation: marching-ants 0.5s infinite linear;
+      overflow: visible;
+      z-index: 1;
+    }
+    .bubble.editing .marching-ants-svg rect {
+      width: 100%;
+      height: 100%;
+      fill: none;
+      stroke: #3b82f6;
+      stroke-width: 2;
+      stroke-dasharray: 6 4;
+      animation: marching-ants 0.4s linear infinite;
     }
     @keyframes marching-ants {
-      to { background-position: 8px 0, -8px 100%, 0 -8px, 100% 8px; }
+      to { stroke-dashoffset: -10; }  /* 6 + 4 = 10, one full dash cycle */
     }
     /* Editable cell inputs */
     .bubble.editing .row-body .col-qty input.cell-edit-input {
@@ -824,33 +888,44 @@
     </div>
 
     <!-- ============ Workspace: Actions ============ -->
-    <div class="workspace" data-workspace="actions">
-      <section class="panel stockin-panel">
-        <h2>Receive Stock</h2>
-        <div class="stockin-form">
-          <div class="field field-product">
-            <label for="stockProductInput">Product (type to search)</label>
-            <input type="text" id="stockProductInput" autocomplete="off" placeholder="Start typing product name…">
-            <div class="autocomplete-list" id="stockAcList"></div>
-          </div>
-          <div class="field">
-            <label>ID</label>
-            <div class="id-readout" id="stockIdReadout" data-state="empty">—</div>
-          </div>
-          <div class="field">
-            <label for="stockQtyInput">Quantity</label>
-            <input type="number" id="stockQtyInput" min="1" step="1">
-          </div>
-          <div class="field">
-            <label for="stockSourceInput">Invoice / source</label>
-            <input type="text" id="stockSourceInput" placeholder="e.g. INV-1234">
-          </div>
-          <div class="field field-submit" style="justify-content: flex-end;">
-            <label style="visibility: hidden;">&nbsp;</label>
-            <button class="btn orange" id="logStockBtn" onclick="submitStockIn()">Receive</button>
+    <!-- ============ Workspace: Add Products (multi-row bubble form) ============ -->
+    <div class="workspace" data-workspace="addproducts">
+      <section class="activity-section">
+        <div class="bubble form-sale form-stockin">
+          <div class="bubble-card">
+            <div class="bubble-row row-source">
+              <label for="stockSourceInput">Source / Invoice</label>
+              <input type="text" id="stockSourceInput" autocomplete="off">
+            </div>
+            <div class="bubble-row row-header">
+              <div class="bubble-cell">ID</div>
+              <div class="bubble-cell">Product</div>
+              <div class="bubble-cell">Stock</div>
+              <div class="bubble-cell">Qty</div>
+              <div class="bubble-cell"></div>
+            </div>
+            <div id="stockRowsContainer"></div>
+            <div class="row-add-button">
+              <button class="add-row-btn" id="addStockRowBtn" type="button">
+                <span class="plus-sign">+</span> Add another product
+              </button>
+            </div>
+            <div class="row-feedback">
+              <div class="form-feedback" id="stockFeedback"></div>
+            </div>
+            <div class="row-form-footer">
+              <button class="btn danger" id="cancelStockBtn" type="button">Cancel</button>
+              <button class="btn" id="logStockBtn" onclick="submitStockIn()">Receive</button>
+            </div>
           </div>
         </div>
-        <div class="form-feedback" id="stockFeedback"></div>
+      </section>
+    </div>
+
+    <!-- ============ Workspace: Tools (CSV import, backup, etc.) ============ -->
+    <div class="workspace" data-workspace="tools">
+      <section class="panel">
+        <h2>Tools</h2>
         <div class="import-row">
           <input type="file" id="importFile" accept=".csv,.tsv,.xlsx,.xls,.ods" style="display:none">
           <button class="btn secondary small" id="importBtn" onclick="document.getElementById('importFile').click()">
@@ -873,6 +948,10 @@
           <span class="drawer-icon">🛒</span>
           <span class="drawer-label">New Sale</span>
         </button>
+        <button class="drawer-item" data-workspace="addproducts" onclick="window.switchWorkspace('addproducts')">
+          <span class="drawer-icon">📦</span>
+          <span class="drawer-label">Add Products</span>
+        </button>
         <button class="drawer-item" data-workspace="stock" onclick="window.switchWorkspace('stock')">
           <span class="drawer-icon">📊</span>
           <span class="drawer-label">Current Stock</span>
@@ -881,9 +960,9 @@
           <span class="drawer-icon">🕒</span>
           <span class="drawer-label">Sales History</span>
         </button>
-        <button class="drawer-item" data-workspace="actions" onclick="window.switchWorkspace('actions')">
-          <span class="drawer-icon">📦</span>
-          <span class="drawer-label">Actions</span>
+        <button class="drawer-item" data-workspace="tools" onclick="window.switchWorkspace('tools')">
+          <span class="drawer-icon">🔧</span>
+          <span class="drawer-label">Tools</span>
         </button>
         <div class="drawer-divider"></div>
         <button class="drawer-item" onclick="window.openSettings()">
@@ -1246,6 +1325,9 @@
         Object.values(saleRowAutocompletes).forEach(ac => {
           if (ac && ac.refreshStock) ac.refreshStock()
         })
+        Object.values(stockRowAutocompletes).forEach(ac => {
+          if (ac && ac.refreshStock) ac.refreshStock()
+        })
         await reloadActivity()
       } catch (err) {
         log('error', 'Load failed', err)
@@ -1398,6 +1480,15 @@
       const dateStr = sameYear ? `${month} ${day}` : `${d.getFullYear()} ${month} ${day}`
       if (sameDay) return `Today · ${dateStr}`
       if (isYest) return `Yesterday · ${dateStr}`
+      // WhatsApp-style: weekday prefix for the past 7 days (after yesterday).
+      // E.g. "Wednesday · June 17". Older dates show just the bare date.
+      const startOfToday = new Date(now); startOfToday.setHours(0,0,0,0)
+      const startOfD = new Date(d); startOfD.setHours(0,0,0,0)
+      const daysAgo = Math.floor((startOfToday - startOfD) / 86400000)
+      if (daysAgo >= 2 && daysAgo <= 6) {
+        const weekday = d.toLocaleString('en', { weekday: 'long' })
+        return `${weekday} · ${dateStr}`
+      }
       return dateStr
     }
     function formatHM(iso) {
@@ -1480,8 +1571,19 @@
         if (isEditing) {
           // Source becomes editable in edit mode
           metaRight = `<input type="text" class="cell-edit-input" data-edit-source value="${escapeHtml(r.source || '')}" placeholder="Source / invoice">`
-        } else if (r.source) {
-          metaRight = `<span class="meta-right invoice">${escapeHtml(r.source)}</span>`
+        } else {
+          // Show "edited · DATE" prefix in front of source if any item edited
+          const editedItem = (r.items || []).find(it => it.edited && it.updated_at)
+          let editedPrefix = ''
+          if (editedItem) {
+            const editTime = formatHM(editedItem.updated_at)
+            const editDate = formatDateLong(editedItem.updated_at)
+            editedPrefix = `<span class="edited-prefix">edited · ${editTime} — ${editDate}</span>`
+          }
+          const sourceSpan = r.source ? `<span class="meta-right invoice">${escapeHtml(r.source)}</span>` : ''
+          if (editedPrefix || sourceSpan) {
+            metaRight = `<span class="meta-right-group">${editedPrefix}${sourceSpan}</span>`
+          }
         }
       } else {
         // Sale: show "edited" indicator if any item has been edited
@@ -1503,8 +1605,13 @@
             <button class="btn small" data-action="save-edit" data-group-id="${escapeHtml(r.group_id)}">Save</button>
           </div>`
         : ''
+      // SVG marching-ants overlay (rounded corners) when in edit mode
+      const marchingAnts = isEditing
+        ? `<svg class="marching-ants-svg" xmlns="http://www.w3.org/2000/svg"><rect rx="16" ry="16"></rect></svg>`
+        : ''
       return `
         <div class="${klass}" data-group-id="${escapeHtml(r.group_id)}" data-event-type="${r.event_type}" data-legacy-event-id="${r.legacy_event_id || ''}">
+          ${marchingAnts}
           <div class="bubble-card">
             <div class="bubble-row row-header">
               <div class="bubble-cell col-id">ID</div>
@@ -2015,7 +2122,89 @@
     // Initial state: one empty row
     addSaleRow()
 
-    const stockAc = createAutocomplete('stockProductInput', 'stockAcList', 'stockIdReadout')
+    // ===== Stock-in form: multi-row state (parallel to sale form) =====
+    const stockRowAutocompletes = {}  // rowId -> autocomplete returned by createAutocomplete
+    let nextStockRowId = 0
+
+    function addStockRow() {
+      const rowId = nextStockRowId++
+      const container = document.getElementById('stockRowsContainer')
+      const row = document.createElement('div')
+      row.className = 'sale-row'
+      row.setAttribute('data-row-id', rowId)
+      row.innerHTML = `
+        <div class="bubble-cell col-form-id" id="stockIdReadout-${rowId}" data-state="empty">—</div>
+        <div class="bubble-cell col-form-product">
+          <input type="text" id="stockProductInput-${rowId}" autocomplete="off" placeholder="Start typing product name…">
+          <div class="autocomplete-list" id="stockAcList-${rowId}"></div>
+        </div>
+        <div class="bubble-cell col-form-stock" id="stockStockReadout-${rowId}" data-state="empty" title="Current stock for the selected product">—</div>
+        <div class="bubble-cell col-form-qty">
+          <input type="number" id="stockQtyInput-${rowId}" min="1" step="1">
+        </div>
+        <div class="bubble-cell col-form-x">
+          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" aria-label="Remove row" title="Remove this product">×</button>
+        </div>
+      `
+      container.appendChild(row)
+      const ac = createAutocomplete(
+        `stockProductInput-${rowId}`,
+        `stockAcList-${rowId}`,
+        `stockIdReadout-${rowId}`,
+        `stockStockReadout-${rowId}`
+      )
+      stockRowAutocompletes[rowId] = ac
+      row.querySelector('[data-remove-row]').addEventListener('click', () => removeStockRow(rowId))
+      ac.refreshStock()
+      if (Object.keys(stockRowAutocompletes).length > 1) {
+        document.getElementById(`stockProductInput-${rowId}`).focus()
+      }
+    }
+
+    function removeStockRow(rowId) {
+      const row = document.querySelector(`#stockRowsContainer .sale-row[data-row-id="${rowId}"]`)
+      if (row) row.remove()
+      delete stockRowAutocompletes[rowId]
+    }
+
+    function clearAllStockRows() {
+      document.getElementById('stockRowsContainer').innerHTML = ''
+      Object.keys(stockRowAutocompletes).forEach(k => delete stockRowAutocompletes[k])
+    }
+
+    function resetStockForm() {
+      clearAllStockRows()
+      addStockRow()
+      document.getElementById('stockSourceInput').value = ''
+      const feedback = document.getElementById('stockFeedback')
+      feedback.className = 'form-feedback'
+      feedback.textContent = ''
+    }
+
+    // Wire up Add and Cancel buttons for stock-in form
+    document.getElementById('addStockRowBtn').addEventListener('click', () => addStockRow())
+    document.getElementById('cancelStockBtn').addEventListener('click', async () => {
+      const allRows = document.querySelectorAll('#stockRowsContainer .sale-row')
+      let hasAnyData = false
+      for (const rowEl of allRows) {
+        const rowId = parseInt(rowEl.dataset.rowId, 10)
+        const ac = stockRowAutocompletes[rowId]
+        const productName = ac ? ac.getValue() : ''
+        const qty = document.getElementById(`stockQtyInput-${rowId}`)?.value || ''
+        if (productName || qty) { hasAnyData = true; break }
+      }
+      if (!hasAnyData) hasAnyData = !!document.getElementById('stockSourceInput').value.trim()
+      if (hasAnyData) {
+        const ok = await confirmYesNo('Discard everything you have entered?', {
+          title: 'Discard entries?', okLabel: 'Discard', cancelLabel: 'Keep editing', okStyle: 'danger'
+        })
+        if (!ok) return
+      }
+      resetStockForm()
+    })
+
+    // Initial state: one empty stock row
+    addStockRow()
 
     function updateFormButtonsEnabled() {
       const offline = !isOnline
@@ -2235,55 +2424,87 @@
 
     window.submitStockIn = async function() {
       if (!currentUser) return
-      const productName = stockAc.getValue()
-      const quantity = parseInt(document.getElementById('stockQtyInput').value, 10)
       const source = document.getElementById('stockSourceInput').value.trim()
       const feedback = document.getElementById('stockFeedback')
       feedback.className = 'form-feedback'; feedback.textContent = ''
-      if (!productName) { feedback.className = 'form-feedback error'; feedback.textContent = 'Enter a product name first.'; return }
-      if (!quantity || quantity < 1) { feedback.className = 'form-feedback error'; feedback.textContent = 'Enter a quantity of 1 or more.'; return }
-      if (!isOnline) { feedback.className = 'form-feedback warning'; feedback.textContent = 'No connection — cannot receive stock right now.'; return }
-      const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
-      if (!exact) {
+      // Collect all rows. Skip fully-empty rows; error on partial rows.
+      const allRows = document.querySelectorAll('#stockRowsContainer .sale-row')
+      const collected = []  // { productName, quantity, exact }
+      let visualIdx = 0
+      for (const rowEl of allRows) {
+        visualIdx++
+        const rowId = parseInt(rowEl.dataset.rowId, 10)
+        const ac = stockRowAutocompletes[rowId]
+        if (!ac) continue
+        const productName = ac.getValue()
+        const qtyEl = document.getElementById(`stockQtyInput-${rowId}`)
+        const qtyStr = qtyEl.value
+        if (!productName && !qtyStr) continue
+        if (!productName) {
+          feedback.className = 'form-feedback error'
+          feedback.textContent = `Row ${visualIdx}: enter a product first.`
+          return
+        }
+        const quantity = parseInt(qtyStr, 10)
+        if (isNaN(quantity) || quantity < 1) {
+          feedback.className = 'form-feedback error'
+          feedback.textContent = `Row ${visualIdx}: quantity must be 1 or more.`
+          return
+        }
+        const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
+        if (!exact) {
+          feedback.className = 'form-feedback error'
+          feedback.textContent = `Row ${visualIdx}: "${productName}" is not in the catalog. Add the product first.`
+          return
+        }
+        collected.push({ productName, quantity, exact })
+      }
+      if (collected.length === 0) {
         feedback.className = 'form-feedback error'
-        feedback.textContent = 'Product not in catalog. Add it first before receiving stock for it.'
+        feedback.textContent = 'No products to receive. Add at least one product first.'
         return
       }
-      const groupRow = {
-        received_by: currentUser.email,
-        received_by_display: currentUser.display_name || currentUser.email,
-        client_uuid: crypto.randomUUID(),
+      if (!isOnline) {
+        feedback.className = 'form-feedback warning'
+        feedback.textContent = 'No connection — cannot receive stock right now.'
+        return
       }
-      if (source) groupRow.source = source
-      const itemRow = {
-        product_id: exact.id,
-        quantity,
-        received_by: currentUser.email,
-        received_by_display: currentUser.display_name || currentUser.email,
-        client_uuid: crypto.randomUUID(),
-      }
-      log('stock_in', 'Submitting stock_in (group + item)', { groupRow, itemRow })
+      log('stock_in', `Submitting stock_in (group + ${collected.length} item${collected.length>1?'s':''})`, { source, items: collected.map(c => ({ product: c.productName, qty: c.quantity })) })
       const btn = document.getElementById('logStockBtn')
       btn.disabled = true
       showSubmitOverlay('Sending…')
       try {
+        // Step 1: create the group
+        const groupRow = {
+          received_by: currentUser.email,
+          received_by_display: currentUser.display_name || currentUser.email,
+          client_uuid: crypto.randomUUID(),
+        }
+        if (source) groupRow.source = source
         const { data: groupData, error: groupErr } = await supabase
           .from('stock_in_groups').insert(groupRow).select().single()
         if (groupErr && groupErr.code !== '23505') throw groupErr
         const groupId = groupData?.id
         if (!groupId) throw new Error('Could not retrieve stock_in_group id after insert')
-        itemRow.stock_in_group_id = groupId
-        const { error: itemErr } = await supabase.from('stock_in').insert(itemRow)
-        if (itemErr && itemErr.code !== '23505') throw itemErr
-        log('stock_in', 'Stock_in inserted', { groupId })
+        // Step 2: insert each line item referencing the group
+        for (const c of collected) {
+          const itemRow = {
+            product_id: c.exact.id,
+            quantity: c.quantity,
+            received_by: currentUser.email,
+            received_by_display: currentUser.display_name || currentUser.email,
+            client_uuid: crypto.randomUUID(),
+            stock_in_group_id: groupId,
+          }
+          const { error: itemErr } = await supabase.from('stock_in').insert(itemRow)
+          if (itemErr && itemErr.code !== '23505') throw itemErr
+        }
+        log('stock_in', `Stock_in inserted: ${collected.length} item(s) in group ${groupId}`)
         setSubmitOverlaySuccess()
         feedback.className = 'form-feedback success'
-        feedback.textContent = '✓ Stock received.'
+        feedback.textContent = `✓ Received ${collected.length} product${collected.length>1?'s':''}.`
         setTimeout(() => {
-          stockAc.clear()
-          document.getElementById('stockQtyInput').value = ''
-          document.getElementById('stockSourceInput').value = ''
-          feedback.textContent = ''; feedback.className = 'form-feedback'
+          resetStockForm()
         }, 1500)
         loadAll(false)
       } catch (err) {
@@ -2912,9 +3133,10 @@ new events will not be in this file. Re-download periodically.
     // ============================================================
     const WORKSPACE_TITLES = {
       newsale: 'New Sale',
+      addproducts: 'Add Products',
       stock: 'Current Stock',
       history: 'Sales History',
-      actions: 'Actions',
+      tools: 'Tools',
     }
     const DEFAULT_WORKSPACE = 'newsale'
     const WORKSPACE_STORAGE_KEY = 'inv_last_workspace'
