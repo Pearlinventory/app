@@ -165,7 +165,7 @@
     .bubble.form-sale #stockRowsContainer { display: contents; }
     .bubble.form-sale .bubble-card {
       display: grid;
-      grid-template-columns: 72px 1fr 44px 44px 32px;
+      grid-template-columns: 24px 72px 1fr 44px 44px;
       border-radius: 14px;
       overflow: visible;
       border: 0.5px solid #9ca3af;
@@ -180,8 +180,8 @@
     /* Autocomplete dropdown inside the form bubble: spans full bubble width,
        contained horizontally to the bubble's edges but can extend below vertically. */
     .bubble.form-sale .col-form-product .autocomplete-list {
-      left: -72px;             /* offset back to bubble left edge (ID col is 72px wide) */
-      right: -120px;           /* offset to bubble right edge (Stock 44 + Qty 44 + X 32 = 120) */
+      left: -72px;             /* offset back to bubble ID col left edge (ID col is 72px wide). X col sits to the left of ID — dropdown skips it. */
+      right: -88px;            /* offset to bubble right edge (Stock 44 + Qty 44 = 88) */
       width: auto;
       min-width: auto;
       max-width: none;
@@ -221,7 +221,7 @@
     @media (max-width: 600px) {
       .bubble.form-sale .col-form-product .autocomplete-list {
         left: -60px;          /* mobile ID col is 60px */
-        right: -108px;        /* Stock 40 + Qty 40 + X 28 = 108 */
+        right: -80px;         /* Stock 40 + Qty 40 = 80 */
       }
       .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-item {
         grid-template-columns: 60px 1fr;
@@ -356,7 +356,7 @@
     .bubble.form-sale .col-form-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .bubble.form-sale .col-form-qty input { -moz-appearance: textfield; }
 
-    /* X button cell */
+    /* X button cell — now on the LEFT side of the row */
     .bubble.form-sale .col-form-x {
       background: #fafafa;
       align-items: center !important;
@@ -441,13 +441,33 @@
 
     /* Mobile adjustments */
     @media (max-width: 600px) {
-      .bubble.form-sale .bubble-card { grid-template-columns: 60px 1fr 40px 40px 28px; border-width: 1.5px; border-color: #9ca3af; }
+      .bubble.form-sale .bubble-card { grid-template-columns: 20px 60px 1fr 40px 40px; border-width: 1.5px; border-color: #9ca3af; }
       .bubble.form-sale .col-form-id { font-size: 9.5px; letter-spacing: -0.3px; }
       .bubble.form-sale .col-form-stock { font-size: 12px; }
       .bubble.form-sale .row-body,
       .bubble.form-sale .sale-row,
       .bubble.form-sale .row-add-button,
       .bubble.form-sale .row-form-footer { border-top-width: 1.5px; border-top-color: #cbd0d4; }
+    }
+
+    /* Negative quantity flag — used in stock-in form + history bubble for corrections (e.g. -7).
+       Same visual language as freeform-ID indicator: cream fill + orange outline. */
+    .bubble.form-stockin .col-form-qty.qty-negative {
+      background: #fff7ed;
+      box-shadow: inset 0 0 0 1.5px #d4974a;
+    }
+    .bubble.form-stockin .col-form-qty.qty-negative input {
+      color: #b87a2a;
+      font-weight: 600;
+    }
+    /* History bubble stock-in row with negative qty */
+    .bubble.stockin .row-body .bubble-cell.col-qty.col-qty-negative {
+      background: #fff7ed;
+      box-shadow: inset 0 0 0 1.5px #d4974a;
+    }
+    .bubble.stockin .row-body .bubble-cell.col-qty.col-qty-negative span {
+      color: #b87a2a;
+      font-weight: 600;
     }
 
     /* ===== Add Products (stock-in) bubble form — orange/amber variant ===== */
@@ -973,11 +993,11 @@
         <div class="bubble form-sale">
           <div class="bubble-card">
             <div class="bubble-row row-header">
+              <div class="bubble-cell"></div>
               <div class="bubble-cell">ID</div>
               <div class="bubble-cell">Product</div>
               <div class="bubble-cell">Stock</div>
               <div class="bubble-cell">Qty</div>
-              <div class="bubble-cell"></div>
             </div>
             <div id="saleRowsContainer"></div>
             <div class="row-add-button">
@@ -1029,11 +1049,11 @@
               <input type="text" id="stockSourceInput" autocomplete="off">
             </div>
             <div class="bubble-row row-header">
+              <div class="bubble-cell"></div>
               <div class="bubble-cell">ID</div>
               <div class="bubble-cell">Product</div>
               <div class="bubble-cell">Stock</div>
               <div class="bubble-cell">Qty</div>
-              <div class="bubble-cell"></div>
             </div>
             <div id="stockRowsContainer"></div>
             <div class="row-add-button">
@@ -1781,11 +1801,12 @@
     function renderItemBodyRow(item, isEditing, qtyPrefix, showStockColumn) {
       const idDisplay = item.product_id || ''
       const isFreeform = !item.product_id
+      const isNegative = qtyPrefix === '+' && item.quantity < 0   // only stock-in shows '+' prefix
       const nameDisplay = item.product_id
         ? escapeHtml(item.product_name)
         : `${escapeHtml(item.freeform_name || '?')} <span class="freeform-flag">freeform</span>`
       const qtyCellContent = isEditing
-        ? `<input type="number" class="cell-edit-input" data-edit-qty data-row-id="${item.row_id}" min="0" step="1" value="${item.quantity}">`
+        ? `<input type="number" class="cell-edit-input" data-edit-qty data-row-id="${item.row_id}" step="1" value="${item.quantity}">`
         : `<span>${qtyPrefix}${escapeHtml(String(item.quantity))}</span>`
       // Stock cell (only when editing) — read from lastGoodStock
       let stockCell = ''
@@ -1799,12 +1820,13 @@
       }
       const idCellClass = isFreeform ? 'bubble-cell col-id col-id-freeform' : 'bubble-cell col-id'
       const idCellContent = isFreeform ? '<span>?</span>' : `<span>${softBreakId(idDisplay) || '—'}</span>`
+      const qtyCellClass = isNegative ? 'bubble-cell col-qty col-qty-negative' : 'bubble-cell col-qty'
       return `
         <div class="bubble-row row-body" data-row-id="${item.row_id}">
           <div class="${idCellClass}">${idCellContent}</div>
           <div class="bubble-cell col-name"><span>${nameDisplay}</span></div>
           ${stockCell}
-          <div class="bubble-cell col-qty">${qtyCellContent}</div>
+          <div class="${qtyCellClass}">${qtyCellContent}</div>
         </div>`
     }
 
@@ -2144,15 +2166,22 @@
       const readout = document.getElementById(readoutId)
       const stockReadout = stockReadoutId ? document.getElementById(stockReadoutId) : null
       const noMatchMessage = (options && options.noMatchMessage) || 'No match — will be saved as freeform'
+      const hideZeroStock = !!(options && options.hideZeroStock)
       let visibleItems = []
       let focusedIndex = -1
       function update() {
         const query = input.value.trim().toLowerCase()
         updateReadout(query)
         if (query.length === 0) { hide(); return }
-        const matches = productsCache.filter(p =>
-          p.name.toLowerCase().includes(query) || p.id.toLowerCase().includes(query)
-        ).slice(0, 20)
+        const matches = productsCache.filter(p => {
+          const textMatch = p.name.toLowerCase().includes(query) || p.id.toLowerCase().includes(query)
+          if (!textMatch) return false
+          if (hideZeroStock) {
+            const stock = (typeof getCurrentStockById === 'function') ? getCurrentStockById(p.id) : null
+            if (stock === null || stock < 1) return false
+          }
+          return true
+        }).slice(0, 20)
         visibleItems = matches
         focusedIndex = -1
         if (matches.length === 0) {
@@ -2168,7 +2197,14 @@
         }
         list.classList.add('visible')
       }
-      function select(product) { input.value = product.name; hide(); updateReadout(product.name.toLowerCase()) }
+      function select(product) {
+        input.value = product.name
+        hide()
+        updateReadout(product.name.toLowerCase())
+        // Programmatic value assignment does NOT fire 'input' event, so manually
+        // trigger autoGrow for textareas (otherwise multi-line names get clipped).
+        if (input.classList.contains('auto-grow') && typeof autoGrow === 'function') autoGrow(input)
+      }
       function hide() { list.classList.remove('visible'); visibleItems = []; focusedIndex = -1 }
       function updateReadout(queryLower) {
         if (!queryLower) {
@@ -2215,7 +2251,11 @@
       })
       return {
         getValue: () => input.value.trim(),
-        clear: () => { input.value = ''; updateReadout('') },
+        clear: () => {
+          input.value = ''
+          updateReadout('')
+          if (input.classList.contains('auto-grow') && typeof autoGrow === 'function') autoGrow(input)
+        },
         // Allow external triggers to refresh the stock readout (called after fresh data loads)
         refreshStock: () => {
           const query = input.value.trim().toLowerCase()
@@ -2238,6 +2278,9 @@
       row.className = 'sale-row'
       row.setAttribute('data-row-id', rowId)
       row.innerHTML = `
+        <div class="bubble-cell col-form-x">
+          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" aria-label="Remove row" title="Remove this product">×</button>
+        </div>
         <div class="bubble-cell col-form-id" id="saleIdReadout-${rowId}" data-state="empty">—</div>
         <div class="bubble-cell col-form-product">
           <textarea id="saleProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Start typing product name…"></textarea>
@@ -2247,9 +2290,6 @@
         <div class="bubble-cell col-form-qty">
           <input type="number" id="saleQtyInput-${rowId}" min="0" step="1">
         </div>
-        <div class="bubble-cell col-form-x">
-          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" aria-label="Remove row" title="Remove this product">×</button>
-        </div>
       `
       // Insert the row at the end of the container (before the add-row button block which lives outside this container)
       container.appendChild(row)
@@ -2258,7 +2298,8 @@
         `saleProductInput-${rowId}`,
         `saleAcList-${rowId}`,
         `saleIdReadout-${rowId}`,
-        `saleStockReadout-${rowId}`
+        `saleStockReadout-${rowId}`,
+        { hideZeroStock: true }
       )
       saleRowAutocompletes[rowId] = ac
       // Wire up the remove button
@@ -2290,6 +2331,17 @@
       feedback.className = 'form-feedback'
       feedback.textContent = ''
     }
+
+    // Live styling: stock-in qty inputs flip to "negative" visual flag when user types a negative.
+    document.addEventListener('input', (e) => {
+      const inp = e.target
+      if (!inp || inp.tagName !== 'INPUT' || inp.type !== 'number') return
+      if (!inp.id || !inp.id.startsWith('stockQtyInput-')) return
+      const cell = inp.closest('.col-form-qty')
+      if (!cell) return
+      const v = parseInt(inp.value, 10)
+      cell.classList.toggle('qty-negative', !isNaN(v) && v < 0)
+    })
 
     // Auto-grow textareas (used for multi-line product names + freeform IDs).
     // The textarea grows in height as content wraps so we don't truncate or scroll.
@@ -2365,6 +2417,9 @@
       row.className = 'sale-row'
       row.setAttribute('data-row-id', rowId)
       row.innerHTML = `
+        <div class="bubble-cell col-form-x">
+          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" aria-label="Remove row" title="Remove this product">×</button>
+        </div>
         <div class="bubble-cell col-form-id col-form-id-editable" id="stockIdReadout-${rowId}" data-state="empty">
           <span class="id-display">—</span>
           <textarea class="id-editor auto-grow" rows="1" placeholder="?" autocomplete="off" maxlength="50" aria-label="Product ID"></textarea>
@@ -2375,10 +2430,7 @@
         </div>
         <div class="bubble-cell col-form-stock" id="stockStockReadout-${rowId}" data-state="empty" title="Current stock for the selected product">—</div>
         <div class="bubble-cell col-form-qty">
-          <input type="number" id="stockQtyInput-${rowId}" min="1" step="1">
-        </div>
-        <div class="bubble-cell col-form-x">
-          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" aria-label="Remove row" title="Remove this product">×</button>
+          <input type="number" id="stockQtyInput-${rowId}" step="1" title="Use negative numbers for corrections (e.g. -7)">
         </div>
       `
       container.appendChild(row)
@@ -2682,9 +2734,9 @@
           return
         }
         const quantity = parseInt(qtyStr, 10)
-        if (isNaN(quantity) || quantity < 1) {
+        if (isNaN(quantity) || quantity === 0) {
           feedback.className = 'form-feedback error'
-          feedback.textContent = `Row ${visualIdx}: quantity must be 1 or more.`
+          feedback.textContent = `Row ${visualIdx}: quantity cannot be zero. Use a positive number for receipts, or a negative number for corrections (e.g. -7).`
           return
         }
         const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
