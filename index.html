@@ -1973,7 +1973,7 @@
         const q = parseInt(inp.value, 10)
         if (isNaN(q)) { alert('Quantity must be a number.'); return }
         if (isStockIn) {
-          if (q === 0) { alert('Stock-in quantity cannot be zero. Use negative for corrections (e.g. -7).'); return }
+          // Stock-in allows any integer: positive (receipts), negative (corrections), or zero.
         } else {
           if (q < 0) { alert('Sale quantity must be 0 or more.'); return }
         }
@@ -2763,11 +2763,12 @@
           return
         }
         const quantity = parseInt(qtyStr, 10)
-        if (isNaN(quantity) || quantity === 0) {
+        if (isNaN(quantity)) {
           feedback.className = 'form-feedback error'
-          feedback.textContent = `Row ${visualIdx}: quantity cannot be zero. Use a positive number for receipts, or a negative number for corrections (e.g. -7).`
+          feedback.textContent = `Row ${visualIdx}: quantity must be a number.`
           return
         }
+        // Stock-in allows any integer: positive (receipts), negative (corrections), or zero.
         const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
         if (exact) {
           collected.push({ productName, quantity, exact, isNew: false })
