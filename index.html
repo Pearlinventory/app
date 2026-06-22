@@ -358,7 +358,7 @@
 
     /* X button cell — now on the LEFT side of the row */
     .bubble.form-sale .col-form-x {
-      background: #fafafa;
+      background: #ffffff;
       align-items: center !important;
       justify-content: center;
       padding: 0;
@@ -555,7 +555,7 @@
     .bubble.form-stockin .row-header .bubble-cell { background: linear-gradient(to right, #e3ad7d, #ebc7a0); color: #000; }
     .bubble.form-stockin .col-form-id { background: #fff7ed; }
     .bubble.form-stockin .col-form-stock { background: #fff8ef; }
-    .bubble.form-stockin .col-form-x { background: #fff7ed; }
+    .bubble.form-stockin .col-form-x { background: #ffffff; }
     .bubble.form-stockin .row-form-footer { background: #fff7ed; border-top-color: #e3ad7d; }
     .bubble.form-stockin .row-add-button { border-top-color: #e3ad7d; }
     .bubble.form-stockin .add-row-btn { border-color: #d4974a; color: #b87a2a; }
@@ -1802,12 +1802,14 @@
       const idDisplay = item.product_id || ''
       const isFreeform = !item.product_id
       const isNegative = qtyPrefix === '+' && item.quantity < 0   // only stock-in shows '+' prefix
+      // Only prepend '+' for non-negative values; negatives already carry their own '-' sign
+      const sign = (qtyPrefix === '+' && item.quantity >= 0) ? '+' : ''
       const nameDisplay = item.product_id
         ? escapeHtml(item.product_name)
         : `${escapeHtml(item.freeform_name || '?')} <span class="freeform-flag">freeform</span>`
       const qtyCellContent = isEditing
         ? `<input type="number" class="cell-edit-input" data-edit-qty data-row-id="${item.row_id}" step="1" value="${item.quantity}">`
-        : `<span>${qtyPrefix}${escapeHtml(String(item.quantity))}</span>`
+        : `<span>${sign}${escapeHtml(String(item.quantity))}</span>`
       // Stock cell (only when editing) — read from lastGoodStock
       let stockCell = ''
       if (showStockColumn) {
@@ -1962,19 +1964,24 @@
       // Read inputs directly from the bubble's inline edit cells.
       const bubbleEl = document.querySelector(`.bubble[data-group-id="${CSS.escape(groupId)}"]`)
       if (!bubbleEl) { alert('Bubble element not found.'); return }
+      const isStockIn = bubble.event_type === 'stock_in'
+      const isLegacy = isLegacyGroupId(groupId)
       const qtyInputs = bubbleEl.querySelectorAll('[data-edit-qty]')
       const newQtyByRow = {}
       for (const inp of qtyInputs) {
         const rowId = parseInt(inp.dataset.rowId, 10)
         const q = parseInt(inp.value, 10)
-        if (isNaN(q) || q < 0) { alert('Quantity must be 0 or more.'); return }
+        if (isNaN(q)) { alert('Quantity must be a number.'); return }
+        if (isStockIn) {
+          if (q === 0) { alert('Stock-in quantity cannot be zero. Use negative for corrections (e.g. -7).'); return }
+        } else {
+          if (q < 0) { alert('Sale quantity must be 0 or more.'); return }
+        }
         newQtyByRow[rowId] = q
       }
       // Source (stock-in only)
       const sourceInp = bubbleEl.querySelector('[data-edit-source]')
       const newSource = sourceInp ? sourceInp.value.trim() : null
-      const isStockIn = bubble.event_type === 'stock_in'
-      const isLegacy = isLegacyGroupId(groupId)
       log(bubble.event_type, `Saving edit for ${bubble.event_type} bubble ${groupId}`, { newQtyByRow, newSource, isLegacy })
       showSubmitOverlay('Saving changes…')
       try {
@@ -2283,7 +2290,7 @@
         </div>
         <div class="bubble-cell col-form-id" id="saleIdReadout-${rowId}" data-state="empty">—</div>
         <div class="bubble-cell col-form-product">
-          <textarea id="saleProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Start typing product name…"></textarea>
+          <textarea id="saleProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Type product name…"></textarea>
           <div class="autocomplete-list" id="saleAcList-${rowId}"></div>
         </div>
         <div class="bubble-cell col-form-stock" id="saleStockReadout-${rowId}" data-state="empty" title="Current stock for the selected product (read-only)">—</div>
@@ -2310,6 +2317,9 @@
       if (Object.keys(saleRowAutocompletes).length > 1) {
         document.getElementById(`saleProductInput-${rowId}`).focus()
       }
+      // If the "+ Add another product" button got pushed below the viewport, scroll just
+      // enough to bring it back into view — so the user can click + again without scrolling.
+      scrollAddButtonIntoView(row)
     }
 
     function removeSaleRow(rowId) {
@@ -2349,6 +2359,24 @@
       if (!el || el.tagName !== 'TEXTAREA') return
       el.style.height = 'auto'
       el.style.height = Math.max(36, el.scrollHeight) + 'px'
+    }
+
+    // After adding a new row to a form bubble, if the "+ Add another product" button got pushed
+    // below the viewport, scroll just enough to bring it back into view. Smooth scroll, conditional.
+    function scrollAddButtonIntoView(rowEl) {
+      if (!rowEl) return
+      const card = rowEl.closest('.bubble-card')
+      if (!card) return
+      const addBtn = card.querySelector('.add-row-btn')
+      if (!addBtn) return
+      // Defer to next frame so layout has settled after the row insert
+      requestAnimationFrame(() => {
+        const rect = addBtn.getBoundingClientRect()
+        const overflow = rect.bottom - window.innerHeight
+        if (overflow > 0) {
+          window.scrollBy({ top: overflow + 16, behavior: 'smooth' })
+        }
+      })
     }
     document.addEventListener('input', (e) => {
       if (e.target && e.target.classList && e.target.classList.contains('auto-grow')) {
@@ -2425,7 +2453,7 @@
           <textarea class="id-editor auto-grow" rows="1" placeholder="?" autocomplete="off" maxlength="50" aria-label="Product ID"></textarea>
         </div>
         <div class="bubble-cell col-form-product">
-          <textarea id="stockProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Start typing product name…"></textarea>
+          <textarea id="stockProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Type product name…"></textarea>
           <div class="autocomplete-list" id="stockAcList-${rowId}"></div>
         </div>
         <div class="bubble-cell col-form-stock" id="stockStockReadout-${rowId}" data-state="empty" title="Current stock for the selected product">—</div>
@@ -2447,6 +2475,7 @@
       if (Object.keys(stockRowAutocompletes).length > 1) {
         document.getElementById(`stockProductInput-${rowId}`).focus()
       }
+      scrollAddButtonIntoView(row)
     }
 
     function removeStockRow(rowId) {
