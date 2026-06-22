@@ -923,17 +923,98 @@
       outline: none;
       min-width: 100px;
     }
-    /* Save/Cancel row at bottom of bubble during edit */
+    /* Save/Cancel row at bottom of bubble during edit. Now has two sub-areas:
+       .edit-note-area on the LEFT (icon button OR note input)
+       .edit-action-buttons on the RIGHT (Cancel + Save) */
     .bubble-row.row-edit-actions {
       grid-column: 1 / -1 !important;
       display: flex !important;
-      justify-content: flex-end !important;
+      justify-content: space-between !important;
+      align-items: center;
       gap: 8px;
       padding: 8px 14px;
       background: #ffffff;
       border-top: 0.5px solid var(--border);
     }
+    .bubble-row.row-edit-actions .edit-note-area {
+      display: flex;
+      align-items: center;
+      flex: 1 1 auto;
+      min-width: 0;  /* allow input to shrink */
+    }
+    .bubble-row.row-edit-actions .edit-action-buttons {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
     .bubble-row.row-edit-actions .btn { font-size: 13px; padding: 6px 14px; }
+    .note-icon-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .note-icon-btn:hover {
+      background: #f5f5f5;
+      border-color: var(--text-faint);
+    }
+    .note-edit-input {
+      flex: 1 1 auto;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      font-style: italic;
+      background: #fafafa;
+      color: var(--text);
+      box-sizing: border-box;
+    }
+    .note-edit-input:focus {
+      outline: none;
+      border-color: var(--text-faint);
+      background: #ffffff;
+    }
+    .note-edit-input::placeholder {
+      color: var(--text-faint);
+      font-style: italic;
+    }
+    /* View-mode note row (shown when group has a non-empty note) */
+    .bubble-row.row-note {
+      grid-column: 1 / -1 !important;
+      display: flex !important;
+      padding: 8px 14px;
+      background: #fafafa;
+      border-top: 0.5px dashed var(--border);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .bubble-row.row-note .note-prefix {
+      font-weight: 600;
+      font-style: normal;
+      color: var(--text);
+      margin-right: 6px;
+      flex-shrink: 0;
+    }
+    .bubble-row.row-note .note-text {
+      font-style: italic;
+      color: var(--text);
+      overflow-wrap: break-word;
+      word-break: break-word;
+      min-width: 0;
+    }
 
     /* Inline edit form */
     /* Empty + load-more */
@@ -1761,11 +1842,31 @@
       const bodyRows = items.length > 0
         ? items.map(item => renderItemBodyRow(item, isEditing, qtyPrefix, showStockColumn)).join('')
         : `<div class="bubble-row row-body bubble-row-empty"><div class="bubble-cell" style="grid-column: 1 / -1; text-align: center; color: var(--text-faint); font-style: italic; padding: 14px;">(empty bubble)</div></div>`
-      // Edit-action buttons appear at the bottom of the bubble in edit mode
+      // Note view row: shown only outside edit mode, when a non-empty note exists on the group.
+      const hasNote = r.notes && r.notes.trim().length > 0
+      const noteRow = (!isEditing && hasNote)
+        ? `<div class="bubble-row row-note">
+             <div class="bubble-cell" style="grid-column: 1 / -1;">
+               <span class="note-prefix">Note:</span>
+               <span class="note-text">${escapeHtml(r.notes)}</span>
+             </div>
+           </div>`
+        : ''
+      // Edit-action buttons appear at the bottom of the bubble in edit mode.
+      // Includes a note icon (left) that expands to a text input, OR an input if note exists.
       const editActions = isEditing
         ? `<div class="bubble-row row-edit-actions">
-            <button class="btn danger small" data-action="cancel-edit">Cancel</button>
-            <button class="btn small" data-action="save-edit" data-group-id="${escapeHtml(r.group_id)}">Save</button>
+            <div class="edit-note-area" data-has-note="${hasNote ? '1' : '0'}">
+              ${hasNote || isLegacyGroupId(r.group_id)
+                ? (isLegacyGroupId(r.group_id)
+                    ? ''  /* legacy rows have no group to store notes on; hide note UI */
+                    : `<input type="text" class="cell-edit-input note-edit-input" data-edit-note value="${escapeHtml(r.notes || '')}" placeholder="Add a note…">`)
+                : `<button class="note-icon-btn" data-action="expand-note" type="button" aria-label="Add a note" title="Add a note">📝</button>`}
+            </div>
+            <div class="edit-action-buttons">
+              <button class="btn danger small" data-action="cancel-edit">Cancel</button>
+              <button class="btn small" data-action="save-edit" data-group-id="${escapeHtml(r.group_id)}">Save</button>
+            </div>
           </div>`
         : ''
       // SVG marching-ants overlay (rounded corners) when in edit mode
@@ -1790,6 +1891,7 @@
               </span>
               ${metaRight}
             </div>
+            ${noteRow}
             ${editActions}
           </div>
         </div>`
@@ -1802,8 +1904,8 @@
       const idDisplay = item.product_id || ''
       const isFreeform = !item.product_id
       const isNegative = qtyPrefix === '+' && item.quantity < 0   // only stock-in shows '+' prefix
-      // Only prepend '+' for non-negative values; negatives already carry their own '-' sign
-      const sign = (qtyPrefix === '+' && item.quantity >= 0) ? '+' : ''
+      // Only prepend '+' for strictly positive values; 0 and negatives stay bare.
+      const sign = (qtyPrefix === '+' && item.quantity > 0) ? '+' : ''
       const nameDisplay = item.product_id
         ? escapeHtml(item.product_name)
         : `${escapeHtml(item.freeform_name || '?')} <span class="freeform-flag">freeform</span>`
@@ -1924,6 +2026,18 @@
           renderActivity()
         })
       })
+      // Note icon → expand to text input
+      feedEl.querySelectorAll('[data-action="expand-note"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const area = btn.closest('.edit-note-area')
+          if (!area) return
+          area.innerHTML = `<input type="text" class="cell-edit-input note-edit-input" data-edit-note value="" placeholder="Add a note…">`
+          const inp = area.querySelector('input')
+          if (inp) {
+            inp.focus()
+          }
+        })
+      })
     }
     // Global click handler: close any open bubble menu when clicking outside
     document.addEventListener('click', (e) => {
@@ -1982,7 +2096,10 @@
       // Source (stock-in only)
       const sourceInp = bubbleEl.querySelector('[data-edit-source]')
       const newSource = sourceInp ? sourceInp.value.trim() : null
-      log(bubble.event_type, `Saving edit for ${bubble.event_type} bubble ${groupId}`, { newQtyByRow, newSource, isLegacy })
+      // Note (any bubble type) — read from the note input if it's currently shown
+      const noteInp = bubbleEl.querySelector('[data-edit-note]')
+      const newNote = noteInp ? noteInp.value.trim() : null  // null = note UI not shown / no change intended
+      log(bubble.event_type, `Saving edit for ${bubble.event_type} bubble ${groupId}`, { newQtyByRow, newSource, newNote, isLegacy })
       showSubmitOverlay('Saving changes…')
       try {
         // 1) Update each line-item row's quantity
@@ -2010,6 +2127,15 @@
             const { error } = await supabase.from('stock_in_groups').update({ source: srcValue }).eq('id', groupId)
             if (error) throw error
           }
+        }
+        // 3) Update note on the group (sale_groups or stock_in_groups). Legacy bubbles have no
+        //    group to attach a note to, so skip silently in that case. If user cleared the note
+        //    input, persist null. If noteInp is missing (icon wasn't expanded), don't touch notes.
+        if (noteInp && !isLegacy) {
+          const noteValue = newNote && newNote.length > 0 ? newNote : null
+          const groupTable = isStockIn ? 'stock_in_groups' : 'sale_groups'
+          const { error } = await supabase.from(groupTable).update({ notes: noteValue }).eq('id', groupId)
+          if (error) throw error
         }
         log(bubble.event_type, 'Edit saved')
         setSubmitOverlaySuccess()
