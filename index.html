@@ -414,6 +414,26 @@
     /* Center the button inside its row */
     .bubble.form-sale .row-add-button { text-align: center; }
 
+    /* Note area in form bubbles (sale + add-products). Either shows a 📝 icon button
+       OR a multi-line auto-grow textarea once expanded. */
+    .bubble.form-sale .row-note-area {
+      grid-column: 1 / -1 !important;
+      display: flex !important;
+      align-items: center;
+      padding: 10px 14px;
+      border-top: 0.5px solid #e8e8e8;
+      gap: 8px;
+    }
+    .bubble.form-sale .row-note-area .form-note-icon-btn {
+      flex-shrink: 0;
+    }
+    .bubble.form-sale .row-note-area .note-edit-input {
+      flex: 1 1 auto;
+    }
+    .bubble.form-sale .row-note-area .note-edit-input[style*="display: none"] {
+      display: none !important;
+    }
+
     /* Feedback row */
     .bubble.form-sale .row-feedback {
       grid-column: 1 / -1 !important;
@@ -857,6 +877,7 @@
       .bubble.stockin.editing .bubble-card { grid-template-columns: 60px minmax(100px, 1fr) 44px 50px; }
     }
     .bubble.editing .col-stock-edit {
+      display: flex;
       text-align: center;
       align-items: center !important;
       justify-content: center;
@@ -981,6 +1002,11 @@
       background: #fafafa;
       color: var(--text);
       box-sizing: border-box;
+      line-height: 1.45;
+      resize: none;
+      overflow: hidden;
+      display: block;
+      min-height: 30px;
     }
     .note-edit-input:focus {
       outline: none;
@@ -1000,6 +1026,12 @@
       border-top: 0.5px dashed var(--border);
       font-size: 13px;
       line-height: 1.45;
+    }
+    .bubble-row.row-note .note-icon {
+      margin-right: 6px;
+      font-size: 14px;
+      line-height: 1.45;
+      flex-shrink: 0;
     }
     .bubble-row.row-note .note-prefix {
       font-weight: 600;
@@ -1086,6 +1118,10 @@
                 <span class="plus-sign">+</span> Add another product
               </button>
             </div>
+            <div class="row-note-area" id="saleNoteArea">
+              <button class="note-icon-btn form-note-icon-btn" id="saleNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
+              <textarea class="note-edit-input auto-grow" id="saleNoteInput" rows="1" placeholder="Add a note…" style="display: none;"></textarea>
+            </div>
             <div class="row-feedback">
               <div class="form-feedback" id="saleFeedback"></div>
             </div>
@@ -1141,6 +1177,10 @@
               <button class="add-row-btn" id="addStockRowBtn" type="button">
                 <span class="plus-sign">+</span> Add another product
               </button>
+            </div>
+            <div class="row-note-area" id="stockNoteArea">
+              <button class="note-icon-btn form-note-icon-btn" id="stockNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
+              <textarea class="note-edit-input auto-grow" id="stockNoteInput" rows="1" placeholder="Add a note…" style="display: none;"></textarea>
             </div>
             <div class="row-feedback">
               <div class="form-feedback" id="stockFeedback"></div>
@@ -1847,6 +1887,7 @@
       const noteRow = (!isEditing && hasNote)
         ? `<div class="bubble-row row-note">
              <div class="bubble-cell" style="grid-column: 1 / -1;">
+               <span class="note-icon">📝</span>
                <span class="note-prefix">Note:</span>
                <span class="note-text">${escapeHtml(r.notes)}</span>
              </div>
@@ -1860,7 +1901,7 @@
               ${hasNote || isLegacyGroupId(r.group_id)
                 ? (isLegacyGroupId(r.group_id)
                     ? ''  /* legacy rows have no group to store notes on; hide note UI */
-                    : `<input type="text" class="cell-edit-input note-edit-input" data-edit-note value="${escapeHtml(r.notes || '')}" placeholder="Add a note…">`)
+                    : `<textarea class="note-edit-input auto-grow" rows="1" data-edit-note placeholder="Add a note…">${escapeHtml(r.notes || '')}</textarea>`)
                 : `<button class="note-icon-btn" data-action="expand-note" type="button" aria-label="Add a note" title="Add a note">📝</button>`}
             </div>
             <div class="edit-action-buttons">
@@ -2026,17 +2067,22 @@
           renderActivity()
         })
       })
-      // Note icon → expand to text input
+      // Note icon → expand to text input (auto-grow textarea, multi-line)
       feedEl.querySelectorAll('[data-action="expand-note"]').forEach(btn => {
         btn.addEventListener('click', () => {
           const area = btn.closest('.edit-note-area')
           if (!area) return
-          area.innerHTML = `<input type="text" class="cell-edit-input note-edit-input" data-edit-note value="" placeholder="Add a note…">`
-          const inp = area.querySelector('input')
+          area.innerHTML = `<textarea class="note-edit-input auto-grow" rows="1" data-edit-note placeholder="Add a note…"></textarea>`
+          const inp = area.querySelector('textarea')
           if (inp) {
             inp.focus()
+            if (typeof autoGrow === 'function') autoGrow(inp)
           }
         })
+      })
+      // Auto-grow any pre-filled note textareas (when a bubble enters edit mode with an existing note)
+      feedEl.querySelectorAll('textarea.note-edit-input').forEach(ta => {
+        if (typeof autoGrow === 'function') autoGrow(ta)
       })
     }
     // Global click handler: close any open bubble menu when clicking outside
@@ -2466,7 +2512,39 @@
       const feedback = document.getElementById('saleFeedback')
       feedback.className = 'form-feedback'
       feedback.textContent = ''
+      resetFormNoteArea('sale')
     }
+
+    // Form-bubble note area helper functions ----------------------------------
+    // Each form (sale, stock) has an area at the bottom containing either a 📝 icon button
+    // OR an auto-grow textarea. resetFormNoteArea collapses it back to icon-only.
+    function resetFormNoteArea(formKind) {
+      const iconBtn = document.getElementById(`${formKind}NoteIconBtn`)
+      const input = document.getElementById(`${formKind}NoteInput`)
+      if (!iconBtn || !input) return
+      iconBtn.style.display = ''
+      input.style.display = 'none'
+      input.value = ''
+      input.style.height = ''
+    }
+    function expandFormNoteArea(formKind) {
+      const iconBtn = document.getElementById(`${formKind}NoteIconBtn`)
+      const input = document.getElementById(`${formKind}NoteInput`)
+      if (!iconBtn || !input) return
+      iconBtn.style.display = 'none'
+      input.style.display = ''
+      input.focus()
+      if (typeof autoGrow === 'function') autoGrow(input)
+    }
+    function getFormNoteValue(formKind) {
+      const input = document.getElementById(`${formKind}NoteInput`)
+      if (!input) return null
+      const v = (input.value || '').trim()
+      return v.length > 0 ? v : null
+    }
+    // Wire up icon-click handlers for both forms
+    document.getElementById('saleNoteIconBtn')?.addEventListener('click', () => expandFormNoteArea('sale'))
+    document.getElementById('stockNoteIconBtn')?.addEventListener('click', () => expandFormNoteArea('stock'))
 
     // Live styling: stock-in qty inputs flip to "negative" visual flag when user types a negative.
     document.addEventListener('input', (e) => {
@@ -2548,6 +2626,7 @@
         const qty = document.getElementById(`saleQtyInput-${rowId}`)?.value || ''
         if (productName || qty) { hasAnyData = true; break }
       }
+      if (!hasAnyData && getFormNoteValue('sale')) hasAnyData = true
       if (hasAnyData) {
         const ok = await confirmYesNo('Discard everything you have entered?', {
           title: 'Discard sale?', okLabel: 'Discard', cancelLabel: 'Keep editing', okStyle: 'danger'
@@ -2622,6 +2701,7 @@
       const feedback = document.getElementById('stockFeedback')
       feedback.className = 'form-feedback'
       feedback.textContent = ''
+      resetFormNoteArea('stock')
     }
 
     // Wire up Add and Cancel buttons for stock-in form
@@ -2637,6 +2717,7 @@
         if (productName || qty) { hasAnyData = true; break }
       }
       if (!hasAnyData) hasAnyData = !!document.getElementById('stockSourceInput').value.trim()
+      if (!hasAnyData && getFormNoteValue('stock')) hasAnyData = true
       if (hasAnyData) {
         const ok = await confirmYesNo('Discard everything you have entered?', {
           title: 'Discard entries?', okLabel: 'Discard', cancelLabel: 'Keep editing', okStyle: 'danger'
@@ -2822,12 +2903,14 @@
       btn.disabled = true
       showSubmitOverlay('Sending…')
       try {
-        // Step 1: create the group
+        // Step 1: create the group (with optional note)
+        const noteValue = getFormNoteValue('sale')
         const groupRow = {
           sold_by: currentUser.email,
           sold_by_display: currentUser.display_name || currentUser.email,
           client_uuid: crypto.randomUUID(),
         }
+        if (noteValue) groupRow.notes = noteValue
         const { data: groupData, error: groupErr } = await supabase
           .from('sale_groups').insert(groupRow).select().single()
         if (groupErr && groupErr.code !== '23505') throw groupErr
@@ -2946,13 +3029,15 @@
             log('stock_in', `Created new product: ${c.newId} / ${c.productName}`)
           }
         }
-        // Step 1: create the group
+        // Step 1: create the group (with optional source + note)
+        const noteValue = getFormNoteValue('stock')
         const groupRow = {
           received_by: currentUser.email,
           received_by_display: currentUser.display_name || currentUser.email,
           client_uuid: crypto.randomUUID(),
         }
         if (source) groupRow.source = source
+        if (noteValue) groupRow.notes = noteValue
         const { data: groupData, error: groupErr } = await supabase
           .from('stock_in_groups').insert(groupRow).select().single()
         if (groupErr && groupErr.code !== '23505') throw groupErr
