@@ -414,24 +414,35 @@
     /* Center the button inside its row */
     .bubble.form-sale .row-add-button { text-align: center; }
 
-    /* Note area in form bubbles (sale + add-products). Either shows a 📝 icon button
-       OR a multi-line auto-grow textarea once expanded. */
-    .bubble.form-sale .row-note-area {
-      grid-column: 1 / -1 !important;
-      display: flex !important;
-      align-items: center;
-      padding: 10px 14px;
-      border-top: 0.5px solid #e8e8e8;
-      gap: 8px;
-    }
-    .bubble.form-sale .row-note-area .form-note-icon-btn {
-      flex-shrink: 0;
-    }
-    .bubble.form-sale .row-note-area .note-edit-input {
+    /* Locked "📝Note:" prefix overlay — appears INSIDE the textarea visually (absolute positioned).
+       The textarea has left padding to make room for the prefix, so user text starts after it.
+       pointer-events:none lets clicks pass through to the textarea below. */
+    .note-input-wrapper {
+      position: relative;
       flex: 1 1 auto;
+      min-width: 0;
+      display: block;
     }
-    .bubble.form-sale .row-note-area .note-edit-input[style*="display: none"] {
-      display: none !important;
+    .note-edit-prefix {
+      position: absolute;
+      left: 10px;
+      top: 7px;
+      font-weight: 700;
+      font-style: italic;
+      font-size: 13px;
+      color: var(--text);
+      pointer-events: none;
+      z-index: 1;
+      white-space: nowrap;
+      line-height: 1.45;
+    }
+    /* Make room inside the textarea for the prefix overlay */
+    .note-input-wrapper .note-edit-input {
+      padding-left: 70px;
+    }
+    @media (max-width: 600px) {
+      .note-input-wrapper .note-edit-input { padding-left: 64px; }
+      .note-edit-prefix { font-size: 12px; }
     }
 
     /* Feedback row */
@@ -447,16 +458,38 @@
     }
     .bubble.form-sale .row-feedback .form-feedback:empty { display: none; }
 
-    /* Footer row with Cancel + Submit */
+    /* Footer row with Note area (left) + Cancel + Submit (right) */
     .bubble.form-sale .row-form-footer {
       grid-column: 1 / -1 !important;
       display: flex !important;
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: center;
       padding: 10px 12px;
       background: #fafafa;
       border-top: 0.5px solid #e8e8e8;
+      gap: 10px;
+    }
+    .bubble.form-sale .footer-note-area {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      min-width: 0;
+    }
+    .bubble.form-sale .footer-buttons {
+      display: flex;
       gap: 8px;
+      flex-shrink: 0;
+    }
+    .bubble.form-sale .footer-note-area .note-expanded-state {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .bubble.form-sale .footer-note-area .note-remove-btn {
+      flex-shrink: 0;
+      margin-top: 6px;
     }
 
     /* Mobile adjustments */
@@ -1028,7 +1061,7 @@
       line-height: 1.45;
     }
     .bubble-row.row-note .note-icon {
-      margin-right: 6px;
+      margin-right: 0;
       font-size: 14px;
       line-height: 1.45;
       flex-shrink: 0;
@@ -1118,16 +1151,24 @@
                 <span class="plus-sign">+</span> Add another product
               </button>
             </div>
-            <div class="row-note-area" id="saleNoteArea">
-              <button class="note-icon-btn form-note-icon-btn" id="saleNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
-              <textarea class="note-edit-input auto-grow" id="saleNoteInput" rows="1" placeholder="Add a note…" style="display: none;"></textarea>
-            </div>
             <div class="row-feedback">
               <div class="form-feedback" id="saleFeedback"></div>
             </div>
             <div class="row-form-footer">
-              <button class="btn danger" id="cancelSaleBtn" type="button">Cancel</button>
-              <button class="btn" id="logSaleBtn" onclick="submitSale()">Log Sale</button>
+              <div class="footer-note-area" id="saleNoteArea">
+                <button class="note-icon-btn form-note-icon-btn" id="saleNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
+                <div class="note-expanded-state" id="saleNoteExpandedState" style="display: none;">
+                  <button class="remove-row-btn note-remove-btn" id="saleNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
+                  <div class="note-input-wrapper">
+                    <span class="note-edit-prefix">📝Note:</span>
+                    <textarea class="note-edit-input auto-grow" id="saleNoteInput" rows="1"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="footer-buttons">
+                <button class="btn danger" id="cancelSaleBtn" type="button">Cancel</button>
+                <button class="btn" id="logSaleBtn" onclick="submitSale()">Log Sale</button>
+              </div>
             </div>
           </div>
         </div>
@@ -1178,16 +1219,24 @@
                 <span class="plus-sign">+</span> Add another product
               </button>
             </div>
-            <div class="row-note-area" id="stockNoteArea">
-              <button class="note-icon-btn form-note-icon-btn" id="stockNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
-              <textarea class="note-edit-input auto-grow" id="stockNoteInput" rows="1" placeholder="Add a note…" style="display: none;"></textarea>
-            </div>
             <div class="row-feedback">
               <div class="form-feedback" id="stockFeedback"></div>
             </div>
             <div class="row-form-footer">
-              <button class="btn danger" id="cancelStockBtn" type="button">Cancel</button>
-              <button class="btn" id="logStockBtn" onclick="submitStockIn()">Receive</button>
+              <div class="footer-note-area" id="stockNoteArea">
+                <button class="note-icon-btn form-note-icon-btn" id="stockNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
+                <div class="note-expanded-state" id="stockNoteExpandedState" style="display: none;">
+                  <button class="remove-row-btn note-remove-btn" id="stockNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
+                  <div class="note-input-wrapper">
+                    <span class="note-edit-prefix">📝Note:</span>
+                    <textarea class="note-edit-input auto-grow" id="stockNoteInput" rows="1"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="footer-buttons">
+                <button class="btn danger" id="cancelStockBtn" type="button">Cancel</button>
+                <button class="btn" id="logStockBtn" onclick="submitStockIn()">Receive</button>
+              </div>
             </div>
           </div>
         </div>
@@ -1901,7 +1950,10 @@
               ${hasNote || isLegacyGroupId(r.group_id)
                 ? (isLegacyGroupId(r.group_id)
                     ? ''  /* legacy rows have no group to store notes on; hide note UI */
-                    : `<textarea class="note-edit-input auto-grow" rows="1" data-edit-note placeholder="Add a note…">${escapeHtml(r.notes || '')}</textarea>`)
+                    : `<div class="note-input-wrapper">
+                         <span class="note-edit-prefix">📝Note:</span>
+                         <textarea class="note-edit-input auto-grow" rows="1" data-edit-note>${escapeHtml(r.notes || '')}</textarea>
+                       </div>`)
                 : `<button class="note-icon-btn" data-action="expand-note" type="button" aria-label="Add a note" title="Add a note">📝</button>`}
             </div>
             <div class="edit-action-buttons">
@@ -2067,12 +2119,15 @@
           renderActivity()
         })
       })
-      // Note icon → expand to text input (auto-grow textarea, multi-line)
+      // Note icon → expand to text input (auto-grow textarea, multi-line, with locked prefix)
       feedEl.querySelectorAll('[data-action="expand-note"]').forEach(btn => {
         btn.addEventListener('click', () => {
           const area = btn.closest('.edit-note-area')
           if (!area) return
-          area.innerHTML = `<textarea class="note-edit-input auto-grow" rows="1" data-edit-note placeholder="Add a note…"></textarea>`
+          area.innerHTML = `<div class="note-input-wrapper">
+            <span class="note-edit-prefix">📝Note:</span>
+            <textarea class="note-edit-input auto-grow" rows="1" data-edit-note></textarea>
+          </div>`
           const inp = area.querySelector('textarea')
           if (inp) {
             inp.focus()
@@ -2516,35 +2571,43 @@
     }
 
     // Form-bubble note area helper functions ----------------------------------
-    // Each form (sale, stock) has an area at the bottom containing either a 📝 icon button
-    // OR an auto-grow textarea. resetFormNoteArea collapses it back to icon-only.
+    // Each form (sale, stock) has a note area inside the footer row containing:
+    //   - The 📝 icon button (default state)
+    //   - The expanded state (hidden by default): [X button] [locked-prefix textarea]
+    // resetFormNoteArea: hide expanded, show icon. expandFormNoteArea: hide icon, show expanded.
     function resetFormNoteArea(formKind) {
       const iconBtn = document.getElementById(`${formKind}NoteIconBtn`)
+      const expandedState = document.getElementById(`${formKind}NoteExpandedState`)
       const input = document.getElementById(`${formKind}NoteInput`)
-      if (!iconBtn || !input) return
+      if (!iconBtn || !expandedState || !input) return
       iconBtn.style.display = ''
-      input.style.display = 'none'
+      expandedState.style.display = 'none'
       input.value = ''
       input.style.height = ''
     }
     function expandFormNoteArea(formKind) {
       const iconBtn = document.getElementById(`${formKind}NoteIconBtn`)
+      const expandedState = document.getElementById(`${formKind}NoteExpandedState`)
       const input = document.getElementById(`${formKind}NoteInput`)
-      if (!iconBtn || !input) return
+      if (!iconBtn || !expandedState || !input) return
       iconBtn.style.display = 'none'
-      input.style.display = ''
+      expandedState.style.display = ''
       input.focus()
       if (typeof autoGrow === 'function') autoGrow(input)
     }
     function getFormNoteValue(formKind) {
+      const expandedState = document.getElementById(`${formKind}NoteExpandedState`)
       const input = document.getElementById(`${formKind}NoteInput`)
-      if (!input) return null
+      // Only return a value if the area is actually expanded — collapsed = no note
+      if (!input || !expandedState || expandedState.style.display === 'none') return null
       const v = (input.value || '').trim()
       return v.length > 0 ? v : null
     }
-    // Wire up icon-click handlers for both forms
+    // Wire up handlers for both forms
     document.getElementById('saleNoteIconBtn')?.addEventListener('click', () => expandFormNoteArea('sale'))
     document.getElementById('stockNoteIconBtn')?.addEventListener('click', () => expandFormNoteArea('stock'))
+    document.getElementById('saleNoteRemoveBtn')?.addEventListener('click', () => resetFormNoteArea('sale'))
+    document.getElementById('stockNoteRemoveBtn')?.addEventListener('click', () => resetFormNoteArea('stock'))
 
     // Live styling: stock-in qty inputs flip to "negative" visual flag when user types a negative.
     document.addEventListener('input', (e) => {
