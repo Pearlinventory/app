@@ -296,7 +296,8 @@
       padding: 0;
       background: #ffffff;
     }
-    .bubble.form-sale .col-form-product input {
+    .bubble.form-sale .col-form-product input,
+    .bubble.form-sale .col-form-product textarea {
       width: 100%;
       border: none;
       background: transparent;
@@ -307,8 +308,18 @@
       box-shadow: none;
       outline: none;
     }
-    .bubble.form-sale .col-form-product input::placeholder { font-style: italic; color: var(--text-faint); }
-    .bubble.form-sale .col-form-product input:focus { background: #fffef0; }
+    .bubble.form-sale .col-form-product textarea {
+      resize: none;
+      overflow: hidden;
+      line-height: 1.4;
+      min-height: 36px;
+      display: block;
+      vertical-align: middle;
+    }
+    .bubble.form-sale .col-form-product input::placeholder,
+    .bubble.form-sale .col-form-product textarea::placeholder { font-style: italic; color: var(--text-faint); }
+    .bubble.form-sale .col-form-product input:focus,
+    .bubble.form-sale .col-form-product textarea:focus { background: #fffef0; }
 
     /* Stock readout cell: gray, italic, centered */
     .bubble.form-sale .col-form-stock {
@@ -353,8 +364,8 @@
       padding: 0;
     }
     .bubble.form-sale .remove-row-btn {
-      width: 18px;
-      height: 18px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
       border: 1px solid #dc2626;
       background: transparent;
@@ -364,9 +375,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 10px;
       line-height: 1;
-      font-weight: 600;
+      font-weight: 700;
     }
     .bubble.form-sale .remove-row-btn:hover {
       background: #dc2626;
@@ -475,6 +486,11 @@
       box-shadow: none;
       outline: none;
       box-sizing: border-box;
+      resize: none;
+      overflow: hidden;
+      line-height: 1.4;
+      text-align: center;
+      min-height: 36px;
     }
     .bubble.form-sale .col-form-id-editable .id-editor::placeholder {
       font-size: 15px;
@@ -495,13 +511,18 @@
       background: var(--id-freeform-bg);
     }
     /* When user focuses the freeform editor: orange inner outline (using the bubble's amber theme).
-       Outline persists when input has content. */
+       Outline persists when input has content. Cream/amber fill (#fff7ed) is kept whenever the
+       input has the orange outline (on focus AND when there's typed content). */
     .bubble.form-sale .col-form-id-editable[data-state="freeform"] .id-editor:focus,
     .bubble.form-sale .col-form-id-editable[data-state="freeform"] .id-editor:not(:placeholder-shown) {
       outline: 1.5px solid #d4974a;
       outline-offset: -3px;
       border-radius: 4px;
-      background: #ffffff;
+      background: #fff7ed;
+    }
+    /* "?" placeholder hidden on focus so it doesn't overlap the blinking text cursor */
+    .bubble.form-sale .col-form-id-editable[data-state="freeform"] .id-editor:focus::placeholder {
+      color: transparent;
     }
     /* When empty (no product entered yet) — bigger dash, faint gray, sans font, no letter-spacing */
     .bubble.form-sale .col-form-id-editable[data-state="empty"] .id-display {
@@ -749,6 +770,19 @@
 
     /* Body row content */
     .row-body .bubble-cell.col-id span { font-size: 11px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; line-height: 1.4; overflow-wrap: break-word; word-break: normal; }
+    /* Freeform row's ID cell: orange outline + cream fill so it's visually flagged
+       (matches the Add Products form's freeform-ID styling). Higher specificity to override
+       .bubble.sale/.bubble.stockin row-cell gradient backgrounds. */
+    .bubble .row-body .bubble-cell.col-id.col-id-freeform {
+      background: #fff7ed;
+      box-shadow: inset 0 0 0 1.5px #d4974a;
+    }
+    .bubble .row-body .bubble-cell.col-id.col-id-freeform span {
+      color: var(--danger);
+      font-size: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-weight: 600;
+    }
     .row-body .bubble-cell.col-name span { font-size: 14px; color: #1a1a1a; line-height: 1.45; }
     .row-body .bubble-cell.col-qty span { font-size: 14px; color: #1a1a1a; font-variant-numeric: tabular-nums; line-height: 1.45; }
 
@@ -1746,13 +1780,14 @@
     // When isEditing + isSale, a Stock column is also rendered showing current stock.
     function renderItemBodyRow(item, isEditing, qtyPrefix, showStockColumn) {
       const idDisplay = item.product_id || ''
+      const isFreeform = !item.product_id
       const nameDisplay = item.product_id
         ? escapeHtml(item.product_name)
         : `${escapeHtml(item.freeform_name || '?')} <span class="freeform-flag">freeform</span>`
       const qtyCellContent = isEditing
         ? `<input type="number" class="cell-edit-input" data-edit-qty data-row-id="${item.row_id}" min="0" step="1" value="${item.quantity}">`
         : `<span>${qtyPrefix}${escapeHtml(String(item.quantity))}</span>`
-      // Stock cell (only when editing sales) — read from lastGoodStock
+      // Stock cell (only when editing) — read from lastGoodStock
       let stockCell = ''
       if (showStockColumn) {
         let stockVal = '—'
@@ -1762,9 +1797,11 @@
         }
         stockCell = `<div class="bubble-cell col-stock-edit"><span>${stockVal}</span></div>`
       }
+      const idCellClass = isFreeform ? 'bubble-cell col-id col-id-freeform' : 'bubble-cell col-id'
+      const idCellContent = isFreeform ? '<span>?</span>' : `<span>${softBreakId(idDisplay) || '—'}</span>`
       return `
         <div class="bubble-row row-body" data-row-id="${item.row_id}">
-          <div class="bubble-cell col-id"><span>${softBreakId(idDisplay) || '—'}</span></div>
+          <div class="${idCellClass}">${idCellContent}</div>
           <div class="bubble-cell col-name"><span>${nameDisplay}</span></div>
           ${stockCell}
           <div class="bubble-cell col-qty">${qtyCellContent}</div>
@@ -2083,6 +2120,7 @@
           if (el.dataset.lastState === 'matched') editor.value = ''
         }
         el.dataset.lastState = state
+        if (typeof autoGrow === 'function') autoGrow(editor)
         return
       }
       if (el.tagName === 'INPUT') {
@@ -2202,7 +2240,7 @@
       row.innerHTML = `
         <div class="bubble-cell col-form-id" id="saleIdReadout-${rowId}" data-state="empty">—</div>
         <div class="bubble-cell col-form-product">
-          <input type="text" id="saleProductInput-${rowId}" autocomplete="off" placeholder="Start typing product name…">
+          <textarea id="saleProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Start typing product name…"></textarea>
           <div class="autocomplete-list" id="saleAcList-${rowId}"></div>
         </div>
         <div class="bubble-cell col-form-stock" id="saleStockReadout-${rowId}" data-state="empty" title="Current stock for the selected product (read-only)">—</div>
@@ -2253,6 +2291,35 @@
       feedback.textContent = ''
     }
 
+    // Auto-grow textareas (used for multi-line product names + freeform IDs).
+    // The textarea grows in height as content wraps so we don't truncate or scroll.
+    function autoGrow(el) {
+      if (!el || el.tagName !== 'TEXTAREA') return
+      el.style.height = 'auto'
+      el.style.height = Math.max(36, el.scrollHeight) + 'px'
+    }
+    document.addEventListener('input', (e) => {
+      if (e.target && e.target.classList && e.target.classList.contains('auto-grow')) {
+        autoGrow(e.target)
+      }
+    })
+    // Single-line textareas (.auto-grow): swallow Enter so it doesn't insert newlines.
+    document.addEventListener('keydown', (e) => {
+      if (e.target && e.target.tagName === 'TEXTAREA' && e.target.classList.contains('auto-grow') && e.key === 'Enter') {
+        e.preventDefault()
+        e.target.blur()
+      }
+    })
+    // On window resize, re-run autoGrow on all visible auto-grow textareas — the cell widths
+    // change so the wrapping changes too, and we want the height to track exactly.
+    let resizeGrowTimer = null
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeGrowTimer)
+      resizeGrowTimer = setTimeout(() => {
+        document.querySelectorAll('textarea.auto-grow').forEach(autoGrow)
+      }, 100)
+    })
+
     // Auto-select all text in number inputs when they receive focus.
     // Delegated on document so it covers dynamically-added inputs (sale rows, edit cells).
     document.addEventListener('focusin', (e) => {
@@ -2300,10 +2367,10 @@
       row.innerHTML = `
         <div class="bubble-cell col-form-id col-form-id-editable" id="stockIdReadout-${rowId}" data-state="empty">
           <span class="id-display">—</span>
-          <input class="id-editor" type="text" placeholder="?" autocomplete="off" maxlength="50" aria-label="Product ID">
+          <textarea class="id-editor auto-grow" rows="1" placeholder="?" autocomplete="off" maxlength="50" aria-label="Product ID"></textarea>
         </div>
         <div class="bubble-cell col-form-product">
-          <input type="text" id="stockProductInput-${rowId}" autocomplete="off" placeholder="Start typing product name…">
+          <textarea id="stockProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Start typing product name…"></textarea>
           <div class="autocomplete-list" id="stockAcList-${rowId}"></div>
         </div>
         <div class="bubble-cell col-form-stock" id="stockStockReadout-${rowId}" data-state="empty" title="Current stock for the selected product">—</div>
@@ -3053,11 +3120,35 @@
           }
         }
 
-        // 3. Insert stock_in rows for both new and existing products
+        // 3. Create ONE stock_in_group for this entire import (V2.3g).
+        //    All rows from this file share the same group so the History bubble represents
+        //    "one import event" instead of many disconnected stock-in rows.
         const allStockIns = [
           ...plan.newRows.map(r => ({ product_id: r.code, quantity: r.qty, name: r.name })),
           ...plan.restockRows.map(r => ({ product_id: r.code, quantity: r.qty, name: r.name })),
         ]
+        let importGroupId = null
+        if (allStockIns.length > 0) {
+          status.textContent = 'Creating import batch…'
+          substatus.textContent = ''
+          try {
+            const groupRow = {
+              received_by: currentUser.email,
+              received_by_display: displayName,
+              client_uuid: crypto.randomUUID(),
+            }
+            if (sourceText) groupRow.source = sourceText
+            const { data: groupData, error: groupErr } = await supabase
+              .from('stock_in_groups').insert(groupRow).select().single()
+            if (groupErr && groupErr.code !== '23505') throw groupErr
+            importGroupId = groupData?.id
+          } catch (err) {
+            failures.push(`Create import group: ${err.message}`)
+            // Continue anyway — items will be inserted without a group (legacy behavior).
+          }
+        }
+
+        // 4. Insert stock_in rows referencing the group
         if (allStockIns.length > 0) {
           status.textContent = 'Adding stock receipts…'
           substatus.textContent = `0 / ${allStockIns.length}`
@@ -3065,14 +3156,16 @@
             const r = allStockIns[i]
             substatus.textContent = `${i + 1} / ${allStockIns.length} — ${r.product_id}`
             try {
-              const { error } = await supabase.from('stock_in').insert({
+              const insertRow = {
                 product_id: r.product_id,
                 quantity: r.quantity,
                 received_by: currentUser.email,
                 received_by_display: displayName,
                 source: sourceText || null,
                 client_uuid: crypto.randomUUID(),
-              })
+              }
+              if (importGroupId) insertRow.stock_in_group_id = importGroupId
+              const { error } = await supabase.from('stock_in').insert(insertRow)
               if (error && error.code !== '23505') throw error
               successCount++
             } catch (err) {
