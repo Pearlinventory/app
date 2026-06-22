@@ -441,51 +441,76 @@
 
     /* ===== Add Products (stock-in) bubble form — orange/amber variant ===== */
     .bubble.form-stockin .bubble-card { border-color: #d4974a; }
-    /* Editable ID cell: the input fills the cell and visually matches the static div in matched/empty states. */
-    .bubble.form-sale .col-form-id-editable { padding: 0; }
-    .bubble.form-sale .col-form-id-editable input {
+    /* Editable ID cell: contains BOTH a .id-display span (shown in matched/empty)
+       and a .id-editor input (shown in freeform — user can type a new product ID).
+       The span wraps naturally; the input is single-line by nature. */
+    .bubble.form-sale .col-form-id-editable { padding: 0; position: relative; }
+    .bubble.form-sale .col-form-id-editable .id-display,
+    .bubble.form-sale .col-form-id-editable .id-editor {
       width: 100%;
-      height: 100%;
       min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .bubble.form-sale .col-form-id-editable .id-display {
+      padding: 6px 4px;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: -0.1px;
+      word-break: normal;
+      overflow-wrap: break-word;
+      box-sizing: border-box;
+    }
+    .bubble.form-sale .col-form-id-editable .id-editor {
       border: none;
       background: transparent;
       padding: 6px 4px;
       font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
       font-size: 11px;
-      color: inherit;
-      text-align: center;
+      color: var(--text);
+      letter-spacing: -0.1px;
       box-shadow: none;
       outline: none;
-      letter-spacing: -0.1px;
+      box-sizing: border-box;
     }
-    .bubble.form-sale .col-form-id-editable input::placeholder {
-      color: var(--text-faint);
-      font-style: normal;
-    }
-    /* Match the visual states defined for the .col-form-id parent — the parent already gets
-       the green/red/empty background via [data-state] on the parent. But the input itself
-       has data-state too (set by setIdReadoutState). Use it for placeholder size in empty state. */
-    .bubble.form-sale .col-form-id-editable input[data-state="empty"]::placeholder {
-      font-size: 15px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    .bubble.form-sale .col-form-id-editable input[data-state="matched"] {
-      background: var(--id-matched-bg);
-      color: var(--text);
-    }
-    .bubble.form-sale .col-form-id-editable input[data-state="freeform"] {
-      background: var(--id-freeform-bg);
-      font-style: normal;
-    }
-    .bubble.form-sale .col-form-id-editable input[data-state="freeform"]::placeholder {
+    .bubble.form-sale .col-form-id-editable .id-editor::placeholder {
       font-size: 15px;
       color: var(--danger);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      opacity: 1;
     }
-    .bubble.form-sale .col-form-id-editable input[data-state="freeform"]:focus {
+    /* Toggle visibility by parent state: span in matched/empty, input in freeform */
+    .bubble.form-sale .col-form-id-editable .id-editor { display: none; }
+    .bubble.form-sale .col-form-id-editable[data-state="freeform"] .id-display { display: none; }
+    .bubble.form-sale .col-form-id-editable[data-state="freeform"] .id-editor { display: flex; }
+    /* Cell backgrounds by parent state */
+    .bubble.form-sale .col-form-id-editable[data-state="matched"] {
+      background: var(--id-matched-bg);
+    }
+    .bubble.form-sale .col-form-id-editable[data-state="matched"] .id-display { color: var(--text); }
+    .bubble.form-sale .col-form-id-editable[data-state="freeform"] {
+      background: var(--id-freeform-bg);
+    }
+    /* When user focuses the freeform editor: orange inner outline (using the bubble's amber theme).
+       Outline persists when input has content. */
+    .bubble.form-sale .col-form-id-editable[data-state="freeform"] .id-editor:focus,
+    .bubble.form-sale .col-form-id-editable[data-state="freeform"] .id-editor:not(:placeholder-shown) {
+      outline: 1.5px solid #d4974a;
+      outline-offset: -3px;
+      border-radius: 4px;
       background: #ffffff;
     }
-    /* When the input is the readout: don't let it inherit parent's overall data-state styling */
+    /* When empty (no product entered yet) — bigger dash, faint gray, sans font, no letter-spacing */
+    .bubble.form-sale .col-form-id-editable[data-state="empty"] .id-display {
+      font-size: 15px;
+      letter-spacing: 0;
+      color: var(--text-faint);
+      font-style: normal;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
     .bubble.form-stockin .row-header .bubble-cell { background: linear-gradient(to right, #e3ad7d, #ebc7a0); color: #000; }
     .bubble.form-stockin .col-form-id { background: #fff7ed; }
     .bubble.form-stockin .col-form-stock { background: #fff8ef; }
@@ -768,29 +793,33 @@
        Uses an SVG overlay so the dashes follow the bubble's ROUNDED corners
        (the previous 4-gradient hack drew straight lines and corners were eaten). */
     .bubble.editing { z-index: 2; }
-    /* Sale bubble in edit mode adds a Stock column so user can sanity-check qty against current stock.
-       The new column slots between Name and Qty. Disappears on save/cancel. */
-    .bubble.sale.editing .bubble-card { grid-template-columns: 72px minmax(140px, 1fr) 50px 54px; }
+    /* Bubble in edit mode adds a Stock column so user can sanity-check qty against current stock.
+       The new column slots between Name and Qty. Disappears on save/cancel.
+       Applies to both sale (green) AND stock-in (amber) bubbles. */
+    .bubble.sale.editing .bubble-card,
+    .bubble.stockin.editing .bubble-card { grid-template-columns: 72px minmax(140px, 1fr) 50px 54px; }
     @media (max-width: 600px) {
-      .bubble.sale.editing .bubble-card { grid-template-columns: 60px minmax(100px, 1fr) 44px 50px; }
+      .bubble.sale.editing .bubble-card,
+      .bubble.stockin.editing .bubble-card { grid-template-columns: 60px minmax(100px, 1fr) 44px 50px; }
     }
-    .bubble.sale.editing .col-stock-edit {
+    .bubble.editing .col-stock-edit {
       text-align: center;
       align-items: center !important;
       justify-content: center;
-      color: #4d7050;
       font-style: italic;
       font-size: 13px;
       font-variant-numeric: tabular-nums;
       padding: 8px 4px;
     }
-    .bubble.sale.editing .row-header .col-stock-edit {
+    .bubble.sale.editing .col-stock-edit { color: #4d7050; }
+    .bubble.stockin.editing .col-stock-edit { color: #94522a; }
+    .bubble.editing .row-header .col-stock-edit {
       font-style: normal;
       font-weight: 600;
       color: #000;
     }
     /* Empty bubble row spans all columns including the temp Stock col */
-    .bubble.sale.editing .bubble-row-empty > div { grid-column: 1 / -1; }
+    .bubble.editing .bubble-row-empty > div { grid-column: 1 / -1; }
     .bubble.editing .marching-ants-svg {
       position: absolute;
       inset: -3px;
@@ -1673,7 +1702,7 @@
           metaRight = `<span class="meta-right edited">edited · ${editTime} — ${editDate}</span>`
         }
       }
-      const showStockColumn = isEditing && !isStockIn  // Only sales get the temp Stock column in edit
+      const showStockColumn = isEditing  // Both sale + stock-in get the temp Stock column in edit mode
       const items = r.items || []
       const bodyRows = items.length > 0
         ? items.map(item => renderItemBodyRow(item, isEditing, qtyPrefix, showStockColumn)).join('')
@@ -2030,37 +2059,53 @@
     }
 
     // Helper used by createAutocomplete: sets the ID readout's visual state.
-    // Works for both <div> readouts (sale form) and <input> readouts (stock-in form, where the
-    // ID cell becomes editable when state is "freeform" so the user can type a new product ID).
+    // Supports THREE element kinds:
+    //   1. A wrapper <div> containing both .id-display <span> AND .id-editor <input> children.
+    //      Used by stock-in form so the matched/empty state wraps (in the span), and freeform
+    //      becomes editable (in the input).
+    //   2. A plain <input> (legacy; not currently used).
+    //   3. A plain element (<div>) — used by the sale form where ID is read-only display only.
     function setIdReadoutState(el, state, text) {
       el.setAttribute('data-state', state)
-      if (el.tagName === 'INPUT') {
+      const display = el.querySelector?.('.id-display')
+      const editor = el.querySelector?.('.id-editor')
+      if (display && editor) {
+        // Wrapper combo: show span in matched/empty, show input in freeform
         if (state === 'matched') {
-          el.value = text || ''
-          el.placeholder = ''
-          el.readOnly = true
+          display.textContent = text || ''
+          editor.value = ''  // clear any stale freeform value
         } else if (state === 'empty') {
-          el.value = ''
-          el.placeholder = text || '—'
-          el.readOnly = true
+          display.textContent = '—'
+          editor.value = ''
         } else { // freeform
-          // Don't overwrite value if user already typed something (allows them to enter a new ID).
-          // But if transitioning FROM matched (last value was a real product ID), clear it.
-          if (el.dataset.lastState === 'matched') el.value = ''
-          el.placeholder = text || '?'
-          el.readOnly = false
+          // Don't touch editor.value if user is still typing.
+          // But if transitioning from matched (was a real product ID), clear so user can type fresh.
+          if (el.dataset.lastState === 'matched') editor.value = ''
         }
         el.dataset.lastState = state
-      } else {
-        el.textContent = text || ''
+        return
       }
+      if (el.tagName === 'INPUT') {
+        if (state === 'matched') {
+          el.value = text || ''; el.placeholder = ''; el.readOnly = true
+        } else if (state === 'empty') {
+          el.value = ''; el.placeholder = text || '—'; el.readOnly = true
+        } else {
+          if (el.dataset.lastState === 'matched') el.value = ''
+          el.placeholder = text || '?'; el.readOnly = false
+        }
+        el.dataset.lastState = state
+        return
+      }
+      el.textContent = text || ''
     }
 
-    function createAutocomplete(inputId, listId, readoutId, stockReadoutId) {
+    function createAutocomplete(inputId, listId, readoutId, stockReadoutId, options) {
       const input = document.getElementById(inputId)
       const list = document.getElementById(listId)
       const readout = document.getElementById(readoutId)
       const stockReadout = stockReadoutId ? document.getElementById(stockReadoutId) : null
+      const noMatchMessage = (options && options.noMatchMessage) || 'No match — will be saved as freeform'
       let visibleItems = []
       let focusedIndex = -1
       function update() {
@@ -2073,7 +2118,7 @@
         visibleItems = matches
         focusedIndex = -1
         if (matches.length === 0) {
-          list.innerHTML = `<div class="autocomplete-empty">No match — will be saved as freeform</div>`
+          list.innerHTML = `<div class="autocomplete-empty">${noMatchMessage}</div>`
         } else {
           list.innerHTML = matches.map((p, i) =>
             `<div class="autocomplete-item" data-index="${i}">
@@ -2253,8 +2298,9 @@
       row.className = 'sale-row'
       row.setAttribute('data-row-id', rowId)
       row.innerHTML = `
-        <div class="bubble-cell col-form-id col-form-id-editable">
-          <input type="text" id="stockIdReadout-${rowId}" data-state="empty" placeholder="—" readonly autocomplete="off" maxlength="50" aria-label="Product ID">
+        <div class="bubble-cell col-form-id col-form-id-editable" id="stockIdReadout-${rowId}" data-state="empty">
+          <span class="id-display">—</span>
+          <input class="id-editor" type="text" placeholder="?" autocomplete="off" maxlength="50" aria-label="Product ID">
         </div>
         <div class="bubble-cell col-form-product">
           <input type="text" id="stockProductInput-${rowId}" autocomplete="off" placeholder="Start typing product name…">
@@ -2273,7 +2319,8 @@
         `stockProductInput-${rowId}`,
         `stockAcList-${rowId}`,
         `stockIdReadout-${rowId}`,
-        `stockStockReadout-${rowId}`
+        `stockStockReadout-${rowId}`,
+        { noMatchMessage: 'No match — type a new ID below to create this product' }
       )
       stockRowAutocompletes[rowId] = ac
       row.querySelector('[data-remove-row]').addEventListener('click', () => removeStockRow(rowId))
@@ -2577,8 +2624,9 @@
         if (exact) {
           collected.push({ productName, quantity, exact, isNew: false })
         } else {
-          // Freeform: read the typed ID from the editable ID input
-          const idInput = document.getElementById(`stockIdReadout-${rowId}`)
+          // Freeform: read the typed ID from the editable .id-editor inside the wrapper cell
+          const idWrapper = document.getElementById(`stockIdReadout-${rowId}`)
+          const idInput = idWrapper?.querySelector('.id-editor')
           const newId = (idInput?.value || '').trim()
           if (!newId) {
             feedback.className = 'form-feedback error'
