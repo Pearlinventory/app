@@ -246,6 +246,41 @@
     }
 
     /* Body rows: each is a sale-row with subgrid */
+    /* Universal small × button — same look across form bubbles, history note discard,
+       per-row delete in edit mode. Always 14×14 red-outline circle with red 'x' glyph. */
+    @keyframes errorFlash {
+      0%, 100% { box-shadow: inset 0 0 0 0 rgba(220, 38, 38, 0); }
+      25%, 75% { box-shadow: inset 0 0 0 999px rgba(220, 38, 38, 0.28); }
+      50%      { box-shadow: inset 0 0 0 999px rgba(220, 38, 38, 0.45); }
+    }
+    /* Flash effect for a row containing a validation error. Tinted box-shadow inset overlay
+       on each cell so it works regardless of the cell's existing background gradient. */
+    .error-flash > * { animation: errorFlash 0.8s ease-in-out; }
+    .error-flash { animation: errorFlash 0.8s ease-in-out; }
+
+    .remove-row-btn {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px solid #dc2626;
+      background: transparent;
+      color: #dc2626;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .remove-row-btn:hover { background: rgba(220, 38, 38, 0.08); }
+    /* History bubble edit-mode: note X sits next to textarea — nudge to align with first text line.
+       Form bubbles wrap their X in .note-x-cell which centers it, so this margin applies only to
+       the history-edit context (where the X is a direct flex child without a wrapper cell). */
+    .bubble-row.row-edit-actions .edit-note-area > .note-remove-btn { margin-top: 9px; }
+
     .bubble.form-sale .sale-row {
       display: grid;
       grid-column: 1 / -1;
@@ -363,27 +398,6 @@
       justify-content: center;
       padding: 0;
     }
-    .bubble.form-sale .remove-row-btn {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 1px solid #dc2626;
-      background: transparent;
-      color: #dc2626;
-      cursor: pointer;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      line-height: 1;
-      font-weight: 700;
-    }
-    .bubble.form-sale .remove-row-btn:hover {
-      background: #dc2626;
-      color: #ffffff;
-      border-color: #dc2626;
-    }
 
     /* + Add another product row */
     .bubble.form-sale .row-add-button {
@@ -436,12 +450,16 @@
       white-space: nowrap;
       line-height: 1.45;
     }
-    /* Make room inside the textarea for the prefix overlay */
+    /* Make room inside the textarea for the prefix overlay — text-indent affects ONLY the
+       first visual line. When user-typed text wraps to a second line, the wrapped text
+       starts at the textarea's left padding (10px from the textarea edge), so the second
+       line is NOT indented under the prefix — exactly how you'd hand-write it on paper. */
     .note-input-wrapper .note-edit-input {
-      padding-left: 70px;
+      padding-left: 10px;
+      text-indent: 60px;
     }
     @media (max-width: 600px) {
-      .note-input-wrapper .note-edit-input { padding-left: 64px; }
+      .note-input-wrapper .note-edit-input { text-indent: 54px; }
       .note-edit-prefix { font-size: 12px; }
     }
 
@@ -464,7 +482,7 @@
       display: flex !important;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 12px;
+      padding: 10px 12px 10px 0;  /* no left padding so the X col aligns with the body X col */
       background: #fafafa;
       border-top: 0.5px solid #e8e8e8;
       gap: 10px;
@@ -480,16 +498,27 @@
       gap: 8px;
       flex-shrink: 0;
     }
-    .bubble.form-sale .footer-note-area .note-expanded-state {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      flex: 1 1 auto;
-      min-width: 0;
+    /* Icon-only state — small left margin so 📝 doesn't sit flush against the bubble edge */
+    .bubble.form-sale .footer-note-area .note-icon-btn {
+      margin-left: 12px;
     }
-    .bubble.form-sale .footer-note-area .note-remove-btn {
-      flex-shrink: 0;
-      margin-top: 6px;
+    /* Expanded state — grid layout: [X cell 24px] [note input wrapper 1fr] */
+    .bubble.form-sale .footer-note-area .note-expanded-state {
+      display: grid !important;
+      grid-template-columns: 24px 1fr;
+      width: 100%;
+      align-items: stretch;
+    }
+    .bubble.form-sale .footer-note-area .note-x-cell {
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    @media (max-width: 600px) {
+      .bubble.form-sale .footer-note-area .note-expanded-state {
+        grid-template-columns: 20px 1fr;  /* mobile X col is 20px (matches body) */
+      }
     }
 
     /* Mobile adjustments */
@@ -934,25 +963,6 @@
       background: #ffffff;
       padding: 0;
     }
-    .bubble.editing .row-delete-btn {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      border: 1px solid #dc2626;
-      background: transparent;
-      color: #dc2626;
-      cursor: pointer;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      line-height: 1;
-      font-weight: 700;
-    }
-    .bubble.editing .row-delete-btn:hover {
-      background: rgba(220, 38, 38, 0.08);
-    }
     /* Row marked for deletion: faded + strikethrough. The actual DELETE happens on Save. */
     .bubble.editing .row-body.marked-delete .col-id span,
     .bubble.editing .row-body.marked-delete .col-name,
@@ -1044,10 +1054,6 @@
       flex: 1 1 auto;
       min-width: 0;
       gap: 8px;
-    }
-    .bubble-row.row-edit-actions .edit-note-area .note-remove-btn {
-      flex-shrink: 0;
-      margin-top: 7px;
     }
     .bubble-row.row-edit-actions .edit-action-buttons {
       display: flex;
@@ -1211,7 +1217,9 @@
               <div class="footer-note-area" id="saleNoteArea">
                 <button class="note-icon-btn form-note-icon-btn" id="saleNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
                 <div class="note-expanded-state" id="saleNoteExpandedState" style="display: none;">
-                  <button class="remove-row-btn note-remove-btn" id="saleNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
+                  <div class="note-x-cell">
+                    <button class="remove-row-btn note-remove-btn" id="saleNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
+                  </div>
                   <div class="note-input-wrapper">
                     <span class="note-edit-prefix">📝Note:</span>
                     <textarea class="note-edit-input auto-grow" id="saleNoteInput" rows="1"></textarea>
@@ -1279,7 +1287,9 @@
               <div class="footer-note-area" id="stockNoteArea">
                 <button class="note-icon-btn form-note-icon-btn" id="stockNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
                 <div class="note-expanded-state" id="stockNoteExpandedState" style="display: none;">
-                  <button class="remove-row-btn note-remove-btn" id="stockNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
+                  <div class="note-x-cell">
+                    <button class="remove-row-btn note-remove-btn" id="stockNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
+                  </div>
                   <div class="note-input-wrapper">
                     <span class="note-edit-prefix">📝Note:</span>
                     <textarea class="note-edit-input auto-grow" id="stockNoteInput" rows="1"></textarea>
@@ -2310,11 +2320,12 @@
       for (const inp of qtyInputs) {
         const rowId = parseInt(inp.dataset.rowId, 10)
         const q = parseInt(inp.value, 10)
-        if (isNaN(q)) { alert('Quantity must be a number.'); return }
+        const rowEl = inp.closest('.row-body')
+        if (isNaN(q)) { flashRowError(rowEl); alert('Quantity must be a number.'); return }
         if (isStockIn) {
           // Stock-in allows any integer: positive (receipts), negative (corrections), or zero.
         } else {
-          if (q < 0) { alert('Sale quantity must be 0 or more.'); return }
+          if (q < 0) { flashRowError(rowEl); alert('Sale quantity must be 0 or more.'); return }
         }
         newQtyByRow[rowId] = q
       }
@@ -2757,6 +2768,18 @@
       el.style.height = Math.max(36, el.scrollHeight) + 'px'
     }
 
+    // Flash a row red briefly to draw attention to a validation error. The user gets a
+    // text message ("Row 4: quantity must be 0 or more"); the flash makes sure they don't
+    // miss it when they're about to click Save again.
+    function flashRowError(rowEl) {
+      if (!rowEl) return
+      rowEl.classList.remove('error-flash')
+      // Force a reflow so the animation restarts even if we flash the same row twice in a row
+      void rowEl.offsetWidth
+      rowEl.classList.add('error-flash')
+      setTimeout(() => rowEl.classList.remove('error-flash'), 900)
+    }
+
     // After adding a new row to a form bubble, if the "+ Add another product" button got pushed
     // below the viewport, scroll just enough to bring it back into view. Smooth scroll, conditional.
     function scrollAddButtonIntoView(rowEl) {
@@ -3069,12 +3092,14 @@
         if (!productName) {
           feedback.className = 'form-feedback error'
           feedback.textContent = `Row ${visualIdx}: enter a product first.`
+          flashRowError(rowEl)
           return
         }
         const quantity = parseInt(qtyStr, 10)
         if (isNaN(quantity) || quantity < 0) {
           feedback.className = 'form-feedback error'
           feedback.textContent = `Row ${visualIdx}: quantity must be 0 or more.`
+          flashRowError(rowEl)
           return
         }
         const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
@@ -3161,12 +3186,14 @@
         if (!productName) {
           feedback.className = 'form-feedback error'
           feedback.textContent = `Row ${visualIdx}: enter a product first.`
+          flashRowError(rowEl)
           return
         }
         const quantity = parseInt(qtyStr, 10)
         if (isNaN(quantity)) {
           feedback.className = 'form-feedback error'
           feedback.textContent = `Row ${visualIdx}: quantity must be a number.`
+          flashRowError(rowEl)
           return
         }
         // Stock-in allows any integer: positive (receipts), negative (corrections), or zero.
@@ -3181,6 +3208,7 @@
           if (!newId) {
             feedback.className = 'form-feedback error'
             feedback.textContent = `Row ${visualIdx}: "${productName}" is not in the catalog — type a new ID in the red ID cell.`
+            flashRowError(rowEl)
             return
           }
           // Check ID doesn't collide with existing product
@@ -3188,6 +3216,7 @@
           if (idCollide) {
             feedback.className = 'form-feedback error'
             feedback.textContent = `Row ${visualIdx}: ID "${newId}" is already used by "${idCollide.name}". Pick a different ID.`
+            flashRowError(rowEl)
             return
           }
           collected.push({ productName, quantity, exact: null, isNew: true, newId })
