@@ -951,8 +951,10 @@
       font-weight: 600;
       color: #000;
     }
-    /* Per-row X cell (edit mode only) — sits in column 1, on the left of each body row */
-    .bubble.editing .col-row-x {
+    /* Per-row X cell (edit mode only) — sits in column 1, on the left of each body row.
+       Scoped to .row-body so the header's X cell isn't affected: the header X cell should
+       inherit the same green/amber gradient as the rest of the header row. */
+    .bubble.editing .row-body .col-row-x {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -978,8 +980,6 @@
       background: #dc2626;
       color: #ffffff;
     }
-    /* The empty header X-cell row should not collide with col-id text-align rules */
-    .bubble.editing .row-header .col-row-x { background: transparent; }
     /* Empty bubble row spans all columns including the temp Stock col */
     .bubble.editing .bubble-row-empty > div { grid-column: 1 / -1; }
     .bubble.editing .marching-ants-svg {
