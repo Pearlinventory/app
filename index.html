@@ -276,10 +276,6 @@
       flex-shrink: 0;
     }
     .remove-row-btn:hover { background: rgba(220, 38, 38, 0.08); }
-    /* History bubble edit-mode: note X sits next to textarea — nudge to align with first text line.
-       Form bubbles wrap their X in .note-x-cell which centers it, so this margin applies only to
-       the history-edit context (where the X is a direct flex child without a wrapper cell). */
-    .bubble-row.row-edit-actions .edit-note-area > .note-remove-btn { margin-top: 9px; }
 
     .bubble.form-sale .sale-row {
       display: grid;
@@ -504,7 +500,7 @@
     }
     /* Expanded state — grid layout: [X cell 24px] [note input wrapper 1fr] */
     .bubble.form-sale .footer-note-area .note-expanded-state {
-      display: grid !important;
+      display: grid;
       grid-template-columns: 24px 1fr;
       width: 100%;
       align-items: stretch;
@@ -1037,23 +1033,36 @@
     }
     /* Save/Cancel row at bottom of bubble during edit. Now has two sub-areas:
        .edit-note-area on the LEFT (icon button OR note input)
-       .edit-action-buttons on the RIGHT (Cancel + Save) */
+       .edit-action-buttons on the RIGHT (Cancel + Save)
+       padding-left: 0 so the note X cell aligns with the body X col at column 1. */
     .bubble-row.row-edit-actions {
       grid-column: 1 / -1 !important;
       display: flex !important;
       justify-content: space-between !important;
       align-items: center;
       gap: 8px;
-      padding: 8px 14px;
+      padding: 8px 14px 8px 0;
       background: #ffffff;
       border-top: 0.5px solid var(--border);
     }
+    .bubble-row.row-edit-actions .edit-note-area .note-x-cell {
+      width: 28px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+    }
+    @media (max-width: 600px) {
+      .bubble-row.row-edit-actions .edit-note-area .note-x-cell {
+        width: 24px;
+      }
+    }
     .bubble-row.row-edit-actions .edit-note-area {
       display: flex;
-      align-items: flex-start;
+      align-items: stretch;
       flex: 1 1 auto;
       min-width: 0;
-      gap: 8px;
     }
     .bubble-row.row-edit-actions .edit-action-buttons {
       display: flex;
@@ -2014,7 +2023,9 @@
               ${hasNote || isLegacyGroupId(r.group_id)
                 ? (isLegacyGroupId(r.group_id)
                     ? ''  /* legacy rows have no group to store notes on; hide note UI */
-                    : `<button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+                    : `<div class="note-x-cell">
+                         <button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+                       </div>
                        <div class="note-input-wrapper">
                          <span class="note-edit-prefix">📝Note:</span>
                          <textarea class="note-edit-input auto-grow" rows="1" data-edit-note>${escapeHtml(r.notes || '')}</textarea>
@@ -2163,7 +2174,9 @@
       area.innerHTML = `<button class="note-icon-btn" data-action="expand-note" type="button" aria-label="Add a note" title="Add a note">📝</button>`
       const btn = area.querySelector('[data-action="expand-note"]')
       btn?.addEventListener('click', () => {
-        area.innerHTML = `<button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+        area.innerHTML = `<div class="note-x-cell">
+            <button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+          </div>
           <div class="note-input-wrapper">
             <span class="note-edit-prefix">📝Note:</span>
             <textarea class="note-edit-input auto-grow" rows="1" data-edit-note></textarea>
@@ -2220,7 +2233,9 @@
         btn.addEventListener('click', () => {
           const area = btn.closest('.edit-note-area')
           if (!area) return
-          area.innerHTML = `<button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+          area.innerHTML = `<div class="note-x-cell">
+              <button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+            </div>
             <div class="note-input-wrapper">
               <span class="note-edit-prefix">📝Note:</span>
               <textarea class="note-edit-input auto-grow" rows="1" data-edit-note></textarea>
