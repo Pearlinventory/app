@@ -900,14 +900,14 @@
        Uses an SVG overlay so the dashes follow the bubble's ROUNDED corners
        (the previous 4-gradient hack drew straight lines and corners were eaten). */
     .bubble.editing { z-index: 2; }
-    /* Bubble in edit mode adds a Stock column so user can sanity-check qty against current stock.
-       The new column slots between Name and Qty. Disappears on save/cancel.
+    /* Bubble in edit mode adds two extra columns: an X col on the LEFT (per-row delete)
+       and a Stock col before Qty (sanity-check current stock).
        Applies to both sale (green) AND stock-in (amber) bubbles. */
     .bubble.sale.editing .bubble-card,
-    .bubble.stockin.editing .bubble-card { grid-template-columns: 72px minmax(140px, 1fr) 50px 54px; }
+    .bubble.stockin.editing .bubble-card { grid-template-columns: 28px 72px minmax(140px, 1fr) 50px 54px; }
     @media (max-width: 600px) {
       .bubble.sale.editing .bubble-card,
-      .bubble.stockin.editing .bubble-card { grid-template-columns: 60px minmax(100px, 1fr) 44px 50px; }
+      .bubble.stockin.editing .bubble-card { grid-template-columns: 24px 60px minmax(100px, 1fr) 44px 50px; }
     }
     .bubble.editing .col-stock-edit {
       display: flex;
@@ -926,6 +926,54 @@
       font-weight: 600;
       color: #000;
     }
+    /* Per-row X cell (edit mode only) — sits in column 1, on the left of each body row */
+    .bubble.editing .col-row-x {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      padding: 0;
+    }
+    .bubble.editing .row-delete-btn {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1px solid #dc2626;
+      background: transparent;
+      color: #dc2626;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 700;
+    }
+    .bubble.editing .row-delete-btn:hover {
+      background: rgba(220, 38, 38, 0.08);
+    }
+    /* Row marked for deletion: faded + strikethrough. The actual DELETE happens on Save. */
+    .bubble.editing .row-body.marked-delete .col-id span,
+    .bubble.editing .row-body.marked-delete .col-name,
+    .bubble.editing .row-body.marked-delete .col-name span,
+    .bubble.editing .row-body.marked-delete .col-stock-edit,
+    .bubble.editing .row-body.marked-delete .col-stock-edit span {
+      text-decoration: line-through;
+      opacity: 0.5;
+    }
+    .bubble.editing .row-body.marked-delete .col-qty input {
+      text-decoration: line-through;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    /* Filled-red X when marked (click again to un-mark) */
+    .bubble.editing .row-body.marked-delete .row-delete-btn {
+      background: #dc2626;
+      color: #ffffff;
+    }
+    /* The empty header X-cell row should not collide with col-id text-align rules */
+    .bubble.editing .row-header .col-row-x { background: transparent; }
     /* Empty bubble row spans all columns including the temp Stock col */
     .bubble.editing .bubble-row-empty > div { grid-column: 1 / -1; }
     .bubble.editing .marching-ants-svg {
@@ -992,9 +1040,14 @@
     }
     .bubble-row.row-edit-actions .edit-note-area {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       flex: 1 1 auto;
-      min-width: 0;  /* allow input to shrink */
+      min-width: 0;
+      gap: 8px;
+    }
+    .bubble-row.row-edit-actions .edit-note-area .note-remove-btn {
+      flex-shrink: 0;
+      margin-top: 7px;
     }
     .bubble-row.row-edit-actions .edit-action-buttons {
       display: flex;
@@ -1944,13 +1997,15 @@
         : ''
       // Edit-action buttons appear at the bottom of the bubble in edit mode.
       // Includes a note icon (left) that expands to a text input, OR an input if note exists.
+      // When expanded, an X button appears to discard the note (collapses back to icon).
       const editActions = isEditing
         ? `<div class="bubble-row row-edit-actions">
             <div class="edit-note-area" data-has-note="${hasNote ? '1' : '0'}">
               ${hasNote || isLegacyGroupId(r.group_id)
                 ? (isLegacyGroupId(r.group_id)
                     ? ''  /* legacy rows have no group to store notes on; hide note UI */
-                    : `<div class="note-input-wrapper">
+                    : `<button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+                       <div class="note-input-wrapper">
                          <span class="note-edit-prefix">📝Note:</span>
                          <textarea class="note-edit-input auto-grow" rows="1" data-edit-note>${escapeHtml(r.notes || '')}</textarea>
                        </div>`)
@@ -1971,6 +2026,7 @@
           ${marchingAnts}
           <div class="bubble-card">
             <div class="bubble-row row-header">
+              ${isEditing ? '<div class="bubble-cell col-row-x"></div>' : ''}
               <div class="bubble-cell col-id">ID</div>
               <div class="bubble-cell col-name">Name</div>
               ${showStockColumn ? '<div class="bubble-cell col-stock-edit">Stock</div>' : ''}
@@ -2015,11 +2071,18 @@
         }
         stockCell = `<div class="bubble-cell col-stock-edit"><span>${stockVal}</span></div>`
       }
+      // X cell (only when editing) — per-row mark-for-delete
+      const xCell = isEditing
+        ? `<div class="bubble-cell col-row-x">
+             <button class="remove-row-btn row-delete-btn" type="button" data-action="toggle-row-delete" data-row-id="${item.row_id}" aria-label="Mark for deletion" title="Mark for deletion">×</button>
+           </div>`
+        : ''
       const idCellClass = isFreeform ? 'bubble-cell col-id col-id-freeform' : 'bubble-cell col-id'
       const idCellContent = isFreeform ? '<span>?</span>' : `<span>${softBreakId(idDisplay) || '—'}</span>`
       const qtyCellClass = isNegative ? 'bubble-cell col-qty col-qty-negative' : 'bubble-cell col-qty'
       return `
         <div class="bubble-row row-body" data-row-id="${item.row_id}">
+          ${xCell}
           <div class="${idCellClass}">${idCellContent}</div>
           <div class="bubble-cell col-name"><span>${nameDisplay}</span></div>
           ${stockCell}
@@ -2083,6 +2146,29 @@
       })
     }
 
+    // Collapse a history-bubble's note edit area back to just the 📝 icon (discard the in-progress note).
+    // Used when the user clicks the × button next to a note in edit mode.
+    function discardNoteInArea(area) {
+      if (!area) return
+      area.innerHTML = `<button class="note-icon-btn" data-action="expand-note" type="button" aria-label="Add a note" title="Add a note">📝</button>`
+      const btn = area.querySelector('[data-action="expand-note"]')
+      btn?.addEventListener('click', () => {
+        area.innerHTML = `<button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+          <div class="note-input-wrapper">
+            <span class="note-edit-prefix">📝Note:</span>
+            <textarea class="note-edit-input auto-grow" rows="1" data-edit-note></textarea>
+          </div>`
+        const inp = area.querySelector('textarea')
+        if (inp) {
+          inp.focus()
+          if (typeof autoGrow === 'function') autoGrow(inp)
+        }
+        area.querySelector('[data-action="discard-note"]')?.addEventListener('click', () => {
+          discardNoteInArea(area)
+        })
+      })
+    }
+
     function attachBubbleHandlers() {
       const feedEl = document.getElementById('activityFeed')
       feedEl.querySelectorAll('.bubble').forEach(bubble => {
@@ -2119,25 +2205,49 @@
           renderActivity()
         })
       })
-      // Note icon → expand to text input (auto-grow textarea, multi-line, with locked prefix)
+      // Note icon → expand to text input (auto-grow textarea, multi-line, with locked prefix + X discard)
       feedEl.querySelectorAll('[data-action="expand-note"]').forEach(btn => {
         btn.addEventListener('click', () => {
           const area = btn.closest('.edit-note-area')
           if (!area) return
-          area.innerHTML = `<div class="note-input-wrapper">
-            <span class="note-edit-prefix">📝Note:</span>
-            <textarea class="note-edit-input auto-grow" rows="1" data-edit-note></textarea>
-          </div>`
+          area.innerHTML = `<button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+            <div class="note-input-wrapper">
+              <span class="note-edit-prefix">📝Note:</span>
+              <textarea class="note-edit-input auto-grow" rows="1" data-edit-note></textarea>
+            </div>`
           const inp = area.querySelector('textarea')
           if (inp) {
             inp.focus()
             if (typeof autoGrow === 'function') autoGrow(inp)
           }
+          // Wire up the new discard button (delegated handler below handles it too, but be safe)
+          area.querySelector('[data-action="discard-note"]')?.addEventListener('click', () => {
+            discardNoteInArea(area)
+          })
+        })
+      })
+      // Discard-note (X) clicks on pre-existing note inputs (when bubble opens with a note already)
+      feedEl.querySelectorAll('[data-action="discard-note"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const area = btn.closest('.edit-note-area')
+          if (area) discardNoteInArea(area)
         })
       })
       // Auto-grow any pre-filled note textareas (when a bubble enters edit mode with an existing note)
       feedEl.querySelectorAll('textarea.note-edit-input').forEach(ta => {
         if (typeof autoGrow === 'function') autoGrow(ta)
+      })
+      // Per-row "mark for deletion" toggle
+      feedEl.querySelectorAll('[data-action="toggle-row-delete"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const rowEl = btn.closest('.row-body')
+          if (!rowEl) return
+          rowEl.classList.toggle('marked-delete')
+          // Update tooltip + aria
+          const marked = rowEl.classList.contains('marked-delete')
+          btn.setAttribute('title', marked ? 'Undo delete' : 'Mark for deletion')
+          btn.setAttribute('aria-label', marked ? 'Undo delete' : 'Mark for deletion')
+        })
       })
     }
     // Global click handler: close any open bubble menu when clicking outside
@@ -2181,7 +2291,21 @@
       if (!bubbleEl) { alert('Bubble element not found.'); return }
       const isStockIn = bubble.event_type === 'stock_in'
       const isLegacy = isLegacyGroupId(groupId)
-      const qtyInputs = bubbleEl.querySelectorAll('[data-edit-qty]')
+      // Collect IDs of rows marked for deletion (their X button was clicked).
+      // These bypass the qty-validation loop below and are sent as DELETE statements.
+      const rowsToDelete = []
+      bubbleEl.querySelectorAll('.row-body.marked-delete').forEach(rowEl => {
+        const id = parseInt(rowEl.dataset.rowId, 10)
+        if (!isNaN(id)) rowsToDelete.push(id)
+      })
+      // For legacy single-row bubbles: deleting the only row would orphan the bubble; treat as
+      // a full bubble-delete by deferring to confirmDelete flow instead.
+      if (isLegacy && rowsToDelete.length > 0) {
+        alert('Legacy single-row entries can\'t have their only row deleted from inside the editor — use the bubble menu → Delete to remove the entire entry.')
+        return
+      }
+      // Collect quantity updates ONLY from rows NOT marked for delete.
+      const qtyInputs = bubbleEl.querySelectorAll('.row-body:not(.marked-delete) [data-edit-qty]')
       const newQtyByRow = {}
       for (const inp of qtyInputs) {
         const rowId = parseInt(inp.dataset.rowId, 10)
@@ -2200,10 +2324,10 @@
       // Note (any bubble type) — read from the note input if it's currently shown
       const noteInp = bubbleEl.querySelector('[data-edit-note]')
       const newNote = noteInp ? noteInp.value.trim() : null  // null = note UI not shown / no change intended
-      log(bubble.event_type, `Saving edit for ${bubble.event_type} bubble ${groupId}`, { newQtyByRow, newSource, newNote, isLegacy })
+      log(bubble.event_type, `Saving edit for ${bubble.event_type} bubble ${groupId}`, { newQtyByRow, newSource, newNote, rowsToDelete, isLegacy })
       showSubmitOverlay('Saving changes…')
       try {
-        // 1) Update each line-item row's quantity
+        // 1) Update each line-item row's quantity (skipping rows marked for delete)
         const rowTable = isStockIn ? 'stock_in' : 'sales'
         for (const [rowIdStr, newQty] of Object.entries(newQtyByRow)) {
           const rowId = parseInt(rowIdStr, 10)
@@ -2211,6 +2335,11 @@
           // Mark the sale row as edited (sales has this field; stock_in does not)
           if (!isStockIn) update.edited = true
           const { error } = await supabase.from(rowTable).update(update).eq('id', rowId)
+          if (error) throw error
+        }
+        // 1b) Delete rows that were marked for deletion (per-row X click)
+        for (const rowId of rowsToDelete) {
+          const { error } = await supabase.from(rowTable).delete().eq('id', rowId)
           if (error) throw error
         }
         // 2) Update source on stock-in: either on the group (if real group) or on the row (if legacy)
