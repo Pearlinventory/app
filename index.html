@@ -506,7 +506,7 @@
       align-items: stretch;
     }
     .bubble.form-sale .footer-note-area .note-x-cell {
-      background: #ffffff;
+      background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1008,28 +1008,32 @@
       width: 100%;
       max-width: 60px;
       padding: 4px 2px;
-      border: 1px solid #3b82f6;
+      border: 1px solid #cbd5e1;
       border-radius: 4px;
       background: #ffffff;
       font-size: 14px;
       font-family: inherit;
       font-variant-numeric: tabular-nums;
       text-align: center;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
       outline: none;
+    }
+    .bubble.editing .row-body .col-qty input.cell-edit-input:focus {
+      border-color: #94a3b8;
     }
     .bubble.editing .row-body .col-qty input.cell-edit-input::-webkit-outer-spin-button,
     .bubble.editing .row-body .col-qty input.cell-edit-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .bubble.editing .row-footer input.cell-edit-input {
       padding: 3px 6px;
-      border: 1px solid #3b82f6;
+      border: 1px solid #cbd5e1;
       border-radius: 4px;
       background: #ffffff;
       font-size: 12px;
       font-family: ui-monospace, monospace;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
       outline: none;
       min-width: 100px;
+    }
+    .bubble.editing .row-footer input.cell-edit-input:focus {
+      border-color: #94a3b8;
     }
     /* Save/Cancel row at bottom of bubble during edit. Now has two sub-areas:
        .edit-note-area on the LEFT (icon button OR note input)
@@ -1053,9 +1057,17 @@
       justify-content: center;
       background: #ffffff;
     }
+    /* Icon-only state: give the 📝 button some breathing room from the bubble edge
+       (matches the visual offset of the X button which sits centered in the 28px cell). */
+    .bubble-row.row-edit-actions .edit-note-area > .note-icon-btn {
+      margin-left: 8px;
+    }
     @media (max-width: 600px) {
       .bubble-row.row-edit-actions .edit-note-area .note-x-cell {
         width: 24px;
+      }
+      .bubble-row.row-edit-actions .edit-note-area > .note-icon-btn {
+        margin-left: 6px;
       }
     }
     .bubble-row.row-edit-actions .edit-note-area {
