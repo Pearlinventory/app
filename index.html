@@ -33,6 +33,8 @@
       --id-matched-border: #86efac;
       --id-freeform-bg: #fee2e2;
       --id-freeform-border: #fca5a5;
+      /* App header height — used by sticky descendants (e.g. calendar widget) to offset below it. */
+      --header-h: 48px;
       --overlay-bg: rgba(255, 255, 255, 0.7);
       --danger: #dc2626;
       --danger-hover: #b91c1c;
@@ -102,6 +104,7 @@
     @keyframes header-refresh-spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 600px) {
+      :root { --header-h: 44px; }
       .header { padding: 5px 10px; min-height: 44px; gap: 8px; }
       .header h1 { font-size: 14px; }
       .header-right .last-updated { display: none; }
@@ -165,7 +168,7 @@
     .bubble.form-sale #stockRowsContainer { display: contents; }
     .bubble.form-sale .bubble-card {
       display: grid;
-      grid-template-columns: 24px 72px 1fr 44px 44px;
+      grid-template-columns: 24px 66px 1fr 40px 40px;
       border-radius: 14px;
       overflow: visible;
       border: 0.5px solid #9ca3af;
@@ -180,8 +183,8 @@
     /* Autocomplete dropdown inside the form bubble: spans full bubble width,
        contained horizontally to the bubble's edges but can extend below vertically. */
     .bubble.form-sale .col-form-product .autocomplete-list {
-      left: -72px;             /* offset back to bubble ID col left edge (ID col is 72px wide). X col sits to the left of ID — dropdown skips it. */
-      right: -88px;            /* offset to bubble right edge (Stock 44 + Qty 44 = 88) */
+      left: -66px;             /* offset back to bubble ID col left edge (ID col is 66px). X col sits to the left of ID — dropdown skips it. */
+      right: -80px;            /* offset to bubble right edge (Stock 40 + Qty 40 = 80) */
       width: auto;
       min-width: auto;
       max-width: none;
@@ -200,7 +203,7 @@
       display: block;
       padding: 8px 4px;
       font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-muted);
       text-align: center;
       word-break: normal;
@@ -220,8 +223,8 @@
     }
     @media (max-width: 600px) {
       .bubble.form-sale .col-form-product .autocomplete-list {
-        left: -60px;          /* mobile ID col is 60px */
-        right: -80px;         /* Stock 40 + Qty 40 = 80 */
+        left: -54px;          /* mobile ID col is 54px */
+        right: -72px;         /* Stock 36 + Qty 36 = 72 */
       }
       .bubble.form-sale .col-form-product .autocomplete-list .autocomplete-item {
         grid-template-columns: 60px 1fr;
@@ -294,7 +297,7 @@
       background: #f8f8f8;
       color: var(--text-faint);
       font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-      font-size: 11px;
+      font-size: 10px;
       align-items: center !important;
       justify-content: center;
       padding: 6px 4px;
@@ -519,8 +522,8 @@
 
     /* Mobile adjustments */
     @media (max-width: 600px) {
-      .bubble.form-sale .bubble-card { grid-template-columns: 20px 60px 1fr 40px 40px; border-width: 1.5px; border-color: #9ca3af; }
-      .bubble.form-sale .col-form-id { font-size: 9.5px; letter-spacing: -0.3px; }
+      .bubble.form-sale .bubble-card { grid-template-columns: 20px 54px 1fr 36px 36px; border-width: 1.5px; border-color: #9ca3af; }
+      .bubble.form-sale .col-form-id { font-size: 9px; letter-spacing: -0.3px; }
       .bubble.form-sale .col-form-stock { font-size: 12px; }
       .bubble.form-sale .row-body,
       .bubble.form-sale .sale-row,
@@ -566,7 +569,7 @@
     .bubble.form-sale .col-form-id-editable .id-display {
       padding: 6px 4px;
       font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-faint);
       letter-spacing: -0.1px;
       word-break: normal;
@@ -578,7 +581,7 @@
       background: transparent;
       padding: 6px 4px;
       font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text);
       letter-spacing: -0.1px;
       box-shadow: none;
@@ -787,6 +790,9 @@
     .confirm-card { background: var(--bg); border-radius: 12px; padding: 24px; min-width: 320px; max-width: 460px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
     .confirm-card h3 { margin: 0 0 12px 0; font-size: 16px; }
     .confirm-card p { margin: 0 0 8px 0; font-size: 14px; color: var(--text-muted); }
+    /* Notice modal message — preserves newlines from the message string so multi-line
+       messages (like the import summary) render with proper line breaks. */
+    .notice-message { white-space: pre-wrap; word-break: break-word; }
     .confirm-detail { background: var(--bg-elevated); border-radius: 6px; padding: 10px 12px; font-size: 13px; margin: 12px 0; font-family: ui-monospace, monospace; }
     .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
     .table-container { padding: 20px; overflow-x: auto; position: relative; }
@@ -811,6 +817,341 @@
     /* Activity feed: centered linear feed of bubble-cards */
     .activity-feed { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
 
+    /* =================================================================================
+       Calendar widget — used by the Calendar workspace to filter the activity feed by
+       a specific day or date range. Two visible states:
+         - Expanded: full month grid + mode toggle + nav arrows.
+         - Collapsed: a single-row header showing the current selection, click to expand.
+       Inside expanded, there's also a 'months' sub-mode where the user picks a month
+       (after clicking the month label in the header).
+       ================================================================================= */
+    .cal-widget {
+      max-width: 600px;
+      margin: 0 auto 14px;
+      /* Sticky BELOW the app header (--header-h), not at viewport top — otherwise the calendar
+         would slide up under the header bar and get visually clipped by it on scroll. */
+      position: sticky;
+      top: var(--header-h);
+      z-index: 5;
+      background: var(--bg);
+      padding-top: 6px;
+      padding-bottom: 4px;
+    }
+    /* ---- Collapsed state: single clickable header showing current selection ---- */
+    .cal-collapsed {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #ffffff;
+      border: 0.5px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease;
+    }
+    .cal-collapsed:hover { background: #fafafa; }
+    .cal-collapsed .cal-icon { font-size: 18px; }
+    .cal-collapsed .cal-collapsed-label {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .cal-collapsed .cal-collapsed-label.empty {
+      font-weight: 400;
+      color: var(--text-faint);
+      font-style: italic;
+    }
+    .cal-collapsed .cal-expand-arrow { font-size: 14px; color: var(--text-muted); }
+    /* ---- Expanded state: full widget card ---- */
+    .cal-expanded {
+      background: #ffffff;
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    /* Header layout: prev/label/next clustered in the middle with the LABEL having a fixed
+       width so the < > buttons stay in stable positions regardless of month name length
+       ("May 2026" vs "September 2026"). The minimize button is absolutely positioned on the
+       far right so it doesn't push the center group off-center. */
+    .cal-header {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .cal-header .cal-close-btn {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .cal-nav-btn, .cal-close-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .cal-nav-btn:hover, .cal-close-btn:hover { background: #f3f4f6; }
+    .cal-month-label, .cal-year-label {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      padding: 6px 0;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+      white-space: nowrap;
+      width: 150px;          /* Fixed width so prev/next don't move as label content changes. */
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .cal-month-label:hover, .cal-year-label:hover { background: #f3f4f6; }
+    /* ---- Days grid (default mode) ---- */
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+    }
+    .cal-weekday {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 0 6px;
+      font-weight: 600;
+    }
+    .cal-day {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 8px 0;
+      font-size: 14px;
+      color: var(--text);
+      border-radius: 6px;
+      transition: background 0.1s ease;
+      font-variant-numeric: tabular-nums;
+    }
+    .cal-day:hover { background: #f3f4f6; }
+    .cal-day.other-month { color: var(--text-faint); }
+    /* "Today": subtle gray cell behind the white widget bg + underlined day number, no outline.
+       Only show the gray bg when today isn't selected/in-range (otherwise the highlight wins). */
+    .cal-day.today { text-decoration: underline; font-weight: 600; }
+    .cal-day.today:not(.selected):not(.range-start):not(.range-end):not(.in-range) {
+      background: #ebebeb;
+    }
+    .cal-day.selected {
+      background: #2eb869 !important;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .cal-day.in-range {
+      background: #d4f0e0;
+      border-radius: 0;
+    }
+    .cal-day.range-start { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+    .cal-day.range-end { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+    /* ---- Months grid (when month-label clicked, year-picker mode) ---- */
+    .cal-months-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .cal-month-btn-grid {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 0;
+      font-size: 14px;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.1s ease;
+    }
+    .cal-month-btn-grid:hover { background: #f3f4f6; }
+    .cal-month-btn-grid.current-month { box-shadow: inset 0 0 0 1.5px #2eb869; font-weight: 600; }
+    .cal-month-btn-grid.selected-month { background: #2eb869; color: #ffffff; font-weight: 600; }
+    /* ---- Mode toggle row at the bottom ---- */
+    .cal-mode-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 0.5px solid var(--border);
+    }
+    .cal-mode-toggle {
+      display: inline-flex;
+      background: #f3f4f6;
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .cal-mode-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.1s ease;
+    }
+    .cal-mode-btn.active { background: #ffffff; color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+    /* Picker-area: holds the days grid, months grid, OR quick preset buttons. Fixed min-height
+       so the widget stays the same overall size regardless of which body is shown — otherwise
+       the calendar visually "shrinks" when toggling between Day/Range (7×6 grid) and Months
+       (4×3) or Quick (3 buttons). */
+    .cal-picker-area {
+      min-height: 224px;
+      display: flex;
+      flex-direction: column;
+    }
+    .cal-picker-area > .cal-grid,
+    .cal-picker-area > .cal-months-grid,
+    .cal-picker-area > .cal-quick-grid {
+      flex: 1;
+    }
+    /* Quick mode header — same height/shape as the day/year headers; just shows a static title
+       so layout is identical (close button anchored top-right, same overall row height). */
+    .cal-header-quick {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 34px;             /* matches nav-btn height for vertical alignment with day/year headers */
+      margin-bottom: 10px;
+    }
+    .cal-header-quick .cal-header-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    /* Quick grid: 3 large preset buttons stacked vertically inside the picker-area. Each has a
+       big primary label + secondary detail line (the actual date / range). */
+    .cal-quick-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      justify-content: center;
+    }
+    .cal-quick-btn {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      text-align: left;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+    .cal-quick-btn:hover { background: #fafafa; border-color: var(--border-strong); }
+    .cal-quick-btn.selected {
+      background: #d4f0e0;
+      border-color: #2eb869;
+    }
+    .cal-quick-btn .cal-quick-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .cal-quick-btn .cal-quick-detail {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .cal-quick-btn.selected .cal-quick-label,
+    .cal-quick-btn.selected .cal-quick-detail { color: var(--text); }
+    /* Apply button — primary action, brand-green, disabled when no valid pending selection.
+       margin-left:auto pushes it flush right inside the mode-row (Today button used to do
+       this job; with Today gone, Apply itself anchors the right edge). */
+    .cal-apply-btn {
+      background: #2eb869;
+      border: 1px solid #2eb869;
+      border-radius: 6px;
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+      cursor: pointer;
+      transition: background 0.1s ease;
+      margin-left: auto;
+    }
+    .cal-apply-btn:hover:not([disabled]) { background: #26a55c; }
+    .cal-apply-btn[disabled] { background: #d1d5db; border-color: #d1d5db; cursor: not-allowed; opacity: 0.7; }
+    /* ---- Feed info row (shows what's being displayed below) ---- */
+    .cal-feed-info {
+      max-width: 600px;
+      margin: 4px auto 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    .cal-feed-info.loading { color: var(--text-faint); font-style: italic; }
+    .cal-feed-info.empty { padding: 24px 12px; color: var(--text-faint); }
+    @media (max-width: 600px) {
+      .cal-widget, .cal-feed-info { padding-left: 6px; padding-right: 6px; }
+      .cal-day { padding: 6px 0; font-size: 13px; }
+      .cal-month-btn-grid { padding: 10px 0; font-size: 13px; }
+    }
+    /* ============== END Calendar widget ============== */
+
+    /* ============== Scroll-to-bottom floating button ==============
+       Shown in Sales History + Calendar workspaces when the user has scrolled far up.
+       Click jumps to bottom (newest entries). Hidden by default — JS adds .visible.
+       Sits above bubble menus but below the global drawer (z-index of drawer overlay
+       in this app is 1000+, so 20 is safe and won't cover the hamburger nav when open). */
+    .scroll-to-bottom-btn {
+      position: fixed;
+      right: 18px;
+      bottom: 24px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 1px solid var(--border-strong);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      color: var(--text);
+      cursor: pointer;
+      display: none;             /* hidden by default; JS toggles .visible to show */
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      z-index: 20;
+      transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    .scroll-to-bottom-btn.visible {
+      display: flex;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .scroll-to-bottom-btn:hover { background: #fafafa; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16); }
+    .scroll-to-bottom-btn:active { transform: translateY(0) scale(0.96); }
+    .scroll-to-bottom-btn svg { display: block; }
+    @media (max-width: 600px) {
+      .scroll-to-bottom-btn { right: 14px; bottom: 18px; width: 42px; height: 42px; }
+    }
+    /* ============== END Scroll-to-bottom ============== */
+
     /* Day separator */
     .day-separator { display: flex; align-items: center; gap: 12px; margin: 10px 0 6px; }
     .day-separator .line { flex: 1; height: 0.5px; background: var(--border-strong); }
@@ -834,16 +1175,16 @@
     }
     .bubble-card {
       display: grid;
-      grid-template-columns: 72px minmax(160px, 1fr) 54px;
+      grid-template-columns: 66px minmax(160px, 1fr) 40px;
       border-radius: 14px;
       overflow: hidden;
       width: 100%;
       border: 0.5px solid;
     }
     @media (max-width: 600px) {
-      .bubble-card { grid-template-columns: 60px minmax(120px, 1fr) 50px; border-width: 1.5px; }
+      .bubble-card { grid-template-columns: 54px minmax(120px, 1fr) 36px; border-width: 1.5px; }
       .bubble-row.row-body, .bubble-row.row-footer { border-top-width: 1.5px; }
-      .row-body .bubble-cell.col-id span { font-size: 9.5px; letter-spacing: -0.3px; }
+      .row-body .bubble-cell.col-id span { font-size: 9px; letter-spacing: -0.3px; }
       .row-header .bubble-cell { font-size: 11px; }
       /* Darker border colors on mobile so they don't blend into the bubble's body gradient */
       .bubble.sale .bubble-card { border-color: #79bf90; }
@@ -867,7 +1208,7 @@
     .row-header .bubble-cell { font-size: 13px; font-weight: 600; padding-top: 8px; padding-bottom: 8px; white-space: nowrap; color: #000 !important; }
 
     /* Body row content */
-    .row-body .bubble-cell.col-id span { font-size: 11px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; line-height: 1.4; overflow-wrap: break-word; word-break: normal; }
+    .row-body .bubble-cell.col-id span { font-size: 10px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; line-height: 1.4; overflow-wrap: break-word; word-break: normal; }
     /* Freeform row's ID cell: orange outline + cream fill so it's visually flagged
        (matches the Add Products form's freeform-ID styling). Higher specificity to override
        .bubble.sale/.bubble.stockin row-cell gradient backgrounds. */
@@ -929,10 +1270,10 @@
        and a Stock col before Qty (sanity-check current stock).
        Applies to both sale (green) AND stock-in (amber) bubbles. */
     .bubble.sale.editing .bubble-card,
-    .bubble.stockin.editing .bubble-card { grid-template-columns: 28px 72px minmax(140px, 1fr) 50px 54px; }
+    .bubble.stockin.editing .bubble-card { grid-template-columns: 24px 66px minmax(140px, 1fr) 40px 40px; }
     @media (max-width: 600px) {
       .bubble.sale.editing .bubble-card,
-      .bubble.stockin.editing .bubble-card { grid-template-columns: 24px 60px minmax(100px, 1fr) 44px 50px; }
+      .bubble.stockin.editing .bubble-card { grid-template-columns: 20px 54px minmax(100px, 1fr) 36px 36px; }
     }
     .bubble.editing .col-stock-edit {
       display: flex;
@@ -970,6 +1311,15 @@
       text-decoration: line-through;
       opacity: 0.5;
     }
+    /* Firefox does NOT inherit text-decoration into form controls (textarea/input);
+       Chrome does. Explicitly target the name textarea + qty input so the strike-through
+       shows everywhere in marked-delete rows, on every browser. */
+    .bubble.editing .row-body.marked-delete .col-name textarea,
+    .bubble.editing .row-body.marked-delete .col-name input,
+    .bubble.editing .row-body.marked-delete .col-id { /* ID cell on existing rows has text directly, no inner span */
+      text-decoration: line-through;
+      opacity: 0.5;
+    }
     .bubble.editing .row-body.marked-delete .col-qty input {
       text-decoration: line-through;
       opacity: 0.5;
@@ -982,7 +1332,11 @@
     }
     /* Empty bubble row spans all columns including the temp Stock col */
     .bubble.editing .bubble-row-empty > div { grid-column: 1 / -1; }
-    .bubble.editing .marching-ants-svg {
+    /* Marching-ants outline: hidden by default, shown when bubble is in edit mode OR has an
+       active context menu (right-click / long-press). The SVG element is always rendered in
+       the DOM (see renderBubble) so this rule simply toggles its display. */
+    .marching-ants-svg {
+      display: none;
       position: absolute;
       inset: -3px;
       width: calc(100% + 6px);
@@ -991,7 +1345,9 @@
       overflow: visible;
       z-index: 1;
     }
-    .bubble.editing .marching-ants-svg rect {
+    .bubble.editing .marching-ants-svg,
+    .bubble.menu-open .marching-ants-svg { display: block; }
+    .marching-ants-svg rect {
       width: 100%;
       height: 100%;
       fill: none;
@@ -1016,12 +1372,352 @@
       font-variant-numeric: tabular-nums;
       text-align: center;
       outline: none;
+      /* Hide Firefox's number spinner buttons (Chrome handled via ::-webkit-*-spin-button below).
+         Without -moz-appearance, Firefox renders the up/down arrows inside the cell and pushes
+         the digits off-screen on narrow widths like ours. */
+      -moz-appearance: textfield;
+      appearance: textfield;
     }
     .bubble.editing .row-body .col-qty input.cell-edit-input:focus {
       border-color: #94a3b8;
     }
     .bubble.editing .row-body .col-qty input.cell-edit-input::-webkit-outer-spin-button,
     .bubble.editing .row-body .col-qty input.cell-edit-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+    /* =================================================================================
+       Existing rows in edit mode — make name cell editable (with autocomplete) so user
+       can change which product an existing row points to (or convert sale to freeform).
+       Visual: white inner box around the textarea (matches the Qty input style), so
+       existing-row inputs are clearly differentiated from new-row inputs (which use
+       the gray-gradient background and no inner box).
+       ALL rules strictly scoped to .bubble.editing .row-body.row-existing. Form bubbles
+       untouched.
+       ================================================================================= */
+    /* Existing rows must use the SAME cell paddings as new rows for col-id and col-qty,
+       otherwise the inherited .bubble-cell base padding (10px 14px = 20px vertical) makes
+       the col-qty cell 50px tall (way bigger than the new row's 36px), driving row height
+       up by ~14px. Match new-row paddings so all rows render at the same height.
+       col-row-x is intentionally left at default — it inherits .bubble-cell base padding in
+       both row types (existing + new), so it's already consistent and the X button stays
+       centered vertically. */
+    .bubble.editing .row-body.row-existing .col-id   { padding: 6px 4px; }
+    .bubble.editing .row-body.row-existing .col-qty  { padding: 4px 2px; }
+
+    .bubble.editing .row-body.row-existing .col-name {
+      position: relative;     /* anchor for the autocomplete dropdown */
+      padding: 0;             /* let the textarea fill the cell — same as new-row's .new-row-product cell */
+    }
+    .bubble.editing .row-body.row-existing .col-name textarea.cell-edit-name {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #ffffff;
+      padding: 8px 10px;      /* MATCH new-row textarea padding so same text wraps identically */
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      line-height: 1.4;
+      resize: none;
+      overflow: hidden;
+      outline: none;
+      min-height: 36px;       /* MATCH new-row min-height so empty/one-line rows have same height */
+      display: block;
+      /* box-sizing: content-box (default) — same as new-row textarea, so autoGrow's scrollHeight
+         measurement behaves identically. The 1px border adds only ~2px height vs new row, which is
+         negligible (and necessary for the visible "white box" design). */
+    }
+    .bubble.editing .row-body.row-existing .col-name textarea.cell-edit-name:focus {
+      border-color: #94a3b8;
+      background: #fffef0;
+    }
+    /* ID cell text styling (existing rows in edit mode have no inner span — text sits directly
+       in the cell div, so we style the cell directly to match the view-mode .col-id span look).
+       Firefox needs `overflow-wrap: anywhere` (not just break-word) to wrap long IDs without
+       spaces — Chrome wraps with break-word, but Firefox lets the text overflow horizontally. */
+    .bubble.editing .row-body.row-existing .col-id {
+      font-size: 10px;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      min-width: 0;             /* allow grid track to shrink below content size */
+    }
+    .bubble.sale.editing .row-body.row-existing .col-id { color: #4d7050; }
+    .bubble.stockin.editing .row-body.row-existing .col-id { color: #94522a; }
+    /* ID cell is a dynamic readout — its data-state attribute drives the visual.
+       Empty / matched: inherit the row's gradient (green for sale, amber for stockin).
+       Freeform: cream bg + orange border + danger-colored "?" (same as view mode). */
+    .bubble.editing .row-body.row-existing .col-id[data-state="freeform"] {
+      background: #fff7ed;
+      box-shadow: inset 0 0 0 1.5px #d4974a;
+      color: var(--danger);
+      font-size: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    /* Autocomplete dropdown on existing rows — spans ID + Product + Stock + Qty columns
+       (matches the new-row dropdown geometry). */
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: -66px;     /* into ID col (66px) */
+      right: -80px;    /* Stock 40 + Qty 40 = 80 */
+      z-index: 30;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      max-height: 320px;
+      overflow-y: auto;
+      display: none;
+    }
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list.visible { display: block; }
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f3f4f6;
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item:hover,
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item.active { background: #f9fafb; }
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item .ac-id { font-family: ui-monospace, monospace; font-size: 10px; color: var(--text-faint); }
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item .ac-name { font-size: 14px; }
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-empty { padding: 12px; text-align: center; color: var(--text-faint); font-style: italic; font-size: 13px; }
+    /* ============== END existing-row-edit ============== */
+
+    /* =================================================================================
+       PHASE 2: "+ Add another product" in edit mode + new-row visuals.
+       ALL rules below are strictly scoped to .bubble.editing so form bubbles
+       (.bubble.form-sale / .bubble.form-stockin) are untouched.
+       New rows use .new-row-* class names (distinct from form's .col-form-*) so there's
+       zero CSS contamination between contexts.
+       ================================================================================= */
+    .bubble.editing .row-add-button-in-edit {
+      grid-column: 1 / -1;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: center;
+      background: #fafafa;
+      border-top: 0.5px solid var(--border);
+    }
+    .bubble.editing .add-row-in-edit-btn {
+      background: #ffffff;
+      border: 1.5px dashed #2eb869;
+      color: #2eb869;
+      padding: 6px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .bubble.editing .add-row-in-edit-btn:hover { background: #f0fdf4; }
+    .bubble.stockin.editing .add-row-in-edit-btn { border-color: #d4974a; color: #d4974a; }
+    .bubble.stockin.editing .add-row-in-edit-btn:hover { background: #fff7ed; }
+
+    /* New row sits between existing body rows and the "+ Add" button.
+       Inherits subgrid from .bubble-row, just like existing rows.
+       Visual: subtle gray gradient background to distinguish "newly added" rows from
+       the existing rows (which carry the sale-green / stockin-amber gradient). */
+    .bubble.editing .row-body.row-new { border-top: 0.5px solid var(--border); }
+    .bubble.editing .row-body.row-new .bubble-cell {
+      background: linear-gradient(to right, #f4f5f7, #fafafa);
+    }
+
+    /* X cell already styled by .bubble.editing .row-body .col-row-x above — reused as-is.
+
+       ID cell — read-only display for sale, span+textarea combo for stockin (matches form bubble look). */
+    .bubble.editing .row-body .new-row-id {
+      background: #f8f8f8;
+      color: var(--text-faint);
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 10px;
+      letter-spacing: -0.1px;
+      align-items: center !important;
+      justify-content: center;
+      display: flex;
+      padding: 6px 4px;
+      text-align: center;
+      word-break: normal;
+      overflow-wrap: break-word;
+    }
+    .bubble.editing .row-body .new-row-id.new-row-id-editable { padding: 0; position: relative; }
+    .bubble.editing .row-body .new-row-id-editable .id-display,
+    .bubble.editing .row-body .new-row-id-editable .id-editor {
+      width: 100%;
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .bubble.editing .row-body .new-row-id-editable .id-display {
+      padding: 6px 4px;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: -0.1px;
+      word-break: normal;
+      overflow-wrap: break-word;
+      box-sizing: border-box;
+    }
+    .bubble.editing .row-body .new-row-id-editable .id-editor {
+      border: none;
+      background: transparent;
+      padding: 6px 4px;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 10px;
+      color: var(--text);
+      letter-spacing: -0.1px;
+      text-align: center;
+      outline: none;
+      resize: none;
+      overflow: hidden;
+      line-height: 1.3;
+      display: none;
+      box-sizing: border-box;
+    }
+    /* State machine for editable ID (mirrors form bubble) */
+    .bubble.editing .new-row-id-editable[data-state="empty"] .id-display,
+    .bubble.editing .new-row-id-editable[data-state="matched"] .id-display { display: flex; }
+    .bubble.editing .new-row-id-editable[data-state="empty"] .id-editor,
+    .bubble.editing .new-row-id-editable[data-state="matched"] .id-editor { display: none; }
+    .bubble.editing .new-row-id-editable[data-state="freeform"] .id-display { display: none; }
+    .bubble.editing .new-row-id-editable[data-state="freeform"] .id-editor { display: flex; }
+    /* Theme tints */
+    .bubble.sale.editing .row-body .new-row-id[data-state="matched"] { background: var(--id-matched-bg); color: var(--text); }
+    .bubble.stockin.editing .row-body .new-row-id[data-state="matched"] { background: #fff7ed; color: var(--text); }
+    .bubble.editing .row-body .new-row-id[data-state="freeform"] {
+      background: #fff7ed;
+      color: var(--danger);
+      box-shadow: inset 0 0 0 1.5px #d4974a;
+    }
+    /* The "?" itself: same font + color as the existing-row freeform (.col-id-freeform).
+       Applies to both the plain text "?" (sale new row) and the .id-display/.id-editor inside
+       the wrapper combo (stockin new row). */
+    .bubble.editing .row-body .new-row-id[data-state="freeform"],
+    .bubble.editing .row-body .new-row-id-editable[data-state="freeform"] .id-display,
+    .bubble.editing .row-body .new-row-id-editable[data-state="freeform"] .id-editor {
+      font-size: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--danger);
+      letter-spacing: 0;
+    }
+    /* Stockin's matched state already tinted amber by the [data-state="matched"] rule above.
+       Empty state stays gray-gradient (set globally on .row-new .bubble-cell). */
+
+    /* Product cell — autocomplete textarea + dropdown */
+    .bubble.editing .row-body .new-row-product { position: relative; padding: 0; }
+    .bubble.editing .row-body .new-row-product textarea {
+      width: 100%;
+      border: none;
+      background: transparent;
+      padding: 8px 10px;
+      font-size: 14px;
+      font-family: inherit;
+      color: inherit;
+      box-shadow: none;
+      outline: none;
+      resize: none;
+      overflow: hidden;
+      line-height: 1.4;
+      min-height: 36px;
+      display: block;
+      vertical-align: middle;
+    }
+    .bubble.editing .row-body .new-row-product textarea::placeholder { font-style: italic; color: var(--text-faint); }
+    .bubble.editing .row-body .new-row-product textarea:focus { background: #fffef0; }
+
+    /* Autocomplete dropdown — anchored to product cell, spans ID + Product + Stock + Qty
+       so the user can see ID + name together. */
+    .bubble.editing .row-body .new-row-product .autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: -66px;     /* into ID col (66px) */
+      right: -80px;    /* Stock 40 + Qty 40 = 80 */
+      z-index: 30;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      max-height: 320px;
+      overflow-y: auto;
+      display: none;
+    }
+    .bubble.editing .row-body .new-row-product .autocomplete-list.visible { display: block; }
+    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f3f4f6;
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item:hover,
+    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item.active { background: #f9fafb; }
+    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item .ac-id { font-family: ui-monospace, monospace; font-size: 10px; color: var(--text-faint); }
+    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item .ac-name { font-size: 14px; }
+    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-empty { padding: 12px; text-align: center; color: var(--text-faint); font-style: italic; font-size: 13px; }
+    /* Mobile: dropdown offset matches mobile cell widths (ID 54 + Stock 36 + Qty 36 = 72) */
+    @media (max-width: 600px) {
+      .bubble.editing .row-body .new-row-product .autocomplete-list,
+      .bubble.editing .row-body.row-existing .col-name .autocomplete-list {
+        left: -54px;
+        right: -72px;
+      }
+    }
+
+    /* Stock readout cell — same italic-numeric style as existing edit-mode stock cells */
+    .bubble.editing .row-body .new-row-stock {
+      display: flex;
+      text-align: center;
+      align-items: center !important;
+      justify-content: center;
+      font-style: italic;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      padding: 8px 4px;
+      color: var(--text-muted);
+    }
+    .bubble.sale.editing .row-body .new-row-stock[data-state="matched"] { color: #4d7050; }
+    .bubble.stockin.editing .row-body .new-row-stock[data-state="matched"] { color: #94522a; background: #fff8ef; }
+    /* Stock cell stockin tint applied only in matched state (above). Empty/freeform = gradient. */
+
+    /* Qty cell — number input centered */
+    .bubble.editing .row-body .new-row-qty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 2px;
+      /* No white bg here — let the row's gray gradient (set on .bubble-cell above) show through.
+         Per user design: only EXISTING rows in edit mode get the visible white inner box for
+         Qty/Name; new rows blend with their gray gradient. */
+    }
+    .bubble.editing .row-body .new-row-qty input {
+      width: 100%;
+      max-width: 60px;
+      padding: 4px 2px;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      outline: none;
+      /* Firefox spinner removal — same reason as the existing-row qty input above. */
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+    .bubble.editing .row-body .new-row-qty input:focus { border-color: #94a3b8; }
+    .bubble.editing .row-body .new-row-qty input::-webkit-outer-spin-button,
+    .bubble.editing .row-body .new-row-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    /* Stockin negative-qty visual flag */
+    .bubble.stockin.editing .row-body .new-row-qty.qty-negative { background: #fff7ed; box-shadow: inset 0 0 0 1.5px #d4974a; }
+    .bubble.stockin.editing .row-body .new-row-qty.qty-negative input { color: #b87a2a; font-weight: 600; }
+    /* ============== END PHASE 2 ============== */
     .bubble.editing .row-footer input.cell-edit-input {
       padding: 3px 6px;
       border: 1px solid #cbd5e1;
@@ -1168,6 +1864,139 @@
     .activity-load-more .mini-spinner { width: 12px; height: 12px; border: 2px solid var(--bg-elevated); border-top-color: var(--text-muted); border-radius: 50%; animation: spin 1s linear infinite; }
 
     @media (max-width: 600px) { .table-container { padding: 10px; } th, td { padding: 8px; font-size: 13px; } .panel { padding: 12px 14px; } .activity-section { padding: 12px 14px; } }
+
+    /* ============== In-app Debug Console ==============
+       Self-contained, dark floating panel. Captures console.*, fetch, WebSocket, errors, and
+       clicks via passive hooks (originals always called). UI is draggable/resizable; state
+       persisted via localStorage. Scoped under #debugConsole / #debugToggle / .dc-* so it
+       never collides with app styles. High z-index so it floats above everything. */
+    #debugConsole {
+      position: fixed;
+      background: rgba(15, 18, 25, 0.96);
+      color: #e5e7eb;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      display: none;            /* shown by adding .open */
+      flex-direction: column;
+      z-index: 100000;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 11px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+      min-width: 240px;
+      min-height: 180px;
+    }
+    #debugConsole.open { display: flex; }
+    .dc-header {
+      background: #1f2937;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: move;
+      user-select: none;
+      flex-shrink: 0;
+      touch-action: none;       /* let our pointermove handler drive dragging on touch */
+    }
+    .dc-title { color: #f3f4f6; font-weight: 600; font-size: 12px; flex-shrink: 0; }
+    .dc-filter {
+      flex: 1;
+      min-width: 60px;
+      background: #0f1219;
+      border: 1px solid #374151;
+      color: #e5e7eb;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: inherit;
+      outline: none;
+    }
+    .dc-filter:focus { border-color: #6366f1; }
+    .dc-btn {
+      background: transparent;
+      border: 1px solid #374151;
+      color: #e5e7eb;
+      width: 26px;
+      height: 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .dc-btn:hover { background: #374151; }
+    .dc-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 8px;
+      background: #0f1219;
+      line-height: 1.5;
+    }
+    .dc-row {
+      word-break: break-all;
+      padding: 1px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .dc-time { color: #6b7280; }
+    .dc-cat { color: #9ca3af; font-weight: 600; }
+    .dc-msg { color: #e5e7eb; }
+    .dc-data {
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 2px solid #4b5563;
+      margin: 2px 0 4px 12px;
+      padding: 4px 6px;
+      font-size: 10px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #cbd5e1;
+    }
+    /* Per-category accent colors. dc-cat-<name> is added from JS, lower-cased + safe chars. */
+    .dc-cat-error .dc-cat   { color: #f87171; }
+    .dc-cat-error .dc-msg   { color: #fca5a5; }
+    .dc-cat-warn .dc-cat    { color: #fbbf24; }
+    .dc-cat-net .dc-cat     { color: #60a5fa; }
+    .dc-cat-ws .dc-cat      { color: #22d3ee; }
+    .dc-cat-click .dc-cat   { color: #34d399; }
+    .dc-cat-realtime .dc-cat{ color: #c084fc; }
+    .dc-cat-kick .dc-cat    { color: #f472b6; }
+    .dc-cat-activity .dc-cat{ color: #fbcfe8; }
+    .dc-cat-init .dc-cat    { color: #a3e635; }
+    .dc-cat-auth .dc-cat    { color: #93c5fd; }
+    .dc-resize {
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 14px; height: 14px;
+      cursor: nwse-resize;
+      background: linear-gradient(135deg, transparent 50%, #4b5563 50%, #4b5563 60%, transparent 60%, transparent 75%, #4b5563 75%, #4b5563 85%, transparent 85%);
+      touch-action: none;
+    }
+    #debugToggle {
+      position: fixed;
+      bottom: 24px;
+      left: 18px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid #374151;
+      background: rgba(15, 18, 25, 0.85);
+      color: #e5e7eb;
+      font-size: 18px;
+      cursor: pointer;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      padding: 0;
+    }
+    #debugToggle:hover { background: rgba(31, 41, 55, 0.95); }
+    @media (max-width: 600px) {
+      #debugToggle { bottom: 18px; left: 14px; width: 34px; height: 34px; font-size: 16px; }
+    }
+    /* ============== END Debug Console ============== */
   </style>
 </head>
 <body>
@@ -1278,6 +2107,19 @@
       </section>
     </div>
 
+    <!-- ============ Workspace: Calendar ============ -->
+    <!-- A sales-history-like feed but filterable by a date or date range via an inline
+         calendar widget. The widget can be expanded (full month grid) or collapsed to a
+         small header showing the current selection. Independent from "Sales History" so
+         the history workspace stays uncluttered. -->
+    <div class="workspace" data-workspace="calendar">
+      <section class="activity-section">
+        <div class="cal-widget" id="calWidget"></div>
+        <div class="cal-feed-info" id="calFeedInfo"></div>
+        <div class="activity-feed" id="calFeed"></div>
+      </section>
+    </div>
+
     <!-- ============ Workspace: Actions ============ -->
     <!-- ============ Workspace: Add Products (multi-row bubble form) ============ -->
     <div class="workspace" data-workspace="addproducts">
@@ -1364,6 +2206,10 @@
         <button class="drawer-item" data-workspace="history" onclick="window.switchWorkspace('history')">
           <span class="drawer-icon">🕒</span>
           <span class="drawer-label">Sales History</span>
+        </button>
+        <button class="drawer-item" data-workspace="calendar" onclick="window.switchWorkspace('calendar')">
+          <span class="drawer-icon">📅</span>
+          <span class="drawer-label">Calendar</span>
         </button>
         <button class="drawer-item" data-workspace="tools" onclick="window.switchWorkspace('tools')">
           <span class="drawer-icon">🔧</span>
@@ -1496,11 +2342,392 @@
         </div>
       </div>
     </div>
+    <!-- Notice modal — single OK button, in-app replacement for alert().
+         Multi-line messages supported (notice-message uses white-space: pre-wrap). -->
+    <div class="confirm-modal" id="noticeModal">
+      <div class="confirm-card">
+        <h3 id="noticeTitle">Notice</h3>
+        <p id="noticeMessage" class="notice-message"></p>
+        <div class="confirm-actions">
+          <button class="btn" id="noticeOkBtn">OK</button>
+        </div>
+      </div>
+    </div>
+    <!-- Floating scroll-to-bottom button (Sales History + Calendar workspaces only).
+         Shown when the user is scrolled far up; click jumps to the bottom of the feed
+         (newest entries). See SCROLL_TO_BOTTOM_THRESHOLD_PX in JS for the trigger distance. -->
+    <button type="button" class="scroll-to-bottom-btn" id="scrollToBottomBtn" aria-label="Scroll to bottom of feed">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <polyline points="6 13 12 19 18 13"></polyline>
+      </svg>
+    </button>
   </div>
 
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { SUPA_U as SUPABASE_URL, SUPA_K as SUPABASE_KEY } from './config.js'
+
+    // ============== In-app Debug Console ==============
+    // Self-contained overlay. Captures console.*, fetch, WebSocket, errors, clicks.
+    // All hooks are passive: originals are called exactly as-is; we only push to a circular
+    // buffer. UI is draggable/resizable; state persisted via localStorage. Scoped under
+    // #debugConsole / #debugToggle / .dc-* so it never touches app state or styles.
+    // Toggle: click 🐛 button (bottom-left) or Ctrl+Shift+D.
+    ;(() => {
+      'use strict'
+      if (window.__debugConsoleInit) return  // hot-reload guard
+      window.__debugConsoleInit = true
+
+      const MAX_BUFFER = 2000    // circular cap on entries kept in memory
+      const MAX_RENDER = 500     // max DOM rows in the body — keeps scroll fast
+      const LS_KEY = 'debug_console_state_v1'
+
+      // ----- buffer + helpers -----
+      const buffer = []
+      let consoleEl = null, bodyEl = null, filterEl = null, toggleEl = null, isOpen = false
+
+      function nowParts() {
+        const d = new Date()
+        const hh = String(d.getHours()).padStart(2, '0')
+        const mm = String(d.getMinutes()).padStart(2, '0')
+        const ss = String(d.getSeconds()).padStart(2, '0')
+        const ms = String(d.getMilliseconds()).padStart(3, '0')
+        return `${hh}:${mm}:${ss}.${ms}`
+      }
+      function safeStringify(v, maxLen) {
+        let s
+        try {
+          if (v instanceof Error) s = `${v.name}: ${v.message}\n${v.stack || ''}`
+          else if (typeof v === 'object' && v !== null) {
+            const seen = new WeakSet()
+            s = JSON.stringify(v, (k, val) => {
+              if (typeof val === 'object' && val !== null) {
+                if (seen.has(val)) return '[Circular]'
+                seen.add(val)
+              }
+              return val
+            }, 2)
+          } else s = String(v)
+        } catch (e) { s = '[unable to stringify]' }
+        if (maxLen && s && s.length > maxLen) s = s.slice(0, maxLen) + '…'
+        return s
+      }
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+      }
+      function shortenUrl(url) {
+        url = String(url)
+        if (url.length < 130) return url
+        return url.slice(0, 70) + '…' + url.slice(-50)
+      }
+      function addEntry(category, message, data) {
+        const entry = {
+          time: nowParts(),
+          category: String(category),
+          message: String(message),
+          data: data === undefined ? null : safeStringify(data, 4000),
+        }
+        buffer.push(entry)
+        if (buffer.length > MAX_BUFFER) buffer.shift()
+        if (isOpen && bodyEl) appendRow(entry)
+      }
+
+      // ----- hooks -----
+      // console.* — wrap each, preserve original behavior.
+      ;['log','info','warn','error','debug'].forEach(method => {
+        const orig = console[method]
+        console[method] = function(...args) {
+          try {
+            const msg = args.map(a => typeof a === 'string' ? a : safeStringify(a, 500)).join(' ')
+            addEntry(method === 'log' ? 'log' : method, msg)
+          } catch (e) {}
+          return orig.apply(console, args)
+        }
+      })
+      // fetch — log URL, method, status, duration
+      const origFetch = window.fetch
+      if (origFetch) {
+        window.fetch = function(...args) {
+          const [res, opts = {}] = args
+          const url = typeof res === 'string' ? res : (res && res.url) || '?'
+          const method = (opts && opts.method) || (res && res.method) || 'GET'
+          const t0 = performance.now()
+          addEntry('net', `→ ${method} ${shortenUrl(url)}`)
+          return origFetch.apply(this, args).then(r => {
+            const dt = Math.round(performance.now() - t0)
+            addEntry('net', `← ${method} ${r.status} ${shortenUrl(url)} (${dt}ms)`)
+            return r
+          }, err => {
+            const dt = Math.round(performance.now() - t0)
+            addEntry('net', `✕ ${method} ${shortenUrl(url)} FAILED (${dt}ms): ${err && err.message}`)
+            throw err
+          })
+        }
+      }
+      // WebSocket — log connect, send, recv, close, error. Supabase realtime uses this.
+      const OrigWS = window.WebSocket
+      if (OrigWS) {
+        function WrappedWS(url, protocols) {
+          const ws = protocols !== undefined ? new OrigWS(url, protocols) : new OrigWS(url)
+          addEntry('ws', `connect ${shortenUrl(url)}`)
+          ws.addEventListener('open', () => addEntry('ws', 'open'))
+          ws.addEventListener('close', e => addEntry('ws', `close code=${e.code}${e.reason ? ' reason=' + e.reason : ''}`))
+          ws.addEventListener('error', () => addEntry('ws', 'error'))
+          ws.addEventListener('message', e => {
+            addEntry('ws', `← ${String(e.data).slice(0, 400)}`)
+          })
+          const origSend = ws.send.bind(ws)
+          ws.send = function(data) {
+            addEntry('ws', `→ ${String(data).slice(0, 400)}`)
+            return origSend(data)
+          }
+          return ws
+        }
+        // Preserve statics on the wrapper so libraries that read WebSocket.OPEN etc still work.
+        Object.keys(OrigWS).forEach(k => { try { WrappedWS[k] = OrigWS[k] } catch (e) {} })
+        WrappedWS.prototype = OrigWS.prototype
+        WrappedWS.CONNECTING = OrigWS.CONNECTING
+        WrappedWS.OPEN = OrigWS.OPEN
+        WrappedWS.CLOSING = OrigWS.CLOSING
+        WrappedWS.CLOSED = OrigWS.CLOSED
+        window.WebSocket = WrappedWS
+      }
+      // Uncaught errors + promise rejections
+      window.addEventListener('error', e => {
+        addEntry('error', `${e.message} (${e.filename || '?'}:${e.lineno || '?'}:${e.colno || '?'})`)
+      })
+      window.addEventListener('unhandledrejection', e => {
+        const reason = e.reason instanceof Error ? `${e.reason.name}: ${e.reason.message}` : safeStringify(e.reason, 500)
+        addEntry('error', `Unhandled rejection: ${reason}`)
+      })
+      // Clicks (capture, passive — never interferes with app handlers)
+      document.addEventListener('click', e => {
+        const t = e.target
+        if (!t || !t.tagName) return
+        // Ignore clicks INSIDE the debug console itself + the toggle button
+        if ((t.closest && t.closest('#debugConsole')) || t.id === 'debugToggle' || (t.closest && t.closest('#debugToggle'))) return
+        let desc
+        const btn = t.tagName === 'BUTTON' ? t : (t.closest && t.closest('button'))
+        if (btn) {
+          const action = btn.dataset && btn.dataset.action ? btn.dataset.action : ''
+          const label = (btn.textContent || '').trim().slice(0, 40)
+          desc = `button${action ? `[${action}]` : ''} "${label}"`
+        } else if (t.tagName === 'A') {
+          desc = `link "${(t.textContent || '').trim().slice(0, 40)}"`
+        } else if (t.tagName === 'INPUT') {
+          desc = `input${t.id ? '#' + t.id : ''} type=${t.type || ''}`
+        } else {
+          desc = `${t.tagName.toLowerCase()}${t.id ? '#' + t.id : ''}`
+        }
+        addEntry('click', desc)
+      }, { capture: true, passive: true })
+
+      // ----- rendering -----
+      function matchesFilter(entry, filter) {
+        if (!filter) return true
+        const f = filter.toLowerCase()
+        return entry.category.toLowerCase().includes(f) ||
+               entry.message.toLowerCase().includes(f) ||
+               (entry.data && entry.data.toLowerCase().includes(f))
+      }
+      function rowHtml(entry) {
+        const catClass = 'dc-cat-' + entry.category.replace(/[^\w-]/g, '_')
+        return `<div class="dc-row ${catClass}"><span class="dc-time">${escapeHtml(entry.time)}</span> <span class="dc-cat">[${escapeHtml(entry.category)}]</span> <span class="dc-msg">${escapeHtml(entry.message)}</span>${entry.data ? `<pre class="dc-data">${escapeHtml(entry.data)}</pre>` : ''}</div>`
+      }
+      function appendRow(entry) {
+        if (!bodyEl) return
+        const filter = filterEl ? filterEl.value : ''
+        if (!matchesFilter(entry, filter)) return
+        const nearBottom = bodyEl.scrollHeight - bodyEl.scrollTop - bodyEl.clientHeight < 60
+        bodyEl.insertAdjacentHTML('beforeend', rowHtml(entry))
+        while (bodyEl.children.length > MAX_RENDER) bodyEl.removeChild(bodyEl.firstChild)
+        if (nearBottom) bodyEl.scrollTop = bodyEl.scrollHeight
+      }
+      function renderAll() {
+        if (!bodyEl) return
+        const filter = filterEl ? filterEl.value : ''
+        const start = Math.max(0, buffer.length - MAX_RENDER)
+        let html = ''
+        for (let i = start; i < buffer.length; i++) {
+          if (matchesFilter(buffer[i], filter)) html += rowHtml(buffer[i])
+        }
+        bodyEl.innerHTML = html
+        bodyEl.scrollTop = bodyEl.scrollHeight
+      }
+
+      // ----- UI build + interactions -----
+      function buildUI() {
+        if (consoleEl) return
+        let saved = {}
+        try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') } catch (e) {}
+
+        consoleEl = document.createElement('div')
+        consoleEl.id = 'debugConsole'
+        const initW = saved.w || 380
+        const initH = saved.h || 420
+        consoleEl.style.left = Math.max(0, Math.min(window.innerWidth - initW, saved.x ?? (window.innerWidth - initW - 18))) + 'px'
+        consoleEl.style.top = Math.max(0, Math.min(window.innerHeight - initH, saved.y ?? 60)) + 'px'
+        consoleEl.style.width = initW + 'px'
+        consoleEl.style.height = initH + 'px'
+        consoleEl.innerHTML = `
+          <div class="dc-header" data-dc-drag>
+            <span class="dc-title">🐛 Debug</span>
+            <input class="dc-filter" type="text" placeholder="filter..." value="${escapeHtml(saved.filter || '')}">
+            <button class="dc-btn" data-dc-action="copy" title="Copy filtered to clipboard">📋</button>
+            <button class="dc-btn" data-dc-action="clear" title="Clear buffer">🗑️</button>
+            <button class="dc-btn" data-dc-action="close" title="Close (Ctrl+Shift+D)">✕</button>
+          </div>
+          <div class="dc-body"></div>
+          <div class="dc-resize" data-dc-resize></div>
+        `
+        document.body.appendChild(consoleEl)
+        bodyEl = consoleEl.querySelector('.dc-body')
+        filterEl = consoleEl.querySelector('.dc-filter')
+
+        // Toggle button (always visible)
+        toggleEl = document.createElement('button')
+        toggleEl.id = 'debugToggle'
+        toggleEl.type = 'button'
+        toggleEl.title = 'Toggle debug console (Ctrl+Shift+D)'
+        toggleEl.textContent = '🐛'
+        document.body.appendChild(toggleEl)
+        toggleEl.addEventListener('click', toggle)
+
+        // Header buttons
+        consoleEl.querySelectorAll('[data-dc-action]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const a = btn.dataset.dcAction
+            if (a === 'copy') copyAll(btn)
+            else if (a === 'clear') clearAll()
+            else if (a === 'close') setOpen(false)
+          })
+        })
+        filterEl.addEventListener('input', () => { renderAll(); saveState() })
+        // Don't trigger drag if the user is interacting with input/buttons in the header
+        filterEl.addEventListener('pointerdown', e => e.stopPropagation())
+        consoleEl.querySelectorAll('.dc-btn').forEach(b => b.addEventListener('pointerdown', e => e.stopPropagation()))
+
+        const header = consoleEl.querySelector('[data-dc-drag]')
+        header.addEventListener('pointerdown', startDrag)
+        consoleEl.querySelector('[data-dc-resize]').addEventListener('pointerdown', startResize)
+
+        // Keyboard shortcut
+        window.addEventListener('keydown', e => {
+          if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+            e.preventDefault()
+            toggle()
+          }
+        })
+
+        if (saved.open) setOpen(true)
+      }
+
+      function setOpen(open) {
+        isOpen = open
+        if (consoleEl) consoleEl.classList.toggle('open', open)
+        if (open) renderAll()
+        saveState()
+      }
+      function toggle() { setOpen(!isOpen) }
+
+      function copyAll(btn) {
+        const filter = filterEl ? filterEl.value : ''
+        const lines = buffer
+          .filter(e => matchesFilter(e, filter))
+          .map(e => `${e.time} [${e.category}] ${e.message}` + (e.data ? '\n' + e.data : ''))
+          .join('\n')
+        const done = () => {
+          if (!btn) return
+          const orig = btn.textContent
+          btn.textContent = '✓'
+          setTimeout(() => { btn.textContent = orig }, 900)
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(lines).then(done, () => fallbackCopy(lines, done))
+        } else fallbackCopy(lines, done)
+      }
+      function fallbackCopy(text, done) {
+        // Fallback for browsers/contexts where Clipboard API isn't available (e.g. file://)
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.style.position = 'fixed'
+        ta.style.left = '-9999px'
+        document.body.appendChild(ta)
+        ta.select()
+        try { document.execCommand('copy') } catch (e) {}
+        document.body.removeChild(ta)
+        done()
+      }
+      function clearAll() {
+        buffer.length = 0
+        if (bodyEl) bodyEl.innerHTML = ''
+        addEntry('init', 'buffer cleared')
+      }
+
+      // ----- drag + resize via pointer events (unified mouse/touch) -----
+      let dragOff = null, resizeStart = null
+      function startDrag(e) {
+        // Only drag from the header background, not from controls inside it
+        if (e.target.closest('input, button')) return
+        dragOff = { x: e.clientX - consoleEl.offsetLeft, y: e.clientY - consoleEl.offsetTop }
+        document.addEventListener('pointermove', onDragMove)
+        document.addEventListener('pointerup', onDragEnd, { once: true })
+        e.preventDefault()
+      }
+      function onDragMove(e) {
+        if (!dragOff) return
+        const x = Math.max(0, Math.min(window.innerWidth - consoleEl.offsetWidth, e.clientX - dragOff.x))
+        const y = Math.max(0, Math.min(window.innerHeight - consoleEl.offsetHeight, e.clientY - dragOff.y))
+        consoleEl.style.left = x + 'px'
+        consoleEl.style.top = y + 'px'
+      }
+      function onDragEnd() {
+        dragOff = null
+        document.removeEventListener('pointermove', onDragMove)
+        saveState()
+      }
+      function startResize(e) {
+        resizeStart = { x: e.clientX, y: e.clientY, w: consoleEl.offsetWidth, h: consoleEl.offsetHeight }
+        document.addEventListener('pointermove', onResizeMove)
+        document.addEventListener('pointerup', onResizeEnd, { once: true })
+        e.preventDefault()
+        e.stopPropagation()
+      }
+      function onResizeMove(e) {
+        if (!resizeStart) return
+        const w = Math.max(240, resizeStart.w + (e.clientX - resizeStart.x))
+        const h = Math.max(180, resizeStart.h + (e.clientY - resizeStart.y))
+        consoleEl.style.width = w + 'px'
+        consoleEl.style.height = h + 'px'
+      }
+      function onResizeEnd() {
+        resizeStart = null
+        document.removeEventListener('pointermove', onResizeMove)
+        saveState()
+      }
+
+      function saveState() {
+        if (!consoleEl) return
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify({
+            x: consoleEl.offsetLeft, y: consoleEl.offsetTop,
+            w: consoleEl.offsetWidth, h: consoleEl.offsetHeight,
+            open: isOpen,
+            filter: filterEl ? filterEl.value : '',
+          }))
+        } catch (e) {}
+      }
+
+      // ----- init -----
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', buildUI, { once: true })
+      } else {
+        buildUI()
+      }
+      addEntry('init', 'Debug console attached (Ctrl+Shift+D or 🐛 button to open)')
+    })()
+    // ============== END Debug Console ==============
 
     // =====================================================================
     // Display name resolution:
@@ -1659,6 +2886,10 @@
     let activityHasMore = true
     let activityLoading = false
     let editingRow = null
+    // True while saveEdit's DB writes are in flight. Used by the realtime "edit kick" guard so
+    // we don't kick the user out of their own edit when their own UPDATE/INSERT/DELETE events
+    // arrive back via the realtime subscription.
+    let saveInProgress = false
     let realtimeChannel = null
 
     function setConnectionStatus(status, label) {
@@ -1805,6 +3036,13 @@
       // so their typed input isn't wiped. Will refresh after they save/cancel.
       if (editingRow !== null) {
         log('activity', 'reloadActivity skipped — edit in progress')
+        return
+      }
+      // If user is on the Calendar workspace, refresh THAT feed instead of the Sales History
+      // feed. (The user's edits/inserts may or may not fall within the calendar's selected
+      // range — loadCalBubbles re-queries with the current selection and re-renders.)
+      if (currentWorkspace === 'calendar') {
+        await loadCalBubbles()
         return
       }
       // Determine whether user is currently at/near the bottom of the feed.
@@ -2050,10 +3288,18 @@
             </div>
           </div>`
         : ''
-      // SVG marching-ants overlay (rounded corners) when in edit mode
-      const marchingAnts = isEditing
-        ? `<svg class="marching-ants-svg" xmlns="http://www.w3.org/2000/svg"><rect rx="16" ry="16"></rect></svg>`
+      // "+ Add another product" button — shown in edit mode for non-legacy bubbles only.
+      // Lets the user add a brand-new row to an existing bubble (Phase 2). The button row
+      // spans all columns of the bubble's grid via grid-column: 1 / -1.
+      const addRowButton = isEditing && !isLegacyGroupId(r.group_id)
+        ? `<div class="bubble-row row-add-button-in-edit">
+             <button class="add-row-in-edit-btn" type="button" data-action="add-row-in-edit" data-group-id="${escapeHtml(r.group_id)}">+ Add another product</button>
+           </div>`
         : ''
+      // SVG marching-ants overlay — always rendered in the DOM but hidden via CSS by default.
+      // Shown when the bubble has either `.editing` or `.menu-open` class (i.e. edit mode OR
+      // an active context menu from right-click / long-press).
+      const marchingAnts = `<svg class="marching-ants-svg" xmlns="http://www.w3.org/2000/svg"><rect rx="16" ry="16"></rect></svg>`
       return `
         <div class="${klass}" data-group-id="${escapeHtml(r.group_id)}" data-event-type="${r.event_type}" data-legacy-event-id="${r.legacy_event_id || ''}">
           ${marchingAnts}
@@ -2066,6 +3312,7 @@
               <div class="bubble-cell col-qty">Qty</div>
             </div>
             ${bodyRows}
+            ${addRowButton}
             <div class="bubble-row row-footer">
               <span class="meta-left">
                 <span class="person-name">${escapeHtml(personName)}</span>
@@ -2086,39 +3333,52 @@
       const idDisplay = item.product_id || ''
       const isFreeform = !item.product_id
       const isNegative = qtyPrefix === '+' && item.quantity < 0   // only stock-in shows '+' prefix
+      const isStockIn = qtyPrefix === '+'
       // Only prepend '+' for strictly positive values; 0 and negatives stay bare.
       const sign = (qtyPrefix === '+' && item.quantity > 0) ? '+' : ''
-      const nameDisplay = item.product_id
-        ? escapeHtml(item.product_name)
-        : `${escapeHtml(item.freeform_name || '?')} <span class="freeform-flag">freeform</span>`
-      const qtyCellContent = isEditing
-        ? `<input type="number" class="cell-edit-input" data-edit-qty data-row-id="${item.row_id}" step="1" value="${item.quantity}">`
-        : `<span>${sign}${escapeHtml(String(item.quantity))}</span>`
-      // Stock cell (only when editing) — read from lastGoodStock
-      let stockCell = ''
-      if (showStockColumn) {
+      // -- EDIT MODE: name cell becomes an autocomplete textarea (so user can change product
+      //    or convert sale to freeform). ID cell is a dynamic readout updated by the autocomplete.
+      //    Stock cell read-only. Qty cell is a number input (existing behavior).
+      //    For visual differentiation from new rows: existing rows show a visible white
+      //    inner box around the editable name + qty (like a form field). --
+      if (isEditing) {
+        // Pre-resolve current stock
         let stockVal = '—'
         if (item.product_id) {
           const s = getCurrentStockById(item.product_id)
           if (s !== null) stockVal = String(s)
         }
-        stockCell = `<div class="bubble-cell col-stock-edit"><span>${stockVal}</span></div>`
+        const initialName = isFreeform ? (item.freeform_name || '') : (item.product_name || '')
+        const initialDataState = isFreeform ? 'freeform' : 'matched'
+        const initialIdText = isFreeform ? '?' : (softBreakId(idDisplay) || '—')
+        return `
+          <div class="bubble-row row-body row-existing" data-row-id="${item.row_id}" data-original-product-id="${escapeHtml(item.product_id || '')}" data-original-freeform-name="${escapeHtml(item.freeform_name || '')}" data-original-quantity="${item.quantity}">
+            <div class="bubble-cell col-row-x">
+              <button class="remove-row-btn row-delete-btn" type="button" data-action="toggle-row-delete" data-row-id="${item.row_id}" aria-label="Mark for deletion" title="Mark for deletion">×</button>
+            </div>
+            <div class="bubble-cell col-id" id="bubbleExistingId-${item.row_id}" data-state="${initialDataState}">${initialIdText}</div>
+            <div class="bubble-cell col-name">
+              <textarea id="bubbleExistingProduct-${item.row_id}" class="cell-edit-input cell-edit-name auto-grow" rows="1" autocomplete="off" placeholder="Type product name…" data-edit-name data-row-id="${item.row_id}">${escapeHtml(initialName)}</textarea>
+              <div class="autocomplete-list" id="bubbleExistingAcList-${item.row_id}"></div>
+            </div>
+            <div class="bubble-cell col-stock-edit" id="bubbleExistingStock-${item.row_id}"><span>${stockVal}</span></div>
+            <div class="bubble-cell col-qty"><input type="number" class="cell-edit-input" data-edit-qty data-row-id="${item.row_id}" ${isStockIn ? '' : 'min="0"'} step="1" value="${item.quantity}"></div>
+          </div>`
       }
-      // X cell (only when editing) — per-row mark-for-delete
-      const xCell = isEditing
-        ? `<div class="bubble-cell col-row-x">
-             <button class="remove-row-btn row-delete-btn" type="button" data-action="toggle-row-delete" data-row-id="${item.row_id}" aria-label="Mark for deletion" title="Mark for deletion">×</button>
-           </div>`
-        : ''
+      // -- VIEW MODE (unchanged) --
+      // View-mode product name: for freeform sales, just show the name itself — the "?" in
+      // the ID cell already indicates freeform status, so no need for a redundant suffix.
+      const nameDisplay = item.product_id
+        ? escapeHtml(item.product_name)
+        : escapeHtml(item.freeform_name || '?')
+      const qtyCellContent = `<span>${sign}${escapeHtml(String(item.quantity))}</span>`
       const idCellClass = isFreeform ? 'bubble-cell col-id col-id-freeform' : 'bubble-cell col-id'
       const idCellContent = isFreeform ? '<span>?</span>' : `<span>${softBreakId(idDisplay) || '—'}</span>`
       const qtyCellClass = isNegative ? 'bubble-cell col-qty col-qty-negative' : 'bubble-cell col-qty'
       return `
         <div class="bubble-row row-body" data-row-id="${item.row_id}">
-          ${xCell}
           <div class="${idCellClass}">${idCellContent}</div>
           <div class="bubble-cell col-name"><span>${nameDisplay}</span></div>
-          ${stockCell}
           <div class="${qtyCellClass}">${qtyCellContent}</div>
         </div>`
     }
@@ -2204,8 +3464,10 @@
       })
     }
 
-    function attachBubbleHandlers() {
-      const feedEl = document.getElementById('activityFeed')
+    function attachBubbleHandlers(feedEl) {
+      // Default to the Sales History feed for back-compat; the Calendar workspace passes its own.
+      if (!feedEl) feedEl = document.getElementById('activityFeed')
+      if (!feedEl) return
       feedEl.querySelectorAll('.bubble').forEach(bubble => {
         bubble.addEventListener('contextmenu', (e) => {
           e.preventDefault()
@@ -2236,8 +3498,7 @@
             title: 'Discard changes?', okLabel: 'Discard', cancelLabel: 'Keep editing', okStyle: 'danger'
           })
           if (!ok) return
-          editingRow = null
-          renderActivity()
+          exitEditMode()
         })
       })
       // Note icon → expand to text input (auto-grow textarea, multi-line, with locked prefix + X discard)
@@ -2286,7 +3547,145 @@
           btn.setAttribute('aria-label', marked ? 'Undo delete' : 'Mark for deletion')
         })
       })
+      // -- PHASE 2: "+ Add another product" click handler --
+      feedEl.querySelectorAll('[data-action="add-row-in-edit"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const groupId = btn.dataset.groupId
+          if (groupId) addNewRowToBubble(groupId)
+        })
+      })
+      // -- PHASE 2: "X" on a new row (different from existing row's mark-for-delete: this just
+      //    removes the unsaved DOM row entirely and forgets its autocomplete). --
+      feedEl.querySelectorAll('[data-action="remove-new-row"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const newRowId = btn.dataset.newRowId
+          const rowEl = btn.closest('.row-body.row-new')
+          if (rowEl) rowEl.remove()
+          if (newRowId) delete bubbleNewRowAutocompletes[newRowId]
+        })
+      })
+      // -- Existing-row product editing: wire autocomplete per existing row in edit mode --
+      //    Reuses createAutocomplete (same logic as new rows + form bubbles). Pre-filled with
+      //    the current product name; readout already pre-set to matched/freeform via HTML.
+      feedEl.querySelectorAll('.row-body.row-existing').forEach(rowEl => {
+        const rowId = rowEl.dataset.rowId
+        if (!rowId) return
+        const bubbleEl = rowEl.closest('.bubble')
+        if (!bubbleEl) return
+        const isStockIn = bubbleEl.classList.contains('stockin')
+        const inputEl = document.getElementById(`bubbleExistingProduct-${rowId}`)
+        if (!inputEl) return
+        const ac = createAutocomplete(
+          `bubbleExistingProduct-${rowId}`,
+          `bubbleExistingAcList-${rowId}`,
+          `bubbleExistingId-${rowId}`,
+          `bubbleExistingStock-${rowId}`,
+          isStockIn
+            ? { noMatchMessage: 'No match — pick an existing product or remove this row' }
+            : { hideZeroStock: false, noMatchMessage: 'No match — will become a freeform sale' }
+        )
+        bubbleExistingRowAutocompletes[rowId] = { ac, isStockIn, rowEl }
+        // Lock in lastState on the readout (so matched→freeform transitions work later).
+        // Skip on the plain-div col-id (no internal combo) — setIdReadoutState handles it.
+        const readoutEl = document.getElementById(`bubbleExistingId-${rowId}`)
+        if (readoutEl) {
+          const curState = readoutEl.getAttribute('data-state') || 'empty'
+          // For a plain div, setIdReadoutState sets el.textContent = text. We want to preserve
+          // the displayed text (which we've already rendered server-side). Skip the call: lastState
+          // tracking only matters for the wrapper-combo case which we don't use here.
+        }
+        // Auto-grow the pre-filled textarea (value set via innerHTML so 'input' didn't fire)
+        if (typeof autoGrow === 'function') autoGrow(inputEl)
+      })
     }
+    // -- Existing-row state map — keyed by DB row_id, cleared on save/cancel/edit-switch --
+    const bubbleExistingRowAutocompletes = {}
+    function clearBubbleExistingRows() {
+      Object.keys(bubbleExistingRowAutocompletes).forEach(k => delete bubbleExistingRowAutocompletes[k])
+    }
+    // -- PHASE 2: state for new rows added in edit mode --
+    // Counter for unique new-row IDs (n1, n2, n3…). Reset on each saveEdit/cancel.
+    let bubbleNewRowCounter = 1
+    // Map of newRowId → { ac, isStockIn, groupId } for in-progress new rows. Cleared on
+    // save/cancel since renderActivity wipes the DOM. Tracks the autocomplete handles so
+    // saveEdit can read product/qty values back out.
+    const bubbleNewRowAutocompletes = {}
+    function clearBubbleNewRows() {
+      // Called on cancel/save to forget all pending new rows.
+      Object.keys(bubbleNewRowAutocompletes).forEach(k => delete bubbleNewRowAutocompletes[k])
+    }
+    // Creates a new editable row inside a bubble in edit mode + wires up its autocomplete.
+    // The row's DOM is inserted before the "+ Add another product" button.
+    function addNewRowToBubble(groupId) {
+      // Scope to `.editing` so we always target the bubble currently being edited, even when
+      // the same group_id is rendered in both Sales History and Calendar feeds simultaneously.
+      const bubbleEl = document.querySelector(`.bubble.editing[data-group-id="${CSS.escape(groupId)}"]`)
+      if (!bubbleEl) return
+      const isStockIn = bubbleEl.classList.contains('stockin')
+      const rowId = `n${bubbleNewRowCounter++}`
+      const rowEl = document.createElement('div')
+      rowEl.className = 'bubble-row row-body row-new'
+      rowEl.dataset.newRowId = rowId
+      // Stock-in new rows have an editable ID cell (so the user can create a brand-new product
+      // by typing both a name AND a new ID). Sale new rows don't expose an ID textarea
+      // (freeform sales don't have IDs — only freeform names).
+      const idCellHtml = isStockIn
+        ? `<div class="bubble-cell new-row-id new-row-id-editable" id="bubbleNewId-${rowId}" data-state="empty">
+             <span class="id-display">—</span>
+             <textarea class="id-editor auto-grow" rows="1" placeholder="?" autocomplete="off" maxlength="50" aria-label="Product ID"></textarea>
+           </div>`
+        : `<div class="bubble-cell new-row-id" id="bubbleNewId-${rowId}" data-state="empty">—</div>`
+      const qtyAttrs = isStockIn ? `step="1"` : `min="0" step="1"`
+      rowEl.innerHTML = `
+        <div class="bubble-cell col-row-x">
+          <button class="remove-row-btn" type="button" data-action="remove-new-row" data-new-row-id="${rowId}" aria-label="Remove row" title="Remove this new row">×</button>
+        </div>
+        ${idCellHtml}
+        <div class="bubble-cell new-row-product">
+          <textarea id="bubbleNewProduct-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Type product name…"></textarea>
+          <div class="autocomplete-list" id="bubbleNewAcList-${rowId}"></div>
+        </div>
+        <div class="bubble-cell new-row-stock" id="bubbleNewStock-${rowId}" data-state="empty">—</div>
+        <div class="bubble-cell new-row-qty">
+          <input type="number" id="bubbleNewQty-${rowId}" ${qtyAttrs}>
+        </div>
+      `
+      // Insert before the "+ Add another product" button row
+      const addBtnRow = bubbleEl.querySelector('.row-add-button-in-edit')
+      if (addBtnRow) addBtnRow.parentNode.insertBefore(rowEl, addBtnRow)
+      // Wire up autocomplete (reuses createAutocomplete; same options as the form bubbles).
+      const ac = createAutocomplete(
+        `bubbleNewProduct-${rowId}`,
+        `bubbleNewAcList-${rowId}`,
+        `bubbleNewId-${rowId}`,
+        `bubbleNewStock-${rowId}`,
+        isStockIn
+          ? { noMatchMessage: 'No match — type a new ID below to create this product' }
+          : { hideZeroStock: true, noMatchMessage: 'No match — will become a freeform sale' }
+      )
+      bubbleNewRowAutocompletes[rowId] = { ac, isStockIn, groupId }
+      // Wire the X button for THIS row (delegated handler in attachBubbleHandlers also catches it,
+      // but new rows are added AFTER that runs, so we wire here directly).
+      rowEl.querySelector('[data-action="remove-new-row"]')?.addEventListener('click', () => {
+        rowEl.remove()
+        delete bubbleNewRowAutocompletes[rowId]
+      })
+      // Focus the product input so the user can start typing immediately
+      const productInput = document.getElementById(`bubbleNewProduct-${rowId}`)
+      if (productInput) productInput.focus()
+    }
+    // Live qty-negative flag for stockin new rows (matches Add Products form behavior).
+    document.addEventListener('input', (e) => {
+      const inp = e.target
+      if (!inp || inp.tagName !== 'INPUT' || inp.type !== 'number') return
+      if (!inp.id || !inp.id.startsWith('bubbleNewQty-')) return
+      const bubbleEl = inp.closest('.bubble.stockin.editing')
+      if (!bubbleEl) return
+      const cell = inp.closest('.new-row-qty')
+      if (!cell) return
+      const v = parseInt(inp.value, 10)
+      cell.classList.toggle('qty-negative', !isNaN(v) && v < 0)
+    })
     // Global click handler: close any open bubble menu when clicking outside
     document.addEventListener('click', (e) => {
       if (openMenu && !e.target.closest('.bubble-menu')) {
@@ -2305,14 +3704,21 @@
           { title: 'Switch edits?', okLabel: 'Discard & switch', cancelLabel: 'Keep editing', okStyle: 'danger' }
         )
         if (!ok) return
+        clearBubbleNewRows(); clearBubbleExistingRows()
       }
       editingRow = { group_id: groupId }
-      renderActivity()
+      rerenderActivityFeed()
     }
 
     // Find a bubble (group) in activityRows by its group_id.
     function findBubble(groupId) {
+      // Bubbles can be displayed in either the Sales History workspace (data in `activityRows`)
+      // OR the Calendar workspace (data in `calendarState.bubbleRows`). Editing/deleting must
+      // work from EITHER view, so search both stores. Without this, editing a bubble in the
+      // Calendar workspace that isn't yet paginated into activityRows would silently fail
+      // with "Could not find this bubble in the current view."
       return activityRows.find(r => r.group_id === groupId)
+          || calendarState.bubbleRows.find(r => r.group_id === groupId)
     }
     // Determine if a group_id is a virtual legacy one (pre-V2.3) or a real group.
     function isLegacyGroupId(groupId) {
@@ -2320,12 +3726,20 @@
     }
 
     async function saveEdit(groupId) {
-      if (!isOnline) { alert('No connection — cannot save edit right now.'); return }
+      if (!isOnline) { await showNotice('No connection — cannot save edit right now.', { title: 'No connection' }); return }
       const bubble = findBubble(groupId)
-      if (!bubble) { alert('Could not find this bubble in the current view.'); return }
-      // Read inputs directly from the bubble's inline edit cells.
-      const bubbleEl = document.querySelector(`.bubble[data-group-id="${CSS.escape(groupId)}"]`)
-      if (!bubbleEl) { alert('Bubble element not found.'); return }
+      if (!bubble) { await showNotice('Could not find this bubble in the current view.', { title: 'Bubble not found' }); return }
+      // CRITICAL: scope the bubble lookup to the one currently in edit mode (`.editing` class).
+      // Without this, when the same group_id is rendered in BOTH Sales History (#activityFeed)
+      // and Calendar (#calFeed) feeds — which happens whenever the user visits both workspaces
+      // before editing — querySelector returns the FIRST match in DOM order, which is the
+      // view-mode bubble in #activityFeed. All subsequent queries (.cell-edit-input,
+      // [data-edit-qty], .marked-delete, etc.) return empty arrays because view-mode bubbles
+      // have no edit inputs. saveEdit then sees "nothing to change", runs its success path,
+      // shows "Saved", and the actual editing inputs in the Calendar bubble are silently
+      // discarded. Adding `.editing` to the selector guarantees we read from the right bubble.
+      const bubbleEl = document.querySelector(`.bubble.editing[data-group-id="${CSS.escape(groupId)}"]`)
+      if (!bubbleEl) { await showNotice('Bubble element not found.', { title: 'Bubble not found' }); return }
       const isStockIn = bubble.event_type === 'stock_in'
       const isLegacy = isLegacyGroupId(groupId)
       // Collect IDs of rows marked for deletion (their X button was clicked).
@@ -2338,23 +3752,94 @@
       // For legacy single-row bubbles: deleting the only row would orphan the bubble; treat as
       // a full bubble-delete by deferring to confirmDelete flow instead.
       if (isLegacy && rowsToDelete.length > 0) {
-        alert('Legacy single-row entries can\'t have their only row deleted from inside the editor — use the bubble menu → Delete to remove the entire entry.')
+        await showNotice('Legacy single-row entries can\'t have their only row deleted from inside the editor — use the bubble menu → Delete to remove the entire entry.', { title: 'Cannot delete row' })
         return
       }
       // Collect quantity updates ONLY from rows NOT marked for delete.
-      const qtyInputs = bubbleEl.querySelectorAll('.row-body:not(.marked-delete) [data-edit-qty]')
+      // Only existing (DB-persisted) rows have [data-edit-qty]; new rows have a different
+      // input id pattern and are collected separately below.
+      const qtyInputs = bubbleEl.querySelectorAll('.row-body:not(.row-new):not(.marked-delete) [data-edit-qty]')
       const newQtyByRow = {}
+      const productChangesByRow = {}  // rowId → { productId, freeformName } when product was changed
       for (const inp of qtyInputs) {
         const rowId = parseInt(inp.dataset.rowId, 10)
         const q = parseInt(inp.value, 10)
         const rowEl = inp.closest('.row-body')
-        if (isNaN(q)) { flashRowError(rowEl); alert('Quantity must be a number.'); return }
+        if (isNaN(q)) { flashRowError(rowEl); await showNotice('Quantity must be a number.', { title: 'Invalid quantity' }); return }
         if (isStockIn) {
           // Stock-in allows any integer: positive (receipts), negative (corrections), or zero.
         } else {
-          if (q < 0) { flashRowError(rowEl); alert('Sale quantity must be 0 or more.'); return }
+          if (q < 0) { flashRowError(rowEl); await showNotice('Sale quantity must be 0 or more.', { title: 'Invalid quantity' }); return }
         }
         newQtyByRow[rowId] = q
+        // -- Detect product change on this existing row (user edited the name textarea) --
+        const acData = bubbleExistingRowAutocompletes[rowId]
+        if (acData) {
+          const typedName = (acData.ac.getValue() || '').trim()
+          const originalProductId = rowEl.dataset.originalProductId || ''
+          const originalFreeformName = rowEl.dataset.originalFreeformName || ''
+          if (!typedName) {
+            flashRowError(rowEl); await showNotice('Product name cannot be empty. Mark the row × to delete it instead.', { title: 'Missing product name' }); return
+          }
+          const exact = productsCache.find(p => p.name.toLowerCase() === typedName.toLowerCase())
+          if (exact) {
+            // Matched. Only record if it's a DIFFERENT product than the original.
+            if (exact.id !== originalProductId) {
+              productChangesByRow[rowId] = { productId: exact.id, freeformName: null }
+            }
+          } else {
+            // No catalog match → freeform path
+            if (isStockIn) {
+              flashRowError(rowEl); await showNotice(`"${typedName}" is not in the catalog. Pick an existing product, or remove this row and re-add via "+ Add another product" to create a brand-new product.`, { title: 'Unknown product' }); return
+            } else {
+              // Sale freeform — only record if name actually changed
+              if (originalProductId || originalFreeformName !== typedName) {
+                productChangesByRow[rowId] = { productId: null, freeformName: typedName }
+              }
+            }
+          }
+        }
+      }
+      // -- PHASE 2: Collect + validate NEW rows (added via "+ Add another product") --
+      // Each new row is in bubbleNewRowAutocompletes; we read its inputs and resolve product
+      // info (matched/freeform). Build a list of inserts; if any row fails validation, abort
+      // the whole save (no partial writes).
+      const newRowsToInsert = []
+      const newRowEls = bubbleEl.querySelectorAll('.row-body.row-new')
+      for (const rowEl of newRowEls) {
+        const newRowId = rowEl.dataset.newRowId
+        const acData = bubbleNewRowAutocompletes[newRowId]
+        if (!acData) continue
+        const productInput = document.getElementById(`bubbleNewProduct-${newRowId}`)
+        const qtyInput = document.getElementById(`bubbleNewQty-${newRowId}`)
+        const idEditor = rowEl.querySelector('.id-editor')
+        const typedName = productInput ? productInput.value.trim() : ''
+        const qtyRaw = qtyInput ? qtyInput.value.trim() : ''
+        const qtyVal = qtyRaw === '' ? NaN : parseInt(qtyRaw, 10)
+        // Skip completely blank rows silently (user clicked + Add but didn't fill anything)
+        if (!typedName && qtyRaw === '') continue
+        // Validate
+        if (!typedName) { flashRowError(rowEl); await showNotice('New row is missing a product name.', { title: 'Missing product name' }); return }
+        if (isNaN(qtyVal)) { flashRowError(rowEl); await showNotice('New row is missing a quantity.', { title: 'Missing quantity' }); return }
+        if (!isStockIn && qtyVal < 0) { flashRowError(rowEl); await showNotice('Sale quantity must be 0 or more.', { title: 'Invalid quantity' }); return }
+        // Resolve product: exact case-insensitive name match against productsCache?
+        const exactMatch = productsCache.find(p => p.name.toLowerCase() === typedName.toLowerCase())
+        if (isStockIn) {
+          if (exactMatch) {
+            newRowsToInsert.push({ kind: 'stockin-existing', productId: exactMatch.id, quantity: qtyVal, rowEl })
+          } else {
+            // No catalog match → user wants to create a brand-new product. Need a typed ID.
+            const newId = idEditor ? idEditor.value.trim() : ''
+            if (!newId) { flashRowError(rowEl); await showNotice(`"${typedName}" — to create a new product, type its ID in the ID column.`, { title: 'Missing product ID' }); return }
+            newRowsToInsert.push({ kind: 'stockin-new-product', productId: newId, productName: typedName, quantity: qtyVal, rowEl })
+          }
+        } else {
+          if (exactMatch) {
+            newRowsToInsert.push({ kind: 'sale-existing', productId: exactMatch.id, quantity: qtyVal, rowEl })
+          } else {
+            newRowsToInsert.push({ kind: 'sale-freeform', freeformName: typedName, quantity: qtyVal, rowEl })
+          }
+        }
       }
       // Source (stock-in only)
       const sourceInp = bubbleEl.querySelector('[data-edit-source]')
@@ -2364,14 +3849,25 @@
       const newNote = noteInp ? noteInp.value.trim() : null  // null = note UI not shown / no change intended
       log(bubble.event_type, `Saving edit for ${bubble.event_type} bubble ${groupId}`, { newQtyByRow, newSource, newNote, rowsToDelete, isLegacy })
       showSubmitOverlay('Saving changes…')
+      // Set BEFORE the first DB write so realtime events triggered by our own statements
+      // (which can arrive while we're still mid-save) don't kick us out of our own edit.
+      saveInProgress = true
       try {
-        // 1) Update each line-item row's quantity (skipping rows marked for delete)
+        // 1) Update each line-item row's quantity (skipping rows marked for delete).
+        //    If the user also changed the product (productChangesByRow), bundle product_id +
+        //    freeform_name into the same UPDATE so we hit each row only once.
         const rowTable = isStockIn ? 'stock_in' : 'sales'
         for (const [rowIdStr, newQty] of Object.entries(newQtyByRow)) {
           const rowId = parseInt(rowIdStr, 10)
           const update = { quantity: newQty }
           // Mark the sale row as edited (sales has this field; stock_in does not)
           if (!isStockIn) update.edited = true
+          // Product change on this row?
+          const change = productChangesByRow[rowId]
+          if (change) {
+            update.product_id = change.productId
+            if (!isStockIn) update.freeform_name = change.freeformName
+          }
           const { error } = await supabase.from(rowTable).update(update).eq('id', rowId)
           if (error) throw error
         }
@@ -2405,6 +3901,64 @@
           const { error } = await supabase.from(groupTable).update({ notes: noteValue }).eq('id', groupId)
           if (error) throw error
         }
+        // 4) -- PHASE 2: INSERT new rows added via "+ Add another product" --
+        //    Each new row inherits the bubble's event_at + person fields so the activity
+        //    feed still treats it as part of the same bubble (same group_id).
+        for (const item of newRowsToInsert) {
+          const newClientUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+          if (item.kind === 'stockin-new-product') {
+            // First create the product row (handle 23505 race: someone else just created it)
+            const { error: prodErr } = await supabase.from('products').insert({ id: item.productId, name: item.productName })
+            if (prodErr && prodErr.code !== '23505') throw prodErr
+            // Then insert the stock_in row
+            const { error } = await supabase.from('stock_in').insert({
+              product_id: item.productId,
+              quantity: item.quantity,
+              received_at: bubble.event_at,
+              received_by: bubble.person,
+              received_by_display: bubble.person_display,
+              stock_in_group_id: groupId,
+              client_uuid: newClientUuid,
+            })
+            if (error) throw error
+          } else if (item.kind === 'stockin-existing') {
+            const { error } = await supabase.from('stock_in').insert({
+              product_id: item.productId,
+              quantity: item.quantity,
+              received_at: bubble.event_at,
+              received_by: bubble.person,
+              received_by_display: bubble.person_display,
+              stock_in_group_id: groupId,
+              client_uuid: newClientUuid,
+            })
+            if (error) throw error
+          } else if (item.kind === 'sale-existing') {
+            const { error } = await supabase.from('sales').insert({
+              product_id: item.productId,
+              quantity: item.quantity,
+              sold_at: bubble.event_at,
+              sold_by: bubble.person,
+              sold_by_display: bubble.person_display,
+              sale_group_id: groupId,
+              client_uuid: newClientUuid,
+            })
+            if (error) throw error
+          } else if (item.kind === 'sale-freeform') {
+            const { error } = await supabase.from('sales').insert({
+              product_id: null,
+              freeform_name: item.freeformName,
+              quantity: item.quantity,
+              sold_at: bubble.event_at,
+              sold_by: bubble.person,
+              sold_by_display: bubble.person_display,
+              sale_group_id: groupId,
+              client_uuid: newClientUuid,
+            })
+            if (error) throw error
+          }
+        }
+        // 5) Clear the new-row state map (DOM rows are wiped by the upcoming reloadActivity)
+        clearBubbleNewRows(); clearBubbleExistingRows()
         log(bubble.event_type, 'Edit saved')
         setSubmitOverlaySuccess()
         editingRow = null
@@ -2413,7 +3967,13 @@
       } catch (err) {
         log('error', 'Edit failed', err)
         hideSubmitOverlay()
-        alert(`Failed to save edit: ${err.message || 'unknown error'}`)
+        await showNotice(`Failed to save edit: ${err.message || 'unknown error'}`, { title: 'Save failed', variant: 'danger' })
+      } finally {
+        // Clear the in-flight flag so the realtime kick logic can resume kicking on subsequent
+        // remote edits. We do this last so any trailing realtime events from THIS save (which
+        // can arrive after our own UPDATE/INSERT/DELETE statements resolve) still see
+        // saveInProgress=true and don't kick the user.
+        saveInProgress = false
       }
     }
 
@@ -2445,7 +4005,7 @@
     })
     document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
       if (!pendingDelete) return
-      if (!isOnline) { alert('No connection — cannot delete right now.'); return }
+      if (!isOnline) { await showNotice('No connection — cannot delete right now.', { title: 'No connection' }); return }
       const { groupId } = pendingDelete
       pendingDelete = null
       document.getElementById('confirmModal').classList.remove('visible')
@@ -2479,7 +4039,7 @@
       } catch (err) {
         log('error', 'Delete failed', err)
         hideSubmitOverlay()
-        alert(`Failed to delete: ${err.message || 'unknown error'}`)
+        await showNotice(`Failed to delete: ${err.message || 'unknown error'}`, { title: 'Delete failed', variant: 'danger' })
       }
     })
 
@@ -2491,22 +4051,99 @@
       if (window.scrollY < 200) loadMoreActivity()
     })
 
+    // ===== Edit-kick safeguard =====
+    // When ANOTHER user edits or deletes the bubble that THIS user is currently editing, kick
+    // this user out of edit mode + show a notice. Prevents silent overwrites of remote changes
+    // (current behavior without this guard is last-write-wins, which violates "never silently
+    // lose data" from the spec). Lossy from the local user's perspective (their typed changes
+    // are discarded), but correctness > convenience here. The user explicitly accepted this
+    // trade-off.
+    function exitEditMode() {
+      // Same teardown as the cancel-edit click handler — extracted so both paths share logic.
+      clearBubbleNewRows()
+      clearBubbleExistingRows()
+      editingRow = null
+      rerenderActivityFeed()
+      // Refresh the feed after exiting. During the edit, reloadActivity was being skipped
+      // (the `if (editingRow !== null) return` guard) so any remote changes that arrived
+      // — via realtime OR the 60s poll — never updated activityRows. Without this reload,
+      // clicking Cancel would re-render from the STALE cache and show the OLD value even
+      // though the DB has a newer one (e.g., the other user saved an edit while we sat in
+      // edit mode). Now editingRow is null, so reloadActivity will actually do work.
+      reloadActivity()
+    }
+    function kickFromEdit(eventType) {
+      log('realtime', `Edit kick: remote ${eventType} on bubble being edited`)
+      exitEditMode()
+      const msg = eventType === 'DELETE'
+        ? 'This entry was just deleted by the other user. Your in-progress edit has been discarded.'
+        : 'This entry was just updated by the other user. Your in-progress edit has been discarded.'
+      // Use alert for now — blocking + impossible to miss. Could upgrade to a non-blocking toast
+      // later if it feels jarring in practice.
+      showNotice(msg, { title: 'Entry changed elsewhere' })
+    }
+    // Extract the group_id affected by a realtime event. Different tables store the group ID
+    // in different columns:
+    //   - sale_groups / stock_in_groups: PK column is `group_id`
+    //   - sales: FK column is `sale_group_id` (the parent group of this line item)
+    //   - stock_in: FK column is `stock_in_group_id`
+    // For DELETE events, only `old` is populated; for INSERT, only `new`; for UPDATE, both.
+    function extractAffectedGroupId(p, tableType) {
+      if (tableType === 'sales') return p.new?.sale_group_id ?? p.old?.sale_group_id ?? null
+      if (tableType === 'stock_in') return p.new?.stock_in_group_id ?? p.old?.stock_in_group_id ?? null
+      if (tableType === 'sale_groups' || tableType === 'stock_in_groups') {
+        return p.new?.group_id ?? p.old?.group_id ?? null
+      }
+      return null
+    }
+    function checkEditKick(p, tableType) {
+      // Only kick when:
+      //   1) the user is actually editing something (editingRow set), AND
+      //   2) the edit is not the user's OWN in-flight save (saveInProgress), AND
+      //   3) the affected group_id matches the group currently being edited.
+      // ----------
+      // Diagnostic logging: emit a 'kick' log entry for EVERY remote event so we can see in
+      // DevTools console exactly what realtime payloads arrive and why a kick did/didn't fire.
+      // Look for "[kick]" lines on the OBSERVING user's tab after the ACTING user saves. Without
+      // these, a non-firing kick is invisible. Safe to leave on; log() is gated on DEBUG.
+      const editingId = editingRow?.group_id ?? '(not editing)'
+      const affectedId = extractAffectedGroupId(p, tableType)
+      log('kick', `check ${tableType}/${p.eventType}: editing=${editingId} affected=${affectedId} saveInProgress=${saveInProgress}`)
+      if (!editingRow || saveInProgress) return
+      if (affectedId && affectedId === editingRow.group_id) {
+        log('kick', `MATCH — kicking out of edit (remote ${p.eventType})`)
+        kickFromEdit(p.eventType)
+      }
+    }
+
     function setupRealtime() {
       if (realtimeChannel) return  // already subscribed
-      log('realtime', 'Subscribing to changes…')
+      log('realtime', '⚡ setupRealtime() called — subscribing to postgres_changes')
       realtimeChannel = supabase
         .channel('inventory-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' },
-          (p) => { log('realtime', 'sales changed', p.eventType); loadAll(false) })
+          (p) => { log('realtime', 'sales changed', p.eventType); checkEditKick(p, 'sales'); loadAll(false) })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_in' },
-          (p) => { log('realtime', 'stock_in changed', p.eventType); loadAll(false) })
+          (p) => { log('realtime', 'stock_in changed', p.eventType); checkEditKick(p, 'stock_in'); loadAll(false) })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'sale_groups' },
-          (p) => { log('realtime', 'sale_groups changed', p.eventType); loadAll(false) })
+          (p) => { log('realtime', 'sale_groups changed', p.eventType); checkEditKick(p, 'sale_groups'); loadAll(false) })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_in_groups' },
-          (p) => { log('realtime', 'stock_in_groups changed', p.eventType); loadAll(false) })
+          (p) => { log('realtime', 'stock_in_groups changed', p.eventType); checkEditKick(p, 'stock_in_groups'); loadAll(false) })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' },
           (p) => { log('realtime', 'products changed', p.eventType); loadAll(false) })
-        .subscribe((status) => log('realtime', `status: ${status}`))
+        .subscribe((status, err) => {
+          // Use console.warn so the status is visible even if filtered. SUBSCRIBED = good.
+          // CHANNEL_ERROR / TIMED_OUT / CLOSED = realtime not delivering events; check whether
+          // the tables are added to the supabase_realtime publication in the Supabase dashboard
+          // (Database → Replication → supabase_realtime). Until the tables are in that publication,
+          // postgres_changes events never broadcast.
+          if (status === 'SUBSCRIBED') {
+            console.log(`%c[realtime] ✅ SUBSCRIBED`, 'color:#16a34a;font-weight:600')
+          } else {
+            console.warn(`[realtime] subscription status: ${status}`, err || '')
+          }
+          log('realtime', `status: ${status}`)
+        })
     }
 
     // Helper: look up the current stock quantity for a product id (from lastGoodStock view).
@@ -2639,7 +4276,17 @@
         })
       }
       input.addEventListener('input', update)
-      input.addEventListener('focus', update)
+      // On focus: don't auto-show the dropdown if the input value already exactly matches a
+      // product (showing a single-item dropdown with the already-picked product is pointless).
+      // Show only when the value is non-empty AND has no exact match (i.e., it's a partial
+      // query the user might want to refine).
+      input.addEventListener('focus', () => {
+        const query = input.value.trim().toLowerCase()
+        if (!query) return
+        const exact = productsCache.find(p => p.name.toLowerCase() === query)
+        if (exact) return   // already a matched product, nothing useful to suggest
+        update()
+      })
       input.addEventListener('keydown', e => {
         if (!list.classList.contains('visible') || visibleItems.length === 0) return
         if (e.key === 'ArrowDown') { e.preventDefault(); focusedIndex = Math.min(focusedIndex + 1, visibleItems.length - 1); updateFocus() }
@@ -3055,6 +4702,39 @@
       })
     }
 
+    // In-app single-button notice modal — replacement for the native alert().
+    // Returns a Promise that resolves when the user dismisses (click OK, Enter, or Escape).
+    // Options: { title, okLabel, variant: 'danger' | undefined }.
+    // Multi-line messages work naturally (see .notice-message CSS: white-space:pre-wrap).
+    // The whole page stays responsive — this doesn't block realtime callbacks or timers
+    // the way alert() does. Callers that were `alert(); return` become `await showNotice(); return`.
+    function showNotice(message, options = {}) {
+      return new Promise(resolve => {
+        const modal = document.getElementById('noticeModal')
+        const titleEl = document.getElementById('noticeTitle')
+        const msgEl = document.getElementById('noticeMessage')
+        const okBtn = document.getElementById('noticeOkBtn')
+        titleEl.textContent = options.title || 'Notice'
+        msgEl.textContent = message || ''
+        okBtn.textContent = options.okLabel || 'OK'
+        okBtn.className = (options.variant === 'danger') ? 'btn danger' : 'btn'
+        const onOk = () => { cleanup(); resolve() }
+        const onKey = (e) => {
+          // Both Enter and Escape dismiss — since there's only one action, both keys "confirm".
+          if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); onOk() }
+        }
+        const cleanup = () => {
+          modal.classList.remove('visible')
+          okBtn.removeEventListener('click', onOk)
+          document.removeEventListener('keydown', onKey)
+        }
+        okBtn.addEventListener('click', onOk)
+        document.addEventListener('keydown', onKey)
+        modal.classList.add('visible')
+        setTimeout(() => okBtn.focus(), 10)  // rAF-ish delay so focus lands after the transition
+      })
+    }
+
     async function submitRow(opts) {
       const btn = opts.buttonEl
       const feedback = opts.feedbackEl
@@ -3381,7 +5061,7 @@
       try {
         const rows = await parseSpreadsheetFile(file)
         if (!rows || rows.length === 0) {
-          alert('The file appears to be empty or could not be read.')
+          await showNotice('The file appears to be empty or could not be read.', { title: 'Empty file' })
           document.getElementById('importFile').value = ''
           return
         }
@@ -3398,9 +5078,9 @@
         log('error', 'Import parse failed', err)
         const msg = (err && err.message) || 'Unknown error'
         if (file.name.toLowerCase().endsWith('.ods')) {
-          alert(`Couldn't parse this ODS file: ${msg}\n\nTip: ODS files vary between tools. If this keeps failing, try saving the file as CSV in LibreOffice or Excel and importing that instead.`)
+          await showNotice(`Couldn't parse this ODS file: ${msg}\n\nTip: ODS files vary between tools. If this keeps failing, try saving the file as CSV in LibreOffice or Excel and importing that instead.`, { title: 'ODS parse error', variant: 'danger' })
         } else {
-          alert(`Couldn't parse this file: ${msg}`)
+          await showNotice(`Couldn't parse this file: ${msg}`, { title: 'Parse error', variant: 'danger' })
         }
         document.getElementById('importFile').value = ''
       }
@@ -3607,7 +5287,7 @@
 
     async function executeImport() {
       if (!importPlan) return
-      if (!isOnline) { alert('No connection — cannot import right now.'); return }
+      if (!isOnline) { await showNotice('No connection — cannot import right now.', { title: 'No connection' }); return }
 
       const plan = importPlan
       const sourceText = document.getElementById('importSourceInput').value.trim() || plan.sourceText
@@ -3719,15 +5399,17 @@
         // Show results
         overlay.classList.remove('visible')
         if (failures.length === 0) {
-          alert(`✓ Import complete.\n\n` +
+          await showNotice(`✓ Import complete.\n\n` +
             `${plan.newRows.length} new product(s) created\n` +
             `${plan.renameRows.length} rename(s) applied\n` +
-            `${successCount} stock receipt(s) added`)
+            `${successCount} stock receipt(s) added`,
+            { title: 'Import complete' })
         } else {
-          alert(`Import finished with ${failures.length} error(s):\n\n` + failures.slice(0, 10).join('\n') +
+          await showNotice(`Import finished with ${failures.length} error(s):\n\n` + failures.slice(0, 10).join('\n') +
             (failures.length > 10 ? `\n…and ${failures.length - 10} more` : '') +
             `\n\nSuccessful: ${successCount} stock receipts.\n` +
-            `Note: retrying is safe (UUID dedup protects against duplicates).`)
+            `Note: retrying is safe (UUID dedup protects against duplicates).`,
+            { title: 'Import finished with errors', variant: 'danger' })
         }
 
         // Refresh data
@@ -3736,7 +5418,8 @@
       } catch (err) {
         log('error', 'Import execute failed', err)
         overlay.classList.remove('visible')
-        alert(`Import failed: ${err.message || 'unknown error'}\n\nSome rows may have been imported. Check the stock list. Retrying is safe.`)
+        await showNotice(`Import failed: ${err.message || 'unknown error'}\n\nSome rows may have been imported. Check the stock list. Retrying is safe.`,
+          { title: 'Import failed', variant: 'danger' })
       }
     }
 
@@ -3968,6 +5651,7 @@ new events will not be in this file. Re-download periodically.
       addproducts: 'Add Products',
       stock: 'Current Stock',
       history: 'Sales History',
+      calendar: 'Calendar',
       tools: 'Tools',
     }
     const DEFAULT_WORKSPACE = 'newsale'
@@ -3986,6 +5670,598 @@ new events will not be in this file. Re-download periodically.
     function storeWorkspace(name) {
       try { localStorage.setItem(WORKSPACE_STORAGE_KEY, name) } catch (e) { /* ignore */ }
     }
+
+    // =================================================================================
+    // CALENDAR WORKSPACE
+    // Inline calendar widget that filters the activity feed by either a single day or a
+    // date range. Self-contained module — state, render, data loading, event delegation.
+    // Reuses renderBubble / attachBubbleHandlers / softBreakId etc. from the activity feed.
+    // =================================================================================
+    const calendarState = {
+      expanded: false,         // false = collapsed header; true = full widget shown
+      viewYear: null,          // currently-viewed year (initialized to today's year on first render)
+      viewMonth: null,         // currently-viewed month (0-indexed)
+      pickerMode: 'days',      // 'days' (month grid) or 'months' (12-month grid)
+      // SELECTION MODE — Day, Range, or Quick (preset shortcuts). Pending selection is what's
+      // highlighted in the grid; Apply commits it.
+      selectionMode: 'day',    // 'day' | 'range' | 'quick'
+      selectedDay: null,       // 'YYYY-MM-DD' when selectionMode='day' (pending)
+      rangeStart: null,        // 'YYYY-MM-DD' when selectionMode='range' (pending)
+      rangeEnd: null,          // 'YYYY-MM-DD' when selectionMode='range' (pending)
+      rangeStep: 'start',      // 'start' = next click sets rangeStart, 'end' = next sets rangeEnd
+      quickChoice: null,       // null | 'today' | 'week' | 'month' — which Quick preset is selected
+      // APPLIED — what the feed below + the collapsed header reflect. Distinct from the pending
+      // selection above so the user can browse + tweak the calendar without re-querying until
+      // they hit Apply.
+      applied: {
+        mode: 'day',           // 'day' | 'range' — drives collapsed header label
+        day: null,
+        rangeStart: null,
+        rangeEnd: null,
+      },
+      bubbleRows: [],          // result rows from recent_activity
+      loading: false,
+      initialized: false,
+    }
+    const CAL_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const CAL_MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    const CAL_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    // Format a local Date object as 'YYYY-MM-DD' (avoiding toISOString which uses UTC and can shift days)
+    function calLocalDateKey(d) {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+    function calToday() {
+      return calLocalDateKey(new Date())
+    }
+    // Returns {start, end} keys for the current calendar week (Monday→Sunday — matches our
+    // Monday-first grid). Used by Quick → This Week.
+    function calCurrentWeekRange() {
+      const t = new Date()
+      const dow = t.getDay() || 7  // Sunday = 7 (otherwise 1=Mon … 6=Sat)
+      const monday = new Date(t)
+      monday.setDate(t.getDate() - (dow - 1))
+      const sunday = new Date(monday)
+      sunday.setDate(monday.getDate() + 6)
+      return { start: calLocalDateKey(monday), end: calLocalDateKey(sunday) }
+    }
+    // Returns {start, end} keys for the current calendar month (1st → last day).
+    // Used by Quick → This Month.
+    function calCurrentMonthRange() {
+      const t = new Date()
+      const first = new Date(t.getFullYear(), t.getMonth(), 1)
+      const last = new Date(t.getFullYear(), t.getMonth() + 1, 0)  // day 0 of next month = last of this
+      return { start: calLocalDateKey(first), end: calLocalDateKey(last) }
+    }
+    // Pretty format a 'YYYY-MM-DD' as 'June 26, 2026'
+    function calPrettyDate(key) {
+      if (!key) return ''
+      const [y, m, d] = key.split('-').map(Number)
+      return `${CAL_MONTHS_FULL[m - 1]} ${d}, ${y}`
+    }
+    // First call sets up state (auto-select today). Subsequent calls just re-render.
+    function renderCalWidget() {
+      if (!calendarState.initialized) {
+        const now = new Date()
+        calendarState.viewYear = now.getFullYear()
+        calendarState.viewMonth = now.getMonth()
+        // Per user design: nothing auto-selected. User must explicitly pick a date + hit Apply.
+        // Both pending + applied stay null. The collapsed header shows "Pick a date" italic prompt.
+        calendarState.expanded = false
+        calendarState.initialized = true
+      }
+      const widget = document.getElementById('calWidget')
+      if (!widget) return
+      widget.innerHTML = calendarState.expanded ? renderCalExpanded() : renderCalCollapsed()
+      attachCalHandlers()
+    }
+    function renderCalCollapsed() {
+      // Header showing the APPLIED selection (not the pending pick-in-progress). Click to expand.
+      let label, isEmpty = false
+      const a = calendarState.applied
+      if (a.mode === 'day') {
+        if (a.day) label = calPrettyDate(a.day)
+        else { label = 'Pick a date'; isEmpty = true }
+      } else {
+        if (a.rangeStart && a.rangeEnd) {
+          label = `${calPrettyDate(a.rangeStart)} → ${calPrettyDate(a.rangeEnd)}`
+        } else { label = 'Pick a date range'; isEmpty = true }
+      }
+      return `
+        <div class="cal-collapsed" data-action="cal-expand">
+          <span class="cal-icon">📅</span>
+          <span class="cal-collapsed-label${isEmpty ? ' empty' : ''}">${escapeHtml(label)}</span>
+          <span class="cal-expand-arrow">▾</span>
+        </div>`
+    }
+    function renderCalExpanded() {
+      // In Quick mode the header has no nav buttons (presets are self-contained — there's no
+      // month-by-month browsing). The buttons are kept in the DOM via visibility:hidden so the
+      // close button still anchors flush right and the row height stays identical to Day/Range.
+      // Picker BODY is wrapped in .cal-picker-area which has a fixed min-height so the widget
+      // stays the same overall size whether showing the 7×6 days grid, the 4×3 months grid,
+      // or the 3 quick presets.
+      let header
+      if (calendarState.selectionMode === 'quick') {
+        header = `
+          <div class="cal-header cal-header-quick">
+            <span class="cal-header-title">Quick Select</span>
+            <button class="cal-close-btn" data-action="cal-collapse" aria-label="Close calendar" title="Close">✕</button>
+          </div>`
+      } else if (calendarState.pickerMode === 'days') {
+        header = `
+          <div class="cal-header">
+            <button class="cal-nav-btn" data-action="cal-prev" aria-label="Previous month">‹</button>
+            <button class="cal-month-label" data-action="cal-show-months">${CAL_MONTHS_FULL[calendarState.viewMonth]} ${calendarState.viewYear}</button>
+            <button class="cal-nav-btn" data-action="cal-next" aria-label="Next month">›</button>
+            <button class="cal-close-btn" data-action="cal-collapse" aria-label="Close calendar" title="Close">✕</button>
+          </div>`
+      } else {
+        header = `
+          <div class="cal-header">
+            <button class="cal-nav-btn" data-action="cal-prev-year" aria-label="Previous year">‹</button>
+            <button class="cal-year-label" data-action="cal-show-days">${calendarState.viewYear}</button>
+            <button class="cal-nav-btn" data-action="cal-next-year" aria-label="Next year">›</button>
+            <button class="cal-close-btn" data-action="cal-collapse" aria-label="Close calendar" title="Close">✕</button>
+          </div>`
+      }
+      let body
+      if (calendarState.selectionMode === 'quick') {
+        body = renderCalQuickGrid()
+      } else if (calendarState.pickerMode === 'days') {
+        body = renderCalDaysGrid()
+      } else {
+        body = renderCalMonthsGrid()
+      }
+      const modeRow = renderCalModeRow()
+      return `<div class="cal-expanded">${header}<div class="cal-picker-area">${body}</div>${modeRow}</div>`
+    }
+    // Quick mode body: 3 large preset buttons for common ranges.
+    function renderCalQuickGrid() {
+      const c = calendarState.quickChoice
+      const today = calToday()
+      const week = calCurrentWeekRange()
+      const month = calCurrentMonthRange()
+      // Short detail labels shown beneath each preset's title.
+      const todayDetail = calPrettyDate(today)
+      const weekDetail = `${calPrettyDate(week.start)} → ${calPrettyDate(week.end)}`
+      const monthDetail = `${CAL_MONTHS_FULL[parseInt(month.start.split('-')[1], 10) - 1]} ${month.start.split('-')[0]}`
+      return `
+        <div class="cal-quick-grid">
+          <button class="cal-quick-btn ${c === 'today' ? 'selected' : ''}" data-action="cal-pick-quick" data-choice="today">
+            <span class="cal-quick-label">Today</span>
+            <span class="cal-quick-detail">${escapeHtml(todayDetail)}</span>
+          </button>
+          <button class="cal-quick-btn ${c === 'week' ? 'selected' : ''}" data-action="cal-pick-quick" data-choice="week">
+            <span class="cal-quick-label">This Week</span>
+            <span class="cal-quick-detail">${escapeHtml(weekDetail)}</span>
+          </button>
+          <button class="cal-quick-btn ${c === 'month' ? 'selected' : ''}" data-action="cal-pick-quick" data-choice="month">
+            <span class="cal-quick-label">This Month</span>
+            <span class="cal-quick-detail">${escapeHtml(monthDetail)}</span>
+          </button>
+        </div>`
+    }
+    function renderCalDaysGrid() {
+      const year = calendarState.viewYear, month = calendarState.viewMonth
+      // First day of month + weekday offset (Monday-first calendar)
+      const first = new Date(year, month, 1)
+      // getDay returns 0=Sunday..6=Saturday. Convert to 0=Monday..6=Sunday.
+      let firstWeekdayMonFirst = first.getDay() - 1
+      if (firstWeekdayMonFirst < 0) firstWeekdayMonFirst = 6   // Sunday wraps to position 6
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      const daysInPrevMonth = new Date(year, month, 0).getDate()
+      const today = calToday()
+      // Build cells: leading days from prev month (greyed), this month's days, trailing days from next month (greyed)
+      const cells = []
+      // Leading
+      for (let i = firstWeekdayMonFirst - 1; i >= 0; i--) {
+        const d = daysInPrevMonth - i
+        const prevMonth = month - 1 < 0 ? 11 : month - 1
+        const prevYear  = month - 1 < 0 ? year - 1 : year
+        cells.push({ day: d, year: prevYear, month: prevMonth, otherMonth: true })
+      }
+      // This month
+      for (let d = 1; d <= daysInMonth; d++) {
+        cells.push({ day: d, year: year, month: month, otherMonth: false })
+      }
+      // Trailing — fill out to 6 weeks (42 cells) for consistent height
+      while (cells.length < 42) {
+        const last = cells[cells.length - 1]
+        let nm = last.month + 1, ny = last.year
+        if (nm > 11) { nm = 0; ny++ }
+        // Compute the next day after `last`
+        if (last.otherMonth && last.month === month - 1) {
+          // still in leading prev-month — shouldn't happen here, but be safe
+        }
+        const nextDay = (cells.length - firstWeekdayMonFirst - daysInMonth) + 1
+        // The trailing always belongs to month+1 of `month`
+        const tMonth = month + 1 > 11 ? 0 : month + 1
+        const tYear  = month + 1 > 11 ? year + 1 : year
+        cells.push({ day: nextDay, year: tYear, month: tMonth, otherMonth: true })
+      }
+      const weekdaysHtml = CAL_WEEKDAYS.map(w => `<div class="cal-weekday">${w}</div>`).join('')
+      const cellsHtml = cells.map(c => {
+        const key = `${c.year}-${String(c.month + 1).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`
+        const isToday = key === today
+        const isSelected = calendarState.selectionMode === 'day' && calendarState.selectedDay === key
+        const isRangeStart = calendarState.selectionMode === 'range' && calendarState.rangeStart === key
+        const isRangeEnd = calendarState.selectionMode === 'range' && calendarState.rangeEnd === key
+        let isInRange = false
+        if (calendarState.selectionMode === 'range' && calendarState.rangeStart && calendarState.rangeEnd) {
+          isInRange = key > calendarState.rangeStart && key < calendarState.rangeEnd
+        }
+        const cls = ['cal-day']
+        if (c.otherMonth) cls.push('other-month')
+        if (isToday) cls.push('today')
+        if (isSelected || isRangeStart || isRangeEnd) cls.push('selected')
+        if (isInRange) cls.push('in-range')
+        if (isRangeStart) cls.push('range-start')
+        if (isRangeEnd) cls.push('range-end')
+        return `<button class="${cls.join(' ')}" data-action="cal-pick-day" data-date="${key}">${c.day}</button>`
+      }).join('')
+      return `<div class="cal-grid">${weekdaysHtml}${cellsHtml}</div>`
+    }
+    function renderCalMonthsGrid() {
+      const today = new Date()
+      const currentY = today.getFullYear(), currentM = today.getMonth()
+      const cells = CAL_MONTHS_SHORT.map((name, idx) => {
+        const isCurrent = (calendarState.viewYear === currentY) && (idx === currentM)
+        // Highlight the month that contains the current selection (if any)
+        let isSelectedMonth = false
+        if (calendarState.selectionMode === 'day' && calendarState.selectedDay) {
+          const [sy, sm] = calendarState.selectedDay.split('-').map(Number)
+          isSelectedMonth = (sy === calendarState.viewYear && sm - 1 === idx)
+        }
+        const cls = ['cal-month-btn-grid']
+        if (isCurrent) cls.push('current-month')
+        if (isSelectedMonth) cls.push('selected-month')
+        return `<button class="${cls.join(' ')}" data-action="cal-pick-month" data-month="${idx}">${name}</button>`
+      }).join('')
+      return `<div class="cal-months-grid">${cells}</div>`
+    }
+    function renderCalModeRow() {
+      const m = calendarState.selectionMode
+      // Apply is enabled when the pending selection is valid for the current mode:
+      // - 'day': a day is picked
+      // - 'range': both start AND end picked
+      // - 'quick': a preset is selected (today/week/month)
+      const canApply = m === 'day'   ? !!calendarState.selectedDay
+                     : m === 'range' ? !!(calendarState.rangeStart && calendarState.rangeEnd)
+                     : /* quick */     !!calendarState.quickChoice
+      return `
+        <div class="cal-mode-row">
+          <div class="cal-mode-toggle">
+            <button class="cal-mode-btn ${m === 'day' ? 'active' : ''}" data-action="cal-mode-day">Day</button>
+            <button class="cal-mode-btn ${m === 'range' ? 'active' : ''}" data-action="cal-mode-range">Range</button>
+            <button class="cal-mode-btn ${m === 'quick' ? 'active' : ''}" data-action="cal-mode-quick">Quick</button>
+          </div>
+          <button class="cal-apply-btn" data-action="cal-apply" ${canApply ? '' : 'disabled'}>Apply</button>
+        </div>`
+    }
+    function attachCalHandlers() {
+      const widget = document.getElementById('calWidget')
+      if (!widget) return
+      // Delegated click handler
+      widget.onclick = (ev) => {
+        const btn = ev.target.closest('[data-action]')
+        if (!btn) return
+        const action = btn.dataset.action
+        switch (action) {
+          case 'cal-expand':
+            calendarState.expanded = true
+            // When re-expanding, sync pending → applied so the grid highlight matches the
+            // currently-applied selection (not stale pending bits from a previous discarded session).
+            calendarState.selectionMode = calendarState.applied.mode
+            calendarState.selectedDay = calendarState.applied.day
+            calendarState.rangeStart = calendarState.applied.rangeStart
+            calendarState.rangeEnd = calendarState.applied.rangeEnd
+            calendarState.rangeStep = 'start'
+            // Navigate the view to whichever month contains the applied selection
+            if (calendarState.applied.mode === 'day' && calendarState.applied.day) {
+              const [y, m] = calendarState.applied.day.split('-').map(Number)
+              calendarState.viewYear = y
+              calendarState.viewMonth = m - 1
+            } else if (calendarState.applied.mode === 'range' && calendarState.applied.rangeStart) {
+              const [y, m] = calendarState.applied.rangeStart.split('-').map(Number)
+              calendarState.viewYear = y
+              calendarState.viewMonth = m - 1
+            }
+            calendarState.pickerMode = 'days'
+            renderCalWidget()
+            break
+          case 'cal-collapse':
+            // Minimize without applying — revert any pending selection back to the applied state
+            // so the grid (next time it's opened) starts fresh from what the user committed.
+            calendarState.selectionMode = calendarState.applied.mode
+            calendarState.selectedDay = calendarState.applied.day
+            calendarState.rangeStart = calendarState.applied.rangeStart
+            calendarState.rangeEnd = calendarState.applied.rangeEnd
+            calendarState.rangeStep = 'start'
+            calendarState.expanded = false
+            renderCalWidget()
+            break
+          case 'cal-prev':
+            calendarState.viewMonth--
+            if (calendarState.viewMonth < 0) { calendarState.viewMonth = 11; calendarState.viewYear-- }
+            renderCalWidget()
+            break
+          case 'cal-next':
+            calendarState.viewMonth++
+            if (calendarState.viewMonth > 11) { calendarState.viewMonth = 0; calendarState.viewYear++ }
+            renderCalWidget()
+            break
+          case 'cal-prev-year':
+            calendarState.viewYear--
+            renderCalWidget()
+            break
+          case 'cal-next-year':
+            calendarState.viewYear++
+            renderCalWidget()
+            break
+          case 'cal-show-months':
+            calendarState.pickerMode = 'months'
+            renderCalWidget()
+            break
+          case 'cal-show-days':
+            calendarState.pickerMode = 'days'
+            renderCalWidget()
+            break
+          case 'cal-pick-month': {
+            const m = parseInt(btn.dataset.month, 10)
+            calendarState.viewMonth = m
+            calendarState.pickerMode = 'days'
+            renderCalWidget()
+            break
+          }
+          case 'cal-mode-day':
+            if (calendarState.selectionMode !== 'day') {
+              calendarState.selectionMode = 'day'
+              // Clear OTHER modes' pending state so toggling between modes always starts fresh.
+              calendarState.rangeStart = null
+              calendarState.rangeEnd = null
+              calendarState.rangeStep = 'start'
+              calendarState.quickChoice = null
+              renderCalWidget()
+            }
+            break
+          case 'cal-mode-range':
+            if (calendarState.selectionMode !== 'range') {
+              calendarState.selectionMode = 'range'
+              calendarState.selectedDay = null
+              calendarState.rangeStep = 'start'
+              calendarState.quickChoice = null
+              renderCalWidget()
+            }
+            break
+          case 'cal-mode-quick':
+            if (calendarState.selectionMode !== 'quick') {
+              calendarState.selectionMode = 'quick'
+              // Clear day/range state. quickChoice starts null — user must explicitly pick a preset.
+              calendarState.selectedDay = null
+              calendarState.rangeStart = null
+              calendarState.rangeEnd = null
+              calendarState.rangeStep = 'start'
+              calendarState.quickChoice = null
+              renderCalWidget()
+            }
+            break
+          case 'cal-pick-quick': {
+            // User picked one of the 3 Quick preset buttons. Set quickChoice + compute the
+            // underlying selectedDay or rangeStart/End so Apply can commit it normally.
+            const choice = btn.dataset.choice
+            calendarState.quickChoice = choice
+            if (choice === 'today') {
+              calendarState.selectedDay = calToday()
+              calendarState.rangeStart = null
+              calendarState.rangeEnd = null
+            } else if (choice === 'week') {
+              const r = calCurrentWeekRange()
+              calendarState.selectedDay = null
+              calendarState.rangeStart = r.start
+              calendarState.rangeEnd = r.end
+            } else if (choice === 'month') {
+              const r = calCurrentMonthRange()
+              calendarState.selectedDay = null
+              calendarState.rangeStart = r.start
+              calendarState.rangeEnd = r.end
+            }
+            renderCalWidget()
+            break
+          }
+          case 'cal-pick-day': {
+            const key = btn.dataset.date
+            if (calendarState.selectionMode === 'day') {
+              // Just set pending; user clicks Apply to commit.
+              calendarState.selectedDay = key
+              renderCalWidget()
+            } else {
+              // Range mode: first click = start, second click = end. No auto-apply.
+              if (calendarState.rangeStep === 'start' || !calendarState.rangeStart) {
+                calendarState.rangeStart = key
+                calendarState.rangeEnd = null
+                calendarState.rangeStep = 'end'
+                renderCalWidget()
+              } else {
+                if (key < calendarState.rangeStart) {
+                  // User picked earlier than start → treat as new start, still need end
+                  calendarState.rangeStart = key
+                  renderCalWidget()
+                } else {
+                  calendarState.rangeEnd = key
+                  calendarState.rangeStep = 'start'
+                  renderCalWidget()
+                }
+              }
+            }
+            break
+          }
+          case 'cal-apply': {
+            // Commit pending → applied, then collapse + load. Quick "today" commits as a single
+            // day; Quick "week"/"month" commit as ranges. (The underlying applied.mode is still
+            // just 'day' or 'range' — the Quick label is a UI shortcut, not a third applied mode.)
+            const m = calendarState.selectionMode
+            if (m === 'day') {
+              if (!calendarState.selectedDay) return
+              calendarState.applied.mode = 'day'
+              calendarState.applied.day = calendarState.selectedDay
+              calendarState.applied.rangeStart = null
+              calendarState.applied.rangeEnd = null
+            } else if (m === 'range') {
+              if (!calendarState.rangeStart || !calendarState.rangeEnd) return
+              calendarState.applied.mode = 'range'
+              calendarState.applied.day = null
+              calendarState.applied.rangeStart = calendarState.rangeStart
+              calendarState.applied.rangeEnd = calendarState.rangeEnd
+            } else { /* quick */
+              if (!calendarState.quickChoice) return
+              if (calendarState.quickChoice === 'today') {
+                calendarState.applied.mode = 'day'
+                calendarState.applied.day = calendarState.selectedDay
+                calendarState.applied.rangeStart = null
+                calendarState.applied.rangeEnd = null
+              } else {
+                calendarState.applied.mode = 'range'
+                calendarState.applied.day = null
+                calendarState.applied.rangeStart = calendarState.rangeStart
+                calendarState.applied.rangeEnd = calendarState.rangeEnd
+              }
+            }
+            calendarState.expanded = false
+            renderCalWidget()
+            loadCalBubbles()
+            break
+          }
+        }
+      }
+    }
+    // Re-render the calendar feed from current calendarState.bubbleRows (no DB fetch). Used
+    // when toggling edit mode on/off — same data, different HTML.
+    function renderCalFeed() {
+      const infoEl = document.getElementById('calFeedInfo')
+      const feedEl = document.getElementById('calFeed')
+      if (!infoEl || !feedEl) return
+      const a = calendarState.applied
+      let startKey = null, endKey = null
+      if (a.mode === 'day' && a.day) {
+        startKey = endKey = a.day
+      } else if (a.mode === 'range' && a.rangeStart && a.rangeEnd) {
+        startKey = a.rangeStart
+        endKey = a.rangeEnd
+      }
+      if (!startKey || !endKey) {
+        infoEl.className = 'cal-feed-info empty'
+        infoEl.textContent = 'Pick a date or range above to see activity.'
+        feedEl.innerHTML = ''
+        return
+      }
+      if (calendarState.bubbleRows.length === 0) {
+        infoEl.className = 'cal-feed-info empty'
+        const rangeText = (startKey === endKey)
+          ? calPrettyDate(startKey)
+          : `${calPrettyDate(startKey)} → ${calPrettyDate(endKey)}`
+        infoEl.textContent = `No activity for ${rangeText}.`
+        feedEl.innerHTML = ''
+        return
+      }
+      // Day-separator grouping (same as Sales History feed)
+      const ordered = calendarState.bubbleRows.slice().reverse()
+      const days = []
+      let currentDay = null
+      for (const r of ordered) {
+        const k = dayKey(r.event_at)
+        if (!currentDay || currentDay.key !== k) {
+          currentDay = { key: k, label: dayLabel(r.event_at), rows: [] }
+          days.push(currentDay)
+        }
+        currentDay.rows.push(r)
+      }
+      const html = days.map(d => `
+        <div class="day-separator">
+          <div class="line"></div>
+          <span class="label">${escapeHtml(d.label)}</span>
+          <div class="line"></div>
+        </div>
+        ${d.rows.map(r => renderBubble(r)).join('')}
+      `).join('')
+      feedEl.innerHTML = html
+      attachBubbleHandlers(feedEl)
+      infoEl.className = 'cal-feed-info'
+      infoEl.textContent = ''
+    }
+    // Query the activity feed for the current APPLIED selection and re-render the bubbles below.
+    // Preserves scroll position so realtime auto-updates don't snap user back to the top.
+    // Doesn't clear the feed before the query — content stays visible until the new data arrives,
+    // eliminating the half-second flash on realtime updates.
+    async function loadCalBubbles() {
+      const infoEl = document.getElementById('calFeedInfo')
+      const feedEl = document.getElementById('calFeed')
+      if (!infoEl || !feedEl) return
+      const a = calendarState.applied
+      let startKey = null, endKey = null
+      if (a.mode === 'day' && a.day) {
+        startKey = endKey = a.day
+      } else if (a.mode === 'range' && a.rangeStart && a.rangeEnd) {
+        startKey = a.rangeStart
+        endKey = a.rangeEnd
+      }
+      if (!startKey || !endKey) {
+        calendarState.bubbleRows = []
+        renderCalFeed()
+        return
+      }
+      const startISO = new Date(startKey + 'T00:00:00').toISOString()
+      const endISO = new Date(endKey + 'T23:59:59.999').toISOString()
+      // Preserve scroll position so realtime refresh doesn't yank the user back to the top.
+      const savedScroll = window.scrollY
+      // Show subtle loading hint ONLY on first load (when feed is empty). On subsequent reloads
+      // (realtime auto-updates), keep existing content visible to avoid flash.
+      const isFirstLoad = !feedEl.innerHTML.trim()
+      if (isFirstLoad) {
+        infoEl.className = 'cal-feed-info loading'
+        infoEl.textContent = 'Loading…'
+      }
+      calendarState.loading = true
+      try {
+        const { data, error } = await supabase
+          .from('recent_activity')
+          .select('*')
+          .gte('event_at', startISO)
+          .lte('event_at', endISO)
+          .order('event_at', { ascending: false })
+        if (error) throw error
+        calendarState.bubbleRows = data || []
+        renderCalFeed()
+        // Restore scroll position (clamped to current document height)
+        requestAnimationFrame(() => {
+          const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+          window.scrollTo({ top: Math.min(savedScroll, maxScroll) })
+        })
+      } catch (err) {
+        log('error', 'Calendar load failed', err)
+        infoEl.className = 'cal-feed-info empty'
+        infoEl.textContent = 'Could not load activity. Try again later.'
+      } finally {
+        calendarState.loading = false
+      }
+    }
+    // Dispatcher: re-render whichever activity feed is currently visible. Used by edit/cancel
+    // flows so the right feed gets refreshed without re-fetching when toggling edit mode.
+    function rerenderActivityFeed() {
+      if (currentWorkspace === 'calendar') {
+        renderCalFeed()
+      } else {
+        renderActivity()
+      }
+    }
+    // Expose for any external callers (mainly debugging)
+    window.renderCalWidget = renderCalWidget
+    window.loadCalBubbles = loadCalBubbles
+    // =================================================================================
+    // END CALENDAR WORKSPACE
+    // =================================================================================
 
     window.switchWorkspace = function(name) {
       if (!WORKSPACE_TITLES[name]) {
@@ -4008,9 +6284,21 @@ new events will not be in this file. Re-download periodically.
       // Update header title
       document.getElementById('workspaceTitle').textContent = WORKSPACE_TITLES[name]
 
-      // History workspace: jump to bottom so latest bubbles are visible
+      // History workspace: jump to bottom so latest bubbles are visible.
+      // If activityRows is empty (e.g., user started in Calendar workspace, so initial load
+      // never populated Sales History), trigger an initial load now. Otherwise just scroll.
       if (name === 'history') {
-        requestAnimationFrame(() => { window.scrollTo({ top: document.documentElement.scrollHeight }) })
+        if (activityRows.length === 0 && !editingRow) {
+          loadMoreActivity({ initial: true, scrollToBottom: true })
+        } else {
+          requestAnimationFrame(() => { window.scrollTo({ top: document.documentElement.scrollHeight }) })
+        }
+      } else if (name === 'calendar') {
+        // Calendar workspace: render widget. No auto-load — user must pick + Apply first.
+        requestAnimationFrame(() => { window.scrollTo({ top: 0 }) })
+        renderCalWidget()
+        // Only re-render the feed (from any existing applied selection); don't fire a new query.
+        renderCalFeed()
       } else {
         // Other workspaces: scroll to top of page
         requestAnimationFrame(() => { window.scrollTo({ top: 0 }) })
@@ -4018,7 +6306,41 @@ new events will not be in this file. Re-download periodically.
 
       storeWorkspace(name)
       closeDrawer()
+      // Recompute scroll-to-bottom button visibility for the new workspace.
+      // RAF ensures the post-switch layout (including scrollTo above) has settled before we measure.
+      requestAnimationFrame(updateScrollToBottomBtn)
     }
+
+    // ===== Scroll-to-bottom floating button =====
+    // Threshold (in px): how far above the bottom the user must be scrolled before the button appears.
+    // ~600px feels like "noticeably scrolled up" on most viewports — bumping this hides the button
+    // for slightly-scrolled cases; lowering shows it more aggressively. Currently tuned per user feedback.
+    const SCROLL_TO_BOTTOM_THRESHOLD_PX = 600
+    // Workspaces that have a feed worth scrolling — others (newsale, addproducts, stock, tools) are
+    // short forms / tables and don't need this button.
+    const SCROLL_BTN_WORKSPACES = new Set(['history', 'calendar'])
+    function updateScrollToBottomBtn() {
+      const btn = document.getElementById('scrollToBottomBtn')
+      if (!btn) return
+      if (!SCROLL_BTN_WORKSPACES.has(currentWorkspace)) {
+        btn.classList.remove('visible')
+        return
+      }
+      const dist = document.documentElement.scrollHeight - window.scrollY - window.innerHeight
+      btn.classList.toggle('visible', dist > SCROLL_TO_BOTTOM_THRESHOLD_PX)
+    }
+    window.addEventListener('scroll', updateScrollToBottomBtn, { passive: true })
+    window.addEventListener('resize', updateScrollToBottomBtn)
+    // Document height changes (feed appends, bubble edits expanding/collapsing, etc.) don't fire
+    // scroll or resize events, so observe the body's size directly. This catches all "content
+    // grew/shrunk" cases without sprinkling explicit calls through every render path.
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(updateScrollToBottomBtn)
+      ro.observe(document.body)
+    }
+    document.getElementById('scrollToBottomBtn').addEventListener('click', () => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+    })
 
     window.openDrawer = function() {
       document.getElementById('drawer').classList.add('visible')
