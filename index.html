@@ -1676,18 +1676,35 @@
     }
     .bubble.editing .row-body.row-existing .col-name .autocomplete-list.visible { display: block; }
     .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item {
-      padding: 8px 12px;
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      align-items: center;
+      padding: 0;
+      gap: 0;
       cursor: pointer;
       border-bottom: 1px solid #f3f4f6;
-      display: grid;
-      grid-template-columns: 90px 1fr;
-      gap: 10px;
-      align-items: center;
     }
     .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item:hover,
     .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item.active { background: #f9fafb; }
-    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item .ac-id { font-family: ui-monospace, monospace; font-size: 10px; color: var(--text-faint); }
-    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item .ac-name { font-size: 14px; }
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item .ac-id {
+      display: block;
+      padding: 8px 4px;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      word-break: normal;
+      overflow-wrap: break-word;
+      border-right: 1px solid var(--border);
+      margin: 0;
+      letter-spacing: -0.1px;
+    }
+    .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item .ac-name {
+      padding: 8px 10px;
+      font-size: 14px;
+      white-space: normal;
+      word-break: break-word;
+    }
     .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-empty { padding: 12px; text-align: center; color: var(--text-faint); font-style: italic; font-size: 13px; }
     /* ============== END existing-row-edit ============== */
 
@@ -1862,18 +1879,35 @@
     }
     .bubble.editing .row-body .new-row-product .autocomplete-list.visible { display: block; }
     .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item {
-      padding: 8px 12px;
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      align-items: center;
+      padding: 0;
+      gap: 0;
       cursor: pointer;
       border-bottom: 1px solid #f3f4f6;
-      display: grid;
-      grid-template-columns: 90px 1fr;
-      gap: 10px;
-      align-items: center;
     }
     .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item:hover,
     .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item.active { background: #f9fafb; }
-    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item .ac-id { font-family: ui-monospace, monospace; font-size: 10px; color: var(--text-faint); }
-    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item .ac-name { font-size: 14px; }
+    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item .ac-id {
+      display: block;
+      padding: 8px 4px;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      word-break: normal;
+      overflow-wrap: break-word;
+      border-right: 1px solid var(--border);
+      margin: 0;
+      letter-spacing: -0.1px;
+    }
+    .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item .ac-name {
+      padding: 8px 10px;
+      font-size: 14px;
+      white-space: normal;
+      word-break: break-word;
+    }
     .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-empty { padding: 12px; text-align: center; color: var(--text-faint); font-style: italic; font-size: 13px; }
     /* Mobile: dropdown offset matches mobile cell widths (ID 54 + Stock 36 + Qty 36 = 72) */
     @media (max-width: 600px) {
@@ -1881,6 +1915,11 @@
       .bubble.editing .row-body.row-existing .col-name .autocomplete-list {
         left: -54px;
         right: -72px;
+      }
+      /* Match form-bubble mobile ID column width */
+      .bubble.editing .row-body .new-row-product .autocomplete-list .autocomplete-item,
+      .bubble.editing .row-body.row-existing .col-name .autocomplete-list .autocomplete-item {
+        grid-template-columns: 60px 1fr;
       }
     }
 
@@ -4625,6 +4664,17 @@
           })
         }
         list.classList.add('visible')
+        // Measure the actual rendered height of the first 5 items (or all items if fewer than 5)
+        // and set that as the dropdown's max-height. Reliable regardless of styling — no
+        // hard-coded pixel guesses. Runs in the next frame so the browser has finished layout.
+        requestAnimationFrame(() => {
+          const items = list.querySelectorAll('.autocomplete-item')
+          if (items.length === 0) return
+          const count = Math.min(items.length, 5)
+          let totalHeight = 0
+          for (let i = 0; i < count; i++) totalHeight += items[i].offsetHeight
+          list.style.maxHeight = totalHeight + 'px'
+        })
       }
       function select(product) {
         input.value = product.name
