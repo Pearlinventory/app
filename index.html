@@ -104,6 +104,7 @@
     .hamburger-btn svg,
     .header-icon-btn svg { width: 18px; height: 18px; display: block; }
     .header-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .header-icon-btn[hidden] { display: none; }
     .header-icon-btn.refreshing svg { animation: header-refresh-spin 0.6s linear infinite; }
     @keyframes header-refresh-spin { to { transform: rotate(360deg); } }
 
@@ -921,6 +922,75 @@
     /* Notice modal message — preserves newlines from the message string so multi-line
        messages (like the import summary) render with proper line breaks. */
     .notice-message { white-space: pre-wrap; word-break: break-word; }
+
+    /* ============== Floating form modal (Add Products) ==============
+       Full-screen dim backdrop + centered/scrollable content area. Unlike the confirm/notice
+       modals, this hosts a full form bubble so the content can grow tall — the container
+       scrolls when the bubble exceeds viewport height. Cancel/Add buttons live INSIDE the
+       bubble itself, so no header/close-X is needed on the modal shell. */
+    .floating-form-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      z-index: 101;
+      overflow-y: auto;
+      padding: 40px 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .floating-form-modal.visible { display: flex; }
+    .floating-form-modal-card {
+      width: 100%;
+      max-width: 640px;
+      margin: auto 0;              /* vertical centering when the bubble is short; scrolls when tall */
+    }
+    @media (max-width: 600px) {
+      .floating-form-modal { padding: 20px 10px; }
+    }
+    /* Also lock the underlying page scroll while this modal is open (matches confirm-modal). */
+    body:has(.floating-form-modal.visible) { overflow: hidden; }
+
+    /* ============== Actions menu popover (header "+" button) ==============
+       Small floating dropdown below the header's "+" button. Uses `position: fixed` with
+       top/right anchored to a reliable header position so it works regardless of scroll. */
+    .actions-menu {
+      position: fixed;
+      top: 52px;                   /* just below the app header (--header-h + 4px) */
+      right: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      padding: 6px;
+      min-width: 240px;
+      z-index: 60;                 /* above sticky headers, below modals */
+      display: none;
+    }
+    .actions-menu.visible { display: block; }
+    .actions-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 12px;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text);
+      font-family: inherit;
+      text-align: left;
+    }
+    .actions-menu-item:hover { background: var(--bg-elevated); }
+    .actions-menu-item .ico { font-size: 18px; line-height: 1; }
+    .actions-menu-item .lbl { flex: 1; }
+    @media (max-width: 600px) {
+      .actions-menu { top: 48px; right: 10px; min-width: 220px; }
+    }
+    /* ============== END floating-form-modal + actions-menu ============== */
     .confirm-detail { background: var(--bg-elevated); border-radius: 6px; padding: 10px 12px; font-size: 13px; margin: 12px 0; font-family: ui-monospace, monospace; }
     .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
     .table-container { padding: 20px; overflow-x: auto; position: relative; }
@@ -1388,7 +1458,7 @@
     @media (max-width: 600px) {
       .bubble-card { grid-template-columns: 54px minmax(120px, 1fr) 36px; border-width: 1.5px; }
       .bubble-row.row-body, .bubble-row.row-footer { border-top-width: 1.5px; }
-      .row-body .bubble-cell.col-id span { font-size: 9px; letter-spacing: -0.3px; }
+      .row-body .bubble-cell.col-id span { font-size: 8px; letter-spacing: -0.3px; }
       .row-header .bubble-cell { font-size: 11px; }
       /* Darker border colors on mobile so they don't blend into the bubble's body gradient */
       .bubble.sale .bubble-card { border-color: #79bf90; }
@@ -2289,11 +2359,32 @@
           <span class="conn-label">Connecting…</span>
         </span>
         <span class="last-updated" id="lastUpdated"></span>
+        <!-- Refresh button — shown in most workspaces (Sales, Calendar). Hidden in Current
+             Stock where the "+" menu takes its place. Toggling handled in switchWorkspace(). -->
         <button class="header-icon-btn" id="refreshBtn" onclick="manualRefresh()" aria-label="Refresh" title="Refresh">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
+        <!-- "+" menu button — Current Stock workspace only. Opens a small popover with actions
+             (Add product, Import from spreadsheet). Hidden by default; shown by switchWorkspace('stock'). -->
+        <button class="header-icon-btn" id="actionsMenuBtn" onclick="window.toggleActionsMenu()" aria-label="Actions" title="Actions" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
       </div>
     </header>
+
+    <!-- Actions menu popover, opened by the header "+" button. Hidden by default; visible
+         via .visible. Menu items trigger their respective flows (open Add Products modal,
+         click the hidden importFile input). Click outside closes it (handled in JS). -->
+    <div class="actions-menu" id="actionsMenu">
+      <button class="actions-menu-item" data-action="add-product" type="button">
+        <span class="ico">📦</span>
+        <span class="lbl">Add product</span>
+      </button>
+      <button class="actions-menu-item" data-action="import-spreadsheet" type="button">
+        <span class="ico">📥</span>
+        <span class="lbl">Import from spreadsheet</span>
+      </button>
+    </div>
 
     <!-- Workspace: New Sale — REMOVED. The form was moved into the Sales workspace as an
          inline compose (see data-workspace="history" below). The internal name 'newsale' is
@@ -2378,7 +2469,7 @@
                 </div>
                 <div class="footer-buttons">
                   <button class="btn danger" id="cancelSaleBtn" type="button">Cancel</button>
-                  <button class="btn" id="logSaleBtn" onclick="submitSale()">Log Sale</button>
+                  <button class="btn" id="logSaleBtn" onclick="submitSale()">Add</button>
                 </div>
               </div>
             </div>
@@ -2400,10 +2491,18 @@
       </section>
     </div>
 
-    <!-- ============ Workspace: Actions ============ -->
-    <!-- ============ Workspace: Add Products (multi-row bubble form) ============ -->
-    <div class="workspace" data-workspace="addproducts">
-      <section class="activity-section">
+    <!-- Hidden file input for the "Import from spreadsheet" menu action. Kept in the DOM
+         (not inside any removed workspace) so the import-JS still binds cleanly and the
+         menu can trigger a click() on it. -->
+    <input type="file" id="importFile" accept=".csv,.tsv,.xlsx,.xls,.ods" style="display:none">
+
+    <!-- ============ Add Products modal (was: data-workspace="addproducts") ============
+         Moved from a full-page workspace into a floating modal that opens from the header's
+         "+" menu. The bubble HTML is untouched — just the outer wrapper changed. Legacy
+         switchWorkspace('addproducts') calls redirect to the Sales workspace + open this
+         modal (see switchWorkspace() in JS). -->
+    <div class="floating-form-modal" id="addProductsModal">
+      <div class="floating-form-modal-card">
         <div class="bubble form-sale form-stockin">
           <div class="bubble-card">
             <div class="bubble-row row-source">
@@ -2441,27 +2540,19 @@
               </div>
               <div class="footer-buttons">
                 <button class="btn danger" id="cancelStockBtn" type="button">Cancel</button>
-                <button class="btn" id="logStockBtn" onclick="submitStockIn()">Receive</button>
+                <button class="btn" id="logStockBtn" onclick="submitStockIn()">Add</button>
               </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
     </div>
 
-    <!-- ============ Workspace: Tools (CSV import, backup, etc.) ============ -->
-    <div class="workspace" data-workspace="tools">
-      <section class="panel">
-        <h2>Tools</h2>
-        <div class="import-row">
-          <input type="file" id="importFile" accept=".csv,.tsv,.xlsx,.xls,.ods" style="display:none">
-          <button class="btn secondary small" id="importBtn" onclick="document.getElementById('importFile').click()">
-            📥 Import from spreadsheet (.csv .xlsx .ods)
-          </button>
-          <span class="import-help">Bulk-add stock from a supplier invoice file</span>
-        </div>
-      </section>
-    </div>
+    <!-- Tools workspace REMOVED. Its only feature was CSV/spreadsheet import, which is now
+         accessible via the header "+" menu → "Import from spreadsheet". Legacy
+         switchWorkspace('tools') redirects to the Sales workspace. The file input element
+         (#importFile) still lives in the DOM below the modal so the same click-driven
+         import flow works via the menu. -->
 
     <!-- ============ Side drawer (workspace nav) ============ -->
     <div class="drawer-backdrop" id="drawerBackdrop" onclick="window.closeDrawer()"></div>
@@ -2471,10 +2562,6 @@
         <button class="btn secondary small" onclick="window.closeDrawer()" aria-label="Close menu">✕</button>
       </div>
       <nav class="drawer-nav">
-        <button class="drawer-item" data-workspace="addproducts" onclick="window.switchWorkspace('addproducts')">
-          <span class="drawer-icon">📦</span>
-          <span class="drawer-label">Add Products</span>
-        </button>
         <button class="drawer-item" data-workspace="stock" onclick="window.switchWorkspace('stock')">
           <span class="drawer-icon">📊</span>
           <span class="drawer-label">Current Stock</span>
@@ -2486,10 +2573,6 @@
         <button class="drawer-item" data-workspace="calendar" onclick="window.switchWorkspace('calendar')">
           <span class="drawer-icon">📅</span>
           <span class="drawer-label">Calendar</span>
-        </button>
-        <button class="drawer-item" data-workspace="tools" onclick="window.switchWorkspace('tools')">
-          <span class="drawer-icon">🔧</span>
-          <span class="drawer-label">Tools</span>
         </button>
         <div class="drawer-divider"></div>
         <button class="drawer-item" onclick="window.openSettings()">
@@ -3214,8 +3297,10 @@
       if (!currentUser) { log('api', 'Not authenticated, skipping load'); return }
       log('api', `Loading… (manual=${isManual})`)
       const refreshBtnEl = document.getElementById('refreshBtn')
-      refreshBtnEl.disabled = true
-      refreshBtnEl.classList.add('refreshing')
+      if (refreshBtnEl) {
+        refreshBtnEl.disabled = true
+        refreshBtnEl.classList.add('refreshing')
+      }
       setConnectionStatus('reconnecting', 'Loading…')
       try {
         const [productsRes, stockRes] = await Promise.all([
@@ -3258,8 +3343,10 @@
         }
       } finally {
         const refreshBtnEl2 = document.getElementById('refreshBtn')
-        refreshBtnEl2.disabled = false
-        refreshBtnEl2.classList.remove('refreshing')
+        if (refreshBtnEl2) {
+          refreshBtnEl2.disabled = false
+          refreshBtnEl2.classList.remove('refreshing')
+        }
       }
     }
 
@@ -3841,10 +3928,16 @@
       if (!feedEl) return
       feedEl.querySelectorAll('.bubble').forEach(bubble => {
         bubble.addEventListener('contextmenu', (e) => {
+          // Block context menu on the bubble that's currently in edit mode — right-click on it
+          // would let the user open Edit/Delete while already editing, which is confusing and
+          // can lead to broken state. Other bubbles remain accessible.
+          if (bubble.classList.contains('editing')) return
           e.preventDefault()
           openBubbleMenu(bubble, { x: e.clientX, y: e.clientY })
         })
         bubble.addEventListener('touchstart', (e) => {
+          // Same restriction on mobile long-press.
+          if (bubble.classList.contains('editing')) return
           longPressFired = false
           clearTimeout(longPressTimer)
           const touch = e.touches[0]
@@ -4644,10 +4737,14 @@
         const limited = matches.slice(0, 20)
         visibleItems = limited
         focusedIndex = -1
+        // No matches → hide the dropdown entirely (no "No match" message). User just sees
+        // their typed text without an empty overlay.
         if (limited.length === 0) {
-          list.innerHTML = `<div class="autocomplete-empty">${noMatchMessage}</div>`
-        } else {
-          list.innerHTML = limited.map((p, i) => {
+          list.innerHTML = ''
+          list.classList.remove('visible')
+          return
+        }
+        list.innerHTML = limited.map((p, i) => {
             // Tag items with stock < 1 (zero or negative) so they render distinctly — see the
             // `.autocomplete-item.ac-low-stock` CSS. When hideZeroStock is true these are already
             // filtered above, so this only fires in contexts that allow them (stock-in form +
@@ -4662,15 +4759,16 @@
           list.querySelectorAll('.autocomplete-item').forEach(el => {
             el.addEventListener('click', () => select(visibleItems[parseInt(el.dataset.index)]))
           })
-        }
         list.classList.add('visible')
-        // Measure the actual rendered height of the first 5 items (or all items if fewer than 5)
-        // and set that as the dropdown's max-height. Reliable regardless of styling — no
-        // hard-coded pixel guesses. Runs in the next frame so the browser has finished layout.
+        // Measure the actual rendered height of the first N items and set that as the dropdown's
+        // max-height. Reliable regardless of styling — no hard-coded pixel guesses. Runs in the
+        // next frame so the browser has finished layout.
+        // Mobile (≤600px) caps at 4 rows; desktop at 5 — matches the tighter mobile aesthetic.
         requestAnimationFrame(() => {
           const items = list.querySelectorAll('.autocomplete-item')
           if (items.length === 0) return
-          const count = Math.min(items.length, 5)
+          const maxRows = window.innerWidth <= 600 ? 4 : 5
+          const count = Math.min(items.length, maxRows)
           let totalHeight = 0
           for (let i = 0; i < count; i++) totalHeight += items[i].offsetHeight
           list.style.maxHeight = totalHeight + 'px'
@@ -5052,6 +5150,8 @@
       feedback.className = 'form-feedback'
       feedback.textContent = ''
       resetFormNoteArea('stock')
+      // Close the floating modal — same pattern as resetSaleForm() closing the inline compose.
+      closeAddProductsModal()
     }
 
     // Wire up Add and Cancel buttons for stock-in form
@@ -6108,11 +6208,9 @@ new events will not be in this file. Re-download periodically.
     // Workspace navigation (V2.1)
     // ============================================================
     const WORKSPACE_TITLES = {
-      addproducts: 'Add Products',
       stock: 'Current Stock',
       history: 'Sales',       // was 'Sales History' (V2.11: New Sale form now inline here)
       calendar: 'Calendar',
-      tools: 'Tools',
     }
     const DEFAULT_WORKSPACE = 'history'
     const WORKSPACE_STORAGE_KEY = 'inv_last_workspace'
@@ -6123,8 +6221,9 @@ new events will not be in this file. Re-download periodically.
       try {
         let v = localStorage.getItem(WORKSPACE_STORAGE_KEY)
         // V2.11 migration: 'newsale' was collapsed into 'history' with an inline compose.
-        // Anyone with a stored 'newsale' preference gets routed to the new Sales workspace.
-        if (v === 'newsale') v = 'history'
+        // V2.12 migration: 'addproducts' and 'tools' both became modal/menu flows rooted in
+        // the 'history' workspace. All three legacy values silently redirect.
+        if (v === 'newsale' || v === 'addproducts' || v === 'tools') v = 'history'
         if (v && WORKSPACE_TITLES[v]) return v
       } catch (e) { /* localStorage may be blocked */ }
       return DEFAULT_WORKSPACE
@@ -6752,14 +6851,94 @@ new events will not be in this file. Re-download periodically.
       if (btn) btn.removeAttribute('hidden')
     }
 
+    // ===== Add Products modal =====
+    // Formerly the "Add Products" workspace. Now a floating modal opened from the header
+    // "+" menu. Uses the same bubble HTML/JS — only the outer container changed. Cancel
+    // and Add (was: "Receive") buttons already exist in the bubble; both flow through
+    // resetStockForm() which now also closes the modal.
+    function openAddProductsModal() {
+      const modal = document.getElementById('addProductsModal')
+      if (modal) modal.classList.add('visible')
+    }
+    function closeAddProductsModal() {
+      const modal = document.getElementById('addProductsModal')
+      if (modal) modal.classList.remove('visible')
+    }
+
+    // ===== Header "+" actions menu =====
+    // Small popover with two entries: Add product (opens the modal) and Import from
+    // spreadsheet (triggers the hidden file input). Click-outside closes it.
+    window.toggleActionsMenu = function() {
+      const menu = document.getElementById('actionsMenu')
+      if (!menu) return
+      if (menu.classList.contains('visible')) closeActionsMenu()
+      else openActionsMenu()
+    }
+    function openActionsMenu() {
+      const menu = document.getElementById('actionsMenu')
+      if (!menu) return
+      menu.classList.add('visible')
+      // Register a one-shot outside-click closer on the next tick (so THIS click doesn't
+      // instantly close the menu we just opened).
+      requestAnimationFrame(() => {
+        document.addEventListener('click', onOutsideActionsClick, { once: true, capture: true })
+      })
+    }
+    function closeActionsMenu() {
+      const menu = document.getElementById('actionsMenu')
+      if (menu) menu.classList.remove('visible')
+    }
+    function onOutsideActionsClick(e) {
+      const menu = document.getElementById('actionsMenu')
+      const btn = document.getElementById('actionsMenuBtn')
+      if (!menu) return
+      if (menu.contains(e.target) || (btn && btn.contains(e.target))) {
+        // Click was inside the menu or on the trigger button — re-register the outside listener.
+        requestAnimationFrame(() => {
+          document.addEventListener('click', onOutsideActionsClick, { once: true, capture: true })
+        })
+        return
+      }
+      closeActionsMenu()
+    }
+    // Wire up menu item clicks (runs at module init since elements exist in DOM).
+    {
+      const menu = document.getElementById('actionsMenu')
+      if (menu) {
+        menu.querySelectorAll('[data-action]').forEach(item => {
+          item.addEventListener('click', () => {
+            const action = item.dataset.action
+            closeActionsMenu()
+            if (action === 'add-product') openAddProductsModal()
+            else if (action === 'import-spreadsheet') {
+              const fileInput = document.getElementById('importFile')
+              if (fileInput) fileInput.click()
+            }
+          })
+        })
+      }
+    }
+
     window.switchWorkspace = function(name) {
       // V2.11 legacy compat: the 'newsale' workspace was folded into 'history' with an inline
       // compose. Any code path still calling switchWorkspace('newsale') opens Sales AND expands
       // the compose form — so the effect matches the old workspace behavior.
       let openComposeAfterSwitch = false
+      let openAddProductsAfterSwitch = false
       if (name === 'newsale') {
         name = 'history'
         openComposeAfterSwitch = true
+      }
+      // V2.12 legacy compat: 'addproducts' workspace is now a floating modal opened from the
+      // header "+" menu. Legacy calls redirect to Sales and open the modal.
+      if (name === 'addproducts') {
+        name = 'history'
+        openAddProductsAfterSwitch = true
+      }
+      // V2.12 legacy compat: 'tools' workspace is gone (its only feature — CSV import — moved
+      // to the header "+" menu). Redirect to Sales.
+      if (name === 'tools') {
+        name = 'history'
       }
       if (!WORKSPACE_TITLES[name]) {
         log('nav', `Unknown workspace: ${name}, falling back to default`)
@@ -6780,6 +6959,23 @@ new events will not be in this file. Re-download periodically.
 
       // Update header title
       document.getElementById('workspaceTitle').textContent = WORKSPACE_TITLES[name]
+
+      // Header buttons: refresh vs "+" actions menu. The "+" menu (Add product, Import) is
+      // Current Stock-specific — that's where creating products / bulk importing feels
+      // contextual. Everywhere else, the manual refresh button is shown as before.
+      const refreshBtn = document.getElementById('refreshBtn')
+      const actionsBtn = document.getElementById('actionsMenuBtn')
+      if (refreshBtn && actionsBtn) {
+        if (name === 'stock') {
+          refreshBtn.setAttribute('hidden', '')
+          actionsBtn.removeAttribute('hidden')
+        } else {
+          refreshBtn.removeAttribute('hidden')
+          actionsBtn.setAttribute('hidden', '')
+          // Also close the popover if it was left open while switching away
+          closeActionsMenu()
+        }
+      }
 
       // History workspace: jump to bottom so latest bubbles are visible.
       // If activityRows is empty (e.g., user started in Calendar workspace, so initial load
@@ -6802,6 +6998,7 @@ new events will not be in this file. Re-download periodically.
       }
 
       if (openComposeAfterSwitch) openInlineCompose()
+      if (openAddProductsAfterSwitch) openAddProductsModal()
 
       storeWorkspace(name)
       closeDrawer()
