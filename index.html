@@ -42,6 +42,10 @@
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; }
     /* Scroll lock: when any modal/overlay/drawer is visible, prevent the page from scrolling underneath. */
+    /* Reserve space for the scrollbar always so that when a modal locks scrolling (overflow:hidden below)
+       the scrollbar disappearing doesn't shift page content ~15px to the right, causing a visible "jitter"
+       when modals open/close. `scrollbar-gutter: stable` is supported in all modern browsers. */
+    html { scrollbar-gutter: stable; }
     body:has(.confirm-modal.visible),
     body:has(.import-modal.visible),
     body:has(.settings-modal.visible),
@@ -403,7 +407,11 @@
       grid-column: 1 / -1 !important;
       display: block !important;
       border-top: 0.5px solid #e8e8e8;
-      padding: 14px 12px;
+      /* Extra vertical breathing room around the "+ Add another product" button — approximately
+         2 rows worth of empty space above and below the button. Makes the button feel like a
+         deliberate call-to-action rather than butted against the last row. Applies to both the
+         New Sale form bubble and the Add Products (form-stockin) bubble via inheritance. */
+      padding: 71px 12px;
     }
     .bubble.form-sale .add-row-btn {
       display: inline-flex;
@@ -426,6 +434,114 @@
     .bubble.form-sale .add-row-btn .plus-sign { font-size: 14px; line-height: 1; }
     /* Center the button inside its row */
     .bubble.form-sale .row-add-button { text-align: center; }
+
+    /* Inline compose "+ New sale" button — primary compose entry point in the Sales workspace.
+       Solid brand-green fill + thicker dark-green border + white bold label. Two shadows for
+       depth: text-shadow behind the label (contrast against the green) and an inset white glow
+       on the inner edges (makes the button look "lit from within", inviting to click). Top
+       margin matches the visual "day-break" gap between different-day bubbles. */
+    .inline-compose-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 600px;
+      margin: 28px auto 16px;
+      padding: 14px 22px;
+      background: #3ecf8e;
+      border: 2.5px solid #239d66;
+      border-radius: 10px;
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      /* Two-layer visual polish:
+         1. text-shadow: soft dark haze behind the white text so it doesn't blend into green.
+            75% opacity + 12px blur = a nice smoky halo without harsh outline.
+         2. inset box-shadow: white edge-glow. Two stops: an intense inner band (8px blur,
+            100% white) right at the border, plus a longer soft falloff (40px blur, 60% white)
+            that extends the glow toward the middle. Bright edge, gentle falloff. */
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
+      box-shadow:
+        inset 0 0 8px rgba(255, 255, 255, 1),
+        inset 0 0 40px rgba(255, 255, 255, 0.6);
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+    }
+    .inline-compose-btn:hover {
+      background: #35b378;
+      border-color: #1a7a4d;
+      /* On hover the falloff pushes brighter (edge is already maxed at 100%). */
+      box-shadow:
+        inset 0 0 8px rgba(255, 255, 255, 1),
+        inset 0 0 40px rgba(255, 255, 255, 0.75);
+    }
+    .inline-compose-btn:active { transform: translateY(1px); }
+    .inline-compose-btn .plus-sign {
+      font-size: 26px;
+      line-height: 1;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
+    }
+    /* The `hidden` HTML attribute normally applies `display: none`, but our `display: flex`
+       above overrides it (higher specificity wins). Explicit rule so hidden actually hides. */
+    .inline-compose-btn[hidden] { display: none; }
+    /* When the form is showing (button hidden), reserve the same top-gap as the button had —
+       otherwise the form would sit butt-to-butt with the previous history bubble. */
+    .inline-compose-form { margin-top: 28px; }
+    .inline-compose-form[hidden] { display: none; }
+
+    /* Rotating gradient border on the New Sale bubble — one continuous stroke around the
+       perimeter whose COLOR rotates while the shape stays put. Reads as a soft loading effect.
+       
+       Technique:
+         1. `::before` covers the bubble edge with a conic-gradient that has two white peaks
+            (at ~25% and ~75%) sitting on a green base — the peaks are the "trails".
+         2. A two-layer mask hides the inner content-box, leaving only the border ring visible.
+         3. `@property --sale-trail-angle` declares a typed CSS custom property so the browser
+            can smoothly interpolate the angle in an animation (raw CSS variables can't be
+            animated — the browser doesn't know their type without @property).
+         4. `animation` sweeps --sale-trail-angle from 0deg → 360deg, which is fed into the
+            `conic-gradient(from var(--sale-trail-angle), ...)`. The gradient itself rotates;
+            the pseudo-element's geometry stays perfectly still (no layout shift).
+       Fallback for browsers without @property: static gradient (no rotation); acceptable. */
+    @property --sale-trail-angle {
+      syntax: '<angle>';
+      initial-value: 0deg;
+      inherits: false;
+    }
+    .inline-compose-form .bubble.form-sale .bubble-card { isolation: isolate; }
+    .inline-compose-form .bubble.form-sale .bubble-card::before {
+      content: '';
+      position: absolute;
+      inset: -2px;                /* extends 2px beyond the bubble edge */
+      border-radius: 16px;        /* = bubble-card's 14px + 2px inset offset */
+      padding: 3px;               /* ring thickness — where the gradient shows */
+      background: conic-gradient(
+        from var(--sale-trail-angle),
+        #3ecf8e   0%,
+        #ffffff  25%,             /* peak of trail 1 (bright white) */
+        #3ecf8e  50%,
+        #ffffff  75%,             /* peak of trail 2 (opposite side) */
+        #3ecf8e 100%              /* closes the loop cleanly */
+      );
+      /* Reveal only the ring: two identical masks with `exclude` composite punch out the
+         content-box, leaving only the padding ring visible. */
+      -webkit-mask:
+        linear-gradient(#000, #000) content-box,
+        linear-gradient(#000, #000);
+      -webkit-mask-composite: xor;
+      mask:
+        linear-gradient(#000, #000) content-box,
+        linear-gradient(#000, #000);
+      mask-composite: exclude;
+      animation: sale-trail-rotate 3s linear infinite;
+      pointer-events: none;
+      z-index: 5;
+    }
+    @keyframes sale-trail-rotate {
+      to { --sale-trail-angle: 360deg; }
+    }
 
     /* Locked "📝Note:" prefix overlay — appears INSIDE the textarea visually (absolute positioned).
        The textarea has left padding to make room for the prefix, so user text starts after it.
@@ -696,12 +812,24 @@
     .id-readout[data-state="freeform"] { background: var(--id-freeform-bg); border-color: var(--id-freeform-border); color: var(--text); }
     .stock-readout { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--bg-elevated); color: var(--text-muted); min-height: 36px; display: flex; align-items: center; justify-content: flex-end; font-variant-numeric: tabular-nums; cursor: not-allowed; user-select: none; }
     .stock-readout[data-state="empty"] { color: var(--text-faint); }
-    .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; max-height: 240px; overflow-y: auto; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 6px; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 20; display: none; }
+    .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; max-height: 170px; overflow-y: auto; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 6px; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 20; display: none; }
     .autocomplete-list.visible { display: block; }
     .autocomplete-item { padding: 8px 10px; cursor: pointer; font-size: 14px; border-bottom: 1px solid var(--bg-elevated); }
     .autocomplete-item:last-child { border-bottom: none; }
     .autocomplete-item:hover, .autocomplete-item.focused { background: var(--bg-elevated); }
     .autocomplete-item .ac-id { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-muted); margin-right: 8px; }
+    /* Low-stock item (current_stock < 1): distinct red background + italic to warn the user
+       that the product is out of stock — but still selectable. Only appears in contexts that
+       don't filter zero-stock (stock-in form, sales history edit-mode existing rows). */
+    .autocomplete-item.ac-low-stock {
+      background: #ffebeb;
+      font-style: italic;
+    }
+    .autocomplete-item.ac-low-stock .ac-id { color: #7f1d1d; }
+    .autocomplete-item.ac-low-stock:hover,
+    .autocomplete-item.ac-low-stock.focused {
+      background: #ffd6d6;   /* slightly darker so hover/focus is still perceivable */
+    }
     .autocomplete-empty { padding: 8px 10px; font-size: 13px; color: var(--text-muted); font-style: italic; }
     .form-feedback { margin-top: 10px; font-size: 13px; min-height: 18px; display: flex; align-items: center; gap: 8px; }
     .form-feedback.success { color: var(--status-online); }
@@ -811,6 +939,82 @@
     .stock-overlay.visible { display: flex; }
     .overlay-card { background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px 18px; font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: default; }
     .overlay-card .mini-spinner { width: 14px; height: 14px; border: 2px solid var(--bg-elevated); border-top-color: var(--text-muted); border-radius: 50%; animation: spin 1s linear infinite; }
+
+    /* ============== Current Stock search bar ==============
+       Sticky search input at the top of the Current Stock workspace. Live-filters the table
+       rows as the user types. Icon + placeholder text act as a ghost overlay when the input
+       is empty; both vanish automatically once the user starts typing (via :placeholder-shown).
+       X button clears the input and restores all rows. */
+    .stock-search-bar {
+      position: sticky;
+      top: var(--header-h);          /* clip below the app header */
+      z-index: 4;                    /* above content, below drawer/modal */
+      background: var(--bg);
+      padding: 12px 20px 10px;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .stock-search-bar .search-input-wrapper {
+      position: relative;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .stock-search-bar input {
+      width: 100%;
+      padding: 10px 40px 10px 36px;  /* left room for the icon, right room for the X btn */
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .stock-search-bar input:focus { border-color: var(--accent); }
+    /* Placeholder is styled italic + muted to match the ghost look used in the bubbles. */
+    .stock-search-bar input::placeholder {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    /* Magnifying-glass icon sits inside the input, left-aligned. Always visible (design choice —
+       keeps the input's purpose obvious even while the user is typing). pointer-events:none so
+       the click passes through to the input. */
+    .stock-search-bar .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    /* X clear button on the right. Shown only when input has content. Reuses .remove-row-btn
+       styling from bubbles for consistency, with a small size bump for touch-friendliness. */
+    .stock-search-bar .search-clear-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      font-size: 14px;
+      display: none;                 /* hidden when input is empty */
+    }
+    .stock-search-bar input:not(:placeholder-shown) ~ .search-clear-btn { display: flex; }
+
+    /* Low-stock row highlight in Current Stock table — matches the dropdown suggestion style
+       for stock-out products (soft pink bg + italic). Applied via the .low-stock class added
+       in renderStock() when current_quantity < 1. */
+    .table-container tbody tr.low-stock { background: #ffebeb; font-style: italic; }
+    .table-container tbody tr.low-stock:hover { background: #ffd6d6; }
+    /* Search-match highlight: subtle light-green background on the substring the user typed.
+       Uses <mark> for semantics + a11y (screen readers announce it as a highlight). */
+    .table-container mark.search-hit {
+      background: #d4f5e0;
+      color: inherit;
+      padding: 0 1px;
+      border-radius: 2px;
+    }
+    /* ============== END Current Stock search bar ============== */
     .activity-section { padding: 20px; border-top: 1px solid var(--border); }
     .activity-section h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin: 0 0 16px 0; }
 
@@ -1466,7 +1670,7 @@
       border: 1px solid var(--border);
       border-radius: 6px;
       box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-      max-height: 320px;
+      max-height: 170px;
       overflow-y: auto;
       display: none;
     }
@@ -1494,9 +1698,19 @@
        New rows use .new-row-* class names (distinct from form's .col-form-*) so there's
        zero CSS contamination between contexts.
        ================================================================================= */
+    /* Edit mode override: `.bubble-card` normally uses `overflow: hidden` to keep row
+       backgrounds inside the rounded corners. That was clipping the autocomplete dropdown
+       whenever it extended past the bubble's bottom edge. Flip to visible + manually round
+       the corner cells so the visual stays right (same pattern as form-sale bubbles). */
+    .bubble.editing .bubble-card { overflow: visible; }
+    .bubble.editing .row-header .bubble-cell:first-child { border-top-left-radius: 14px; }
+    .bubble.editing .row-header .bubble-cell:last-child { border-top-right-radius: 14px; }
+    .bubble.editing .row-form-footer { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
+
     .bubble.editing .row-add-button-in-edit {
       grid-column: 1 / -1;
-      padding: 12px 16px;
+      /* Matches the form-bubble breathing room — ~2 rows of vertical padding around the button. */
+      padding: 71px 16px;
       display: flex;
       justify-content: center;
       background: #fafafa;
@@ -1642,7 +1856,7 @@
       border: 1px solid var(--border);
       border-radius: 6px;
       box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-      max-height: 320px;
+      max-height: 170px;
       overflow-y: auto;
       display: none;
     }
@@ -2042,52 +2256,28 @@
       </div>
     </header>
 
-    <!-- ============ Workspace: New Sale ============ -->
-    <div class="workspace" data-workspace="newsale">
-      <section class="activity-section">
-        <div class="bubble form-sale">
-          <div class="bubble-card">
-            <div class="bubble-row row-header">
-              <div class="bubble-cell"></div>
-              <div class="bubble-cell">ID</div>
-              <div class="bubble-cell">Product</div>
-              <div class="bubble-cell">Stock</div>
-              <div class="bubble-cell">Qty</div>
-            </div>
-            <div id="saleRowsContainer"></div>
-            <div class="row-add-button">
-              <button class="add-row-btn" id="addSaleRowBtn" type="button">
-                <span class="plus-sign">+</span> Add another product
-              </button>
-            </div>
-            <div class="row-feedback">
-              <div class="form-feedback" id="saleFeedback"></div>
-            </div>
-            <div class="row-form-footer">
-              <div class="footer-note-area" id="saleNoteArea">
-                <button class="note-icon-btn form-note-icon-btn" id="saleNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
-                <div class="note-expanded-state" id="saleNoteExpandedState" style="display: none;">
-                  <div class="note-x-cell">
-                    <button class="remove-row-btn note-remove-btn" id="saleNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
-                  </div>
-                  <div class="note-input-wrapper">
-                    <span class="note-edit-prefix">📝Note:</span>
-                    <textarea class="note-edit-input auto-grow" id="saleNoteInput" rows="1"></textarea>
-                  </div>
-                </div>
-              </div>
-              <div class="footer-buttons">
-                <button class="btn danger" id="cancelSaleBtn" type="button">Cancel</button>
-                <button class="btn" id="logSaleBtn" onclick="submitSale()">Log Sale</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
+    <!-- Workspace: New Sale — REMOVED. The form was moved into the Sales workspace as an
+         inline compose (see data-workspace="history" below). The internal name 'newsale' is
+         redirected to 'history' in switchWorkspace() for backward-compat with any stored
+         session preference. -->
 
     <!-- ============ Workspace: Current Stock ============ -->
     <div class="workspace" data-workspace="stock">
+      <!-- Sticky search bar. Sits below the app header via top: var(--header-h). Placeholder
+           text + magnifying-glass icon overlay disappear once the user starts typing (via
+           :placeholder-shown selector — no JS needed). X button clears the input. Filtering
+           happens live on input events; no dropdown, just direct row filtering of the table. -->
+      <div class="stock-search-bar">
+        <div class="search-input-wrapper">
+          <input type="text" id="stockSearchInput" placeholder="Search products" autocomplete="off" />
+          <!-- Magnifying-glass SVG (simple stroke, no fill) — inline SVG so we can style via currentColor -->
+          <svg class="search-icon" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="8.5" cy="8.5" r="5.5"/>
+            <line x1="12.5" y1="12.5" x2="17" y2="17" stroke-linecap="round"/>
+          </svg>
+          <button class="search-clear-btn remove-row-btn" id="stockSearchClearBtn" type="button" aria-label="Clear search" title="Clear search">×</button>
+        </div>
+      </div>
       <main class="table-container" id="mainContent">
         <div class="state-message" id="loadingState">Loading…</div>
         <div class="stock-overlay" id="stockOverlay">
@@ -2099,11 +2289,62 @@
       </main>
     </div>
 
-    <!-- ============ Workspace: Sales History ============ -->
+    <!-- ============ Workspace: Sales (was Sales History) ============ -->
+    <!-- Unified view: past sales feed + inline compose for a new sale. Clicking "+ New sale"
+         expands the form bubble; save or cancel collapses it back to the button. The form's
+         DOM (previously in data-workspace="newsale") was moved here so a single workspace
+         handles both viewing and creating sales. -->
     <div class="workspace" data-workspace="history">
       <section class="activity-section">
         <div class="activity-load-more" id="activityLoadMore"></div>
         <div class="activity-feed" id="activityFeed"></div>
+        <!-- Inline compose: default = just the + button; expands to New Sale form on click.
+             Positioned AT THE BOTTOM of the feed so it's visible when the workspace opens
+             (which auto-scrolls to bottom to show the latest bubbles). Matches the chat-app
+             convention of "compose new" being at the bottom below the message list. -->
+        <button class="inline-compose-btn" id="inlineComposePlus" type="button">
+          <span class="plus-sign">+</span> New sale
+        </button>
+        <div class="inline-compose-form" id="inlineComposeForm" hidden>
+          <div class="bubble form-sale">
+            <div class="bubble-card">
+              <div class="bubble-row row-header">
+                <div class="bubble-cell"></div>
+                <div class="bubble-cell">ID</div>
+                <div class="bubble-cell">Product</div>
+                <div class="bubble-cell">Stock</div>
+                <div class="bubble-cell">Qty</div>
+              </div>
+              <div id="saleRowsContainer"></div>
+              <div class="row-add-button">
+                <button class="add-row-btn" id="addSaleRowBtn" type="button">
+                  <span class="plus-sign">+</span> Add another product
+                </button>
+              </div>
+              <div class="row-feedback">
+                <div class="form-feedback" id="saleFeedback"></div>
+              </div>
+              <div class="row-form-footer">
+                <div class="footer-note-area" id="saleNoteArea">
+                  <button class="note-icon-btn form-note-icon-btn" id="saleNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
+                  <div class="note-expanded-state" id="saleNoteExpandedState" style="display: none;">
+                    <div class="note-x-cell">
+                      <button class="remove-row-btn note-remove-btn" id="saleNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
+                    </div>
+                    <div class="note-input-wrapper">
+                      <span class="note-edit-prefix">📝Note:</span>
+                      <textarea class="note-edit-input auto-grow" id="saleNoteInput" rows="1"></textarea>
+                    </div>
+                  </div>
+                </div>
+                <div class="footer-buttons">
+                  <button class="btn danger" id="cancelSaleBtn" type="button">Cancel</button>
+                  <button class="btn" id="logSaleBtn" onclick="submitSale()">Log Sale</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -2191,10 +2432,6 @@
         <button class="btn secondary small" onclick="window.closeDrawer()" aria-label="Close menu">✕</button>
       </div>
       <nav class="drawer-nav">
-        <button class="drawer-item" data-workspace="newsale" onclick="window.switchWorkspace('newsale')">
-          <span class="drawer-icon">🛒</span>
-          <span class="drawer-label">New Sale</span>
-        </button>
         <button class="drawer-item" data-workspace="addproducts" onclick="window.switchWorkspace('addproducts')">
           <span class="drawer-icon">📦</span>
           <span class="drawer-label">Add Products</span>
@@ -2204,8 +2441,8 @@
           <span class="drawer-label">Current Stock</span>
         </button>
         <button class="drawer-item" data-workspace="history" onclick="window.switchWorkspace('history')">
-          <span class="drawer-icon">🕒</span>
-          <span class="drawer-label">Sales History</span>
+          <span class="drawer-icon">🛒</span>
+          <span class="drawer-label">Sales</span>
         </button>
         <button class="drawer-item" data-workspace="calendar" onclick="window.switchWorkspace('calendar')">
           <span class="drawer-icon">📅</span>
@@ -2956,6 +3193,10 @@
         updateLastUpdatedDisplay()
         renderStock(stockRes.data)
         hideStockOverlay()
+        // Repaint every visible stock cell across all bubble types (Sales History edit mode,
+        // Calendar bubbles, New Sale form, Add Products form). Works even when a bubble is
+        // being edited — see refreshAllStockCells for why this is needed.
+        refreshAllStockCells()
         // If any product is currently selected on any sale-form row, refresh its stock readout
         // to reflect changes from other users (Realtime) or background polls.
         Object.values(saleRowAutocompletes).forEach(ac => {
@@ -2999,6 +3240,16 @@
         main.insertBefore(emptyMsg, overlay)
         return
       }
+      // Sort low-stock rows (qty < 1) to the BOTTOM. In-stock products come first, then
+       // zero/negative products. Sort is stable so within each group, original catalog order
+       // (however the DB returned them) is preserved. Matches the same low-stock-bottom
+       // treatment done in the autocomplete dropdown filter.
+      const sorted = [...rows].sort((a, b) => {
+        const aLow = Number(a.current_quantity) < 1
+        const bLow = Number(b.current_quantity) < 1
+        if (aLow !== bLow) return aLow ? 1 : -1
+        return 0
+      })
       const html = `
         <table>
           <thead><tr>
@@ -3008,17 +3259,20 @@
             <th class="numeric">In stock</th>
           </tr></thead>
           <tbody>
-            ${rows.map(r => {
+            ${sorted.map(r => {
               const qty = Number(r.current_quantity)
-              let cls = ''
-              if (qty < 0) cls = 'qty-negative'
-              else if (qty === 0) cls = 'qty-zero'
-              return `<tr>
+              let cellCls = ''
+              let rowCls = ''
+              // qty < 1 → stock-out or negative → row-level red bg + italic (matches the
+              // .ac-low-stock dropdown suggestion style, keeping the visual language consistent).
+              if (qty < 0) { cellCls = 'qty-negative'; rowCls = 'low-stock' }
+              else if (qty === 0) { cellCls = 'qty-zero'; rowCls = 'low-stock' }
+              return `<tr${rowCls ? ` class="${rowCls}"` : ''}>
                 <td class="id-cell">${escapeHtml(r.id)}</td>
                 <td>${escapeHtml(r.name)}</td>
                 <td class="numeric">${r.total_received}</td>
                 <td class="numeric">${r.total_sold}</td>
-                <td class="numeric ${cls}">${qty}</td>
+                <td class="numeric ${cellCls}">${qty}</td>
               </tr>`
             }).join('')}
           </tbody>
@@ -3029,6 +3283,84 @@
         wrapper.innerHTML = html
         main.insertBefore(wrapper.firstElementChild, overlay)
       }
+      // If there's an active search filter, reapply it to the newly-rendered rows so a
+      // background refresh (realtime/poll) doesn't visually reset the user's filter.
+      const searchInp = document.getElementById('stockSearchInput')
+      if (searchInp && searchInp.value.trim()) filterStockTable(searchInp.value.trim())
+    }
+
+    // ===== Current Stock: live search filter =====
+    // Filters visible tbody rows using multi-word substring matching against the combined
+    // ID + Name text. So the query "brand import" matches a row with ID "TEST-001" and name
+    // "Brand new import product" because BOTH "brand" and "import" are substrings of
+    // "TEST-001 Brand new import product". Each individual matched word is highlighted.
+    // Called on `input` events + after renderStock (to preserve filter through data refreshes).
+    function filterStockTable(query) {
+      const table = document.querySelector('.workspace[data-workspace="stock"] table')
+      if (!table) return
+      const q = (query || '').toLowerCase().trim()
+      const words = q.split(/\s+/).filter(Boolean)
+      table.querySelectorAll('tbody tr').forEach(row => {
+        const idCell = row.querySelector('.id-cell')
+        const nameCell = row.querySelectorAll('td')[1]
+        if (!idCell || !nameCell) return
+        // Cache original text on first pass so subsequent filters can restore + re-highlight
+        // cleanly without accumulating <mark> spans.
+        if (idCell.dataset.raw === undefined) idCell.dataset.raw = idCell.textContent
+        if (nameCell.dataset.raw === undefined) nameCell.dataset.raw = nameCell.textContent
+        const idRaw = idCell.dataset.raw
+        const nameRaw = nameCell.dataset.raw
+        if (!words.length) {
+          row.style.display = ''
+          idCell.textContent = idRaw
+          nameCell.textContent = nameRaw
+          return
+        }
+        const combined = (idRaw + ' ' + nameRaw).toLowerCase()
+        const matches = words.every(w => combined.includes(w))
+        row.style.display = matches ? '' : 'none'
+        if (matches) {
+          idCell.innerHTML = highlightMatch(idRaw, words)
+          nameCell.innerHTML = highlightMatch(nameRaw, words)
+        }
+      })
+    }
+    // Wraps every occurrence of any word in `words` (case-insensitive) inside `text` with a
+    // <mark class="search-hit"> tag. Preserves original casing. Escapes HTML to prevent XSS.
+    // Handles overlaps by preferring the LONGEST word first — so if the user types "im imp",
+    // the match "imp" in "import" wins over "im" and doesn't get highlighted twice.
+    function highlightMatch(text, words) {
+      if (!words || !words.length) return escapeHtml(text)
+      const sortedWords = [...words].filter(Boolean).sort((a, b) => b.length - a.length)
+      if (!sortedWords.length) return escapeHtml(text)
+      const lowerText = text.toLowerCase()
+      let out = ''
+      let i = 0
+      while (i < text.length) {
+        let matchLen = 0
+        for (const w of sortedWords) {
+          if (lowerText.startsWith(w, i)) { matchLen = w.length; break }
+        }
+        if (matchLen > 0) {
+          out += `<mark class="search-hit">${escapeHtml(text.slice(i, i + matchLen))}</mark>`
+          i += matchLen
+        } else {
+          out += escapeHtml(text[i])
+          i++
+        }
+      }
+      return out
+    }
+    // Wire handlers once on load. Elements exist in DOM by module execution time.
+    {
+      const searchInp = document.getElementById('stockSearchInput')
+      const clearBtn = document.getElementById('stockSearchClearBtn')
+      if (searchInp) searchInp.addEventListener('input', e => filterStockTable(e.target.value.trim()))
+      if (clearBtn && searchInp) clearBtn.addEventListener('click', () => {
+        searchInp.value = ''
+        filterStockTable('')
+        searchInp.focus()
+      })
     }
 
     async function reloadActivity() {
@@ -3361,7 +3693,7 @@
               <textarea id="bubbleExistingProduct-${item.row_id}" class="cell-edit-input cell-edit-name auto-grow" rows="1" autocomplete="off" placeholder="Type product name…" data-edit-name data-row-id="${item.row_id}">${escapeHtml(initialName)}</textarea>
               <div class="autocomplete-list" id="bubbleExistingAcList-${item.row_id}"></div>
             </div>
-            <div class="bubble-cell col-stock-edit" id="bubbleExistingStock-${item.row_id}"><span>${stockVal}</span></div>
+            <div class="bubble-cell col-stock-edit" id="bubbleExistingStock-${item.row_id}"${item.product_id ? ` data-stock-for="${escapeHtml(item.product_id)}"` : ''}><span>${stockVal}</span></div>
             <div class="bubble-cell col-qty"><input type="number" class="cell-edit-input" data-edit-qty data-row-id="${item.row_id}" ${isStockIn ? '' : 'min="0"'} step="1" value="${item.quantity}"></div>
           </div>`
       }
@@ -3661,7 +3993,10 @@
         `bubbleNewStock-${rowId}`,
         isStockIn
           ? { noMatchMessage: 'No match — type a new ID below to create this product' }
-          : { hideZeroStock: true, noMatchMessage: 'No match — will become a freeform sale' }
+          // Zero/negative stock products are visible but styled red+italic (see .ac-low-stock).
+          // Consistent across all bubble types; a future Settings toggle will make this
+          // user-configurable (hide-zero-stock vs show-with-flag).
+          : { hideZeroStock: false, noMatchMessage: 'No match — will become a freeform sale' }
       )
       bubbleNewRowAutocompletes[rowId] = { ac, isStockIn, groupId }
       // Wire the X button for THIS row (delegated handler in attachBubbleHandlers also catches it,
@@ -3673,6 +4008,9 @@
       // Focus the product input so the user can start typing immediately
       const productInput = document.getElementById(`bubbleNewProduct-${rowId}`)
       if (productInput) productInput.focus()
+      // Match the form-bubble behavior: scroll down by exactly one row's height so whatever
+      // was visible at the viewport bottom stays visible after the bubble grows.
+      scrollByAddedRowHeight(rowEl)
     }
     // Live qty-negative flag for stockin new rows (matches Add Products form behavior).
     document.addEventListener('input', (e) => {
@@ -4154,6 +4492,34 @@
       if (!row) return null
       return Number(row.current_quantity) || 0
     }
+    // Repaint every stock cell currently in the DOM from the freshest `lastGoodStock`.
+    // Any element carrying `data-stock-for="<product_id>"` gets its text updated to the
+    // current stock number for that product. Covers:
+    //   - Sales History bubbles in edit mode (existing rows: attribute set on initial render;
+    //     new rows: attribute set by the autocomplete's updateStockReadout when user picks
+    //     a product).
+    //   - Calendar workspace bubbles (share renderBubble with Sales History).
+    //   - New Sale form bubble stock cells (updateStockReadout).
+    //   - Add Products form bubble stock cells (updateStockReadout).
+    // Why this is important: reloadActivity is skipped while a bubble is in edit mode (so
+    // the user's typed input isn't wiped), which used to leave stock cells frozen on stale
+    // numbers even after other users' sales/stock-ins changed the actual stock. This helper
+    // sidesteps that guard — it's a pure display update that doesn't touch any edit state.
+    // Safe because every stock cell is READ-ONLY in every bubble type.
+    function refreshAllStockCells() {
+      if (!lastGoodStock) return
+      const stockByProductId = new Map()
+      for (const s of lastGoodStock) stockByProductId.set(s.id, Number(s.current_quantity) || 0)
+      document.querySelectorAll('[data-stock-for]').forEach(el => {
+        const pid = el.dataset.stockFor
+        if (!pid) return
+        const stock = stockByProductId.get(pid)
+        // Fallback to "—" if the product isn't in the stock view (edge case — shouldn't happen
+        // since current_stock is a view over all products, but handled defensively).
+        el.textContent = stock !== undefined ? String(stock) : '—'
+        el.setAttribute('data-state', stock !== undefined ? 'filled' : 'empty')
+      })
+    }
 
     // Helper used by createAutocomplete: sets the ID readout's visual state.
     // Supports THREE element kinds:
@@ -4211,24 +4577,49 @@
         const query = input.value.trim().toLowerCase()
         updateReadout(query)
         if (query.length === 0) { hide(); return }
+        // Multi-word match: split the query on whitespace and require EVERY word to appear as
+        // a substring somewhere in the combined "name + id" text (in any order). So typing
+        // "brand import" matches "Brand new import product" because both "brand" and "import"
+        // are present. Empty tokens (from stray spaces) are filtered out.
+        const words = query.split(/\s+/).filter(Boolean)
         const matches = productsCache.filter(p => {
-          const textMatch = p.name.toLowerCase().includes(query) || p.id.toLowerCase().includes(query)
+          const searchable = (p.name + ' ' + p.id).toLowerCase()
+          const textMatch = words.every(w => searchable.includes(w))
           if (!textMatch) return false
           if (hideZeroStock) {
             const stock = (typeof getCurrentStockById === 'function') ? getCurrentStockById(p.id) : null
             if (stock === null || stock < 1) return false
           }
           return true
-        }).slice(0, 20)
-        visibleItems = matches
+        })
+        // Sort low-stock products (qty < 1) to the bottom of the suggestions. In-stock rows
+        // stay at their original catalog order (Array.prototype.sort is stable in modern JS).
+        matches.sort((a, b) => {
+          const stockA = (typeof getCurrentStockById === 'function') ? getCurrentStockById(a.id) : null
+          const stockB = (typeof getCurrentStockById === 'function') ? getCurrentStockById(b.id) : null
+          const aLow = stockA !== null && stockA < 1
+          const bLow = stockB !== null && stockB < 1
+          if (aLow !== bLow) return aLow ? 1 : -1
+          return 0
+        })
+        const limited = matches.slice(0, 20)
+        visibleItems = limited
         focusedIndex = -1
-        if (matches.length === 0) {
+        if (limited.length === 0) {
           list.innerHTML = `<div class="autocomplete-empty">${noMatchMessage}</div>`
         } else {
-          list.innerHTML = matches.map((p, i) =>
-            `<div class="autocomplete-item" data-index="${i}">
+          list.innerHTML = limited.map((p, i) => {
+            // Tag items with stock < 1 (zero or negative) so they render distinctly — see the
+            // `.autocomplete-item.ac-low-stock` CSS. When hideZeroStock is true these are already
+            // filtered above, so this only fires in contexts that allow them (stock-in form +
+            // sales history edit-mode existing rows).
+            const stock = (typeof getCurrentStockById === 'function') ? getCurrentStockById(p.id) : null
+            const lowStock = stock !== null && stock < 1
+            const cls = 'autocomplete-item' + (lowStock ? ' ac-low-stock' : '')
+            return `<div class="${cls}" data-index="${i}">
               <span class="ac-id">${escapeHtml(p.id)}</span><span class="ac-name">${escapeHtml(p.name)}</span>
-            </div>`).join('')
+            </div>`
+          }).join('')
           list.querySelectorAll('.autocomplete-item').forEach(el => {
             el.addEventListener('click', () => select(visibleItems[parseInt(el.dataset.index)]))
           })
@@ -4265,9 +4656,14 @@
         if (qty === null) {
           stockReadout.textContent = '—'
           stockReadout.setAttribute('data-state', 'empty')
+          // No linked product → strip the auto-refresh tag so refreshAllStockCells ignores it.
+          stockReadout.removeAttribute('data-stock-for')
         } else {
           stockReadout.textContent = String(qty)
           stockReadout.setAttribute('data-state', 'filled')
+          // Tag the cell with the linked product_id so refreshAllStockCells can update it later
+          // when currentStock changes (via realtime or poll), even during edit mode.
+          stockReadout.setAttribute('data-stock-for', productId)
         }
       }
       function updateFocus() {
@@ -4347,7 +4743,9 @@
         `saleAcList-${rowId}`,
         `saleIdReadout-${rowId}`,
         `saleStockReadout-${rowId}`,
-        { hideZeroStock: true }
+        // Show zero/negative stock products with a red+italic visual flag rather than hiding them.
+        // A future Settings toggle will make this user-configurable across all bubble types.
+        { hideZeroStock: false }
       )
       saleRowAutocompletes[rowId] = ac
       // Wire up the remove button
@@ -4360,7 +4758,7 @@
       }
       // If the "+ Add another product" button got pushed below the viewport, scroll just
       // enough to bring it back into view — so the user can click + again without scrolling.
-      scrollAddButtonIntoView(row)
+      scrollByAddedRowHeight(row)
     }
 
     function removeSaleRow(rowId) {
@@ -4382,6 +4780,9 @@
       feedback.className = 'form-feedback'
       feedback.textContent = ''
       resetFormNoteArea('sale')
+      // Collapse the inline compose back to the "+ New sale" button. Applies on both cancel
+      // and post-save (called from setTimeout after the success message shows for 1.5s).
+      closeInlineCompose()
     }
 
     // Form-bubble note area helper functions ----------------------------------
@@ -4456,18 +4857,25 @@
 
     // After adding a new row to a form bubble, if the "+ Add another product" button got pushed
     // below the viewport, scroll just enough to bring it back into view. Smooth scroll, conditional.
-    function scrollAddButtonIntoView(rowEl) {
+    // Scroll the page down by exactly the height of the newly-added row. Called after inserting
+    // a new row via "+ Add another product" in any bubble type (New Sale form, Add Products
+    // form, Sales History edit mode, Add Products edit mode).
+    //
+    // Rationale: the bubble just grew by one row's worth of vertical space, pushing everything
+    // below the row (the "+ Add another product" button + footer) down by that amount. If the
+    // user was looking at the button/footer at the bottom of the viewport before, we want them
+    // to STILL be looking at those at the bottom after — so we scroll down by the same amount
+    // that the content grew. Net effect: whatever was visible at the viewport bottom stays
+    // visible, and the newly-added row appears above where the button used to be.
+    //
+    // Previous behavior scrolled only if the button was pushed below the viewport, which felt
+    // inconsistent (sometimes scrolled, sometimes didn't). This is uniform: 1 row = 1 row scroll.
+    function scrollByAddedRowHeight(rowEl) {
       if (!rowEl) return
-      const card = rowEl.closest('.bubble-card')
-      if (!card) return
-      const addBtn = card.querySelector('.add-row-btn')
-      if (!addBtn) return
-      // Defer to next frame so layout has settled after the row insert
       requestAnimationFrame(() => {
-        const rect = addBtn.getBoundingClientRect()
-        const overflow = rect.bottom - window.innerHeight
-        if (overflow > 0) {
-          window.scrollBy({ top: overflow + 16, behavior: 'smooth' })
+        const rowHeight = rowEl.offsetHeight
+        if (rowHeight > 0) {
+          window.scrollBy({ top: rowHeight, behavior: 'smooth' })
         }
       })
     }
@@ -4504,6 +4912,9 @@
 
     // Wire up Add and Cancel buttons (the buttons exist by now in DOM)
     document.getElementById('addSaleRowBtn').addEventListener('click', () => addSaleRow())
+    // "+ New sale" button — expands the inline compose form. Sits at the top of the Sales
+    // workspace when the form is collapsed.
+    document.getElementById('inlineComposePlus').addEventListener('click', openInlineCompose)
     document.getElementById('cancelSaleBtn').addEventListener('click', async () => {
       // Only ask for confirmation if any row has any data
       const allRows = document.querySelectorAll('#saleRowsContainer .sale-row')
@@ -4569,7 +4980,7 @@
       if (Object.keys(stockRowAutocompletes).length > 1) {
         document.getElementById(`stockProductInput-${rowId}`).focus()
       }
-      scrollAddButtonIntoView(row)
+      scrollByAddedRowHeight(row)
     }
 
     function removeStockRow(rowId) {
@@ -5647,21 +6058,23 @@ new events will not be in this file. Re-download periodically.
     // Workspace navigation (V2.1)
     // ============================================================
     const WORKSPACE_TITLES = {
-      newsale: 'New Sale',
       addproducts: 'Add Products',
       stock: 'Current Stock',
-      history: 'Sales History',
+      history: 'Sales',       // was 'Sales History' (V2.11: New Sale form now inline here)
       calendar: 'Calendar',
       tools: 'Tools',
     }
-    const DEFAULT_WORKSPACE = 'newsale'
+    const DEFAULT_WORKSPACE = 'history'
     const WORKSPACE_STORAGE_KEY = 'inv_last_workspace'
 
     let currentWorkspace = null
 
     function getStoredWorkspace() {
       try {
-        const v = localStorage.getItem(WORKSPACE_STORAGE_KEY)
+        let v = localStorage.getItem(WORKSPACE_STORAGE_KEY)
+        // V2.11 migration: 'newsale' was collapsed into 'history' with an inline compose.
+        // Anyone with a stored 'newsale' preference gets routed to the new Sales workspace.
+        if (v === 'newsale') v = 'history'
         if (v && WORKSPACE_TITLES[v]) return v
       } catch (e) { /* localStorage may be blocked */ }
       return DEFAULT_WORKSPACE
@@ -6263,7 +6676,41 @@ new events will not be in this file. Re-download periodically.
     // END CALENDAR WORKSPACE
     // =================================================================================
 
+    // Inline compose helpers — the New Sale form now lives inside the Sales workspace as a
+    // collapsible bubble. Default state: only the "+ New sale" button is visible. Click →
+    // expand form. Save/Cancel/resetSaleForm() → collapse back to the button.
+    function openInlineCompose() {
+      const form = document.getElementById('inlineComposeForm')
+      const btn = document.getElementById('inlineComposePlus')
+      if (form) form.removeAttribute('hidden')
+      if (btn) btn.setAttribute('hidden', '')
+      // Scroll the newly-revealed form into view. `block: 'end'` aligns the form's bottom
+      // with the viewport bottom, so both the input rows AND the Save/Cancel buttons stay
+      // visible without the user having to scroll further.
+      // Scroll the newly-revealed form into view. Using `scrollIntoView({block:'end'})` used
+      // to stop a few pixels short of the true page bottom because any margin/padding below
+      // the form wasn't included in the target. Instead, scroll to the actual document bottom
+      // so the entire form (including its bottom margin) sits flush with the viewport bottom.
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+      })
+    }
+    function closeInlineCompose() {
+      const form = document.getElementById('inlineComposeForm')
+      const btn = document.getElementById('inlineComposePlus')
+      if (form) form.setAttribute('hidden', '')
+      if (btn) btn.removeAttribute('hidden')
+    }
+
     window.switchWorkspace = function(name) {
+      // V2.11 legacy compat: the 'newsale' workspace was folded into 'history' with an inline
+      // compose. Any code path still calling switchWorkspace('newsale') opens Sales AND expands
+      // the compose form — so the effect matches the old workspace behavior.
+      let openComposeAfterSwitch = false
+      if (name === 'newsale') {
+        name = 'history'
+        openComposeAfterSwitch = true
+      }
       if (!WORKSPACE_TITLES[name]) {
         log('nav', `Unknown workspace: ${name}, falling back to default`)
         name = DEFAULT_WORKSPACE
@@ -6303,6 +6750,8 @@ new events will not be in this file. Re-download periodically.
         // Other workspaces: scroll to top of page
         requestAnimationFrame(() => { window.scrollTo({ top: 0 }) })
       }
+
+      if (openComposeAfterSwitch) openInlineCompose()
 
       storeWorkspace(name)
       closeDrawer()
