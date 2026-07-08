@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inventory — V2.3</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- xlsx-js-style: drop-in replacement for SheetJS with cell styling support (bold/centered
+       headers, colors, etc.). Same global (`XLSX`) so all existing import + export code keeps
+       working. Free/OSS fork of SheetJS community edition. -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
     :root {
@@ -614,6 +617,10 @@
       gap: 8px;
       flex-shrink: 0;
     }
+    /* Cancel + Add buttons get a shared min-width so short labels ("Add", "Добави") stay the
+       same visual width as the longer Cancel button. If a translated label is LONGER than
+       min-width, the button grows to fit — this is a min-cap, not a hard width. */
+    .bubble.form-sale .footer-buttons .btn { min-width: 80px; }
     /* Icon-only state — small left margin so 📝 doesn't sit flush against the bubble edge */
     .bubble.form-sale .footer-note-area .note-icon-btn {
       margin-left: 12px;
@@ -991,6 +998,62 @@
       .actions-menu { top: 48px; right: 10px; min-width: 220px; }
     }
     /* ============== END floating-form-modal + actions-menu ============== */
+
+    /* ============== Export Stock modal ============== */
+    .export-format-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin: 14px 0 8px;
+    }
+    .export-format-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+    .export-format-option:hover { background: var(--bg-elevated); }
+    .export-format-option:has(input:checked) { border-color: var(--accent); background: rgba(62, 207, 142, 0.06); }
+    .export-format-option input[type="radio"] { margin: 0; accent-color: var(--accent); }
+    .export-format-option .fmt-name { font-size: 14px; color: var(--text); }
+    .export-filename-hint { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; }
+    .export-filename-hint code { font-family: ui-monospace, monospace; background: var(--bg-elevated); padding: 1px 6px; border-radius: 3px; }
+    /* Sort dropdown row: label on the left, select on the right */
+    .export-option-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 10px 0 8px;
+    }
+    .export-option-label { font-size: 13px; color: var(--text); font-weight: 500; }
+    .export-select {
+      padding: 6px 26px 6px 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      background: var(--bg);
+      font-size: 13px;
+      color: var(--text);
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .export-select:focus { outline: none; border-color: var(--accent); }
+    /* Include-zero checkbox row */
+    .export-checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      padding: 6px 0;
+    }
+    .export-checkbox-row input[type="checkbox"] { accent-color: var(--accent); margin: 0; cursor: pointer; }
+    /* ============== END Export Stock modal ============== */
     .confirm-detail { background: var(--bg-elevated); border-radius: 6px; padding: 10px 12px; font-size: 13px; margin: 12px 0; font-family: ui-monospace, monospace; }
     .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
     .table-container { padding: 20px; overflow-x: auto; position: relative; }
@@ -2364,17 +2427,18 @@
         <button class="header-icon-btn" id="refreshBtn" onclick="manualRefresh()" aria-label="Refresh" title="Refresh">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
-        <!-- "+" menu button — Current Stock workspace only. Opens a small popover with actions
-             (Add product, Import from spreadsheet). Hidden by default; shown by switchWorkspace('stock'). -->
+        <!-- Actions menu button (3 dots) — Current Stock workspace only. Opens a small popover
+             with actions (Add product, Import from spreadsheet, Export stock). Hidden by
+             default; shown by switchWorkspace('stock'). Using a universal 3-dots icon rather
+             than a "+" since it now hosts non-additive actions like export too. -->
         <button class="header-icon-btn" id="actionsMenuBtn" onclick="window.toggleActionsMenu()" aria-label="Actions" title="Actions" hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
         </button>
       </div>
     </header>
 
-    <!-- Actions menu popover, opened by the header "+" button. Hidden by default; visible
-         via .visible. Menu items trigger their respective flows (open Add Products modal,
-         click the hidden importFile input). Click outside closes it (handled in JS). -->
+    <!-- Actions menu popover, opened by the header 3-dots button. Hidden by default; visible
+         via .visible. Menu items trigger their respective flows. Click outside closes it. -->
     <div class="actions-menu" id="actionsMenu">
       <button class="actions-menu-item" data-action="add-product" type="button">
         <span class="ico">📦</span>
@@ -2383,6 +2447,10 @@
       <button class="actions-menu-item" data-action="import-spreadsheet" type="button">
         <span class="ico">📥</span>
         <span class="lbl">Import from spreadsheet</span>
+      </button>
+      <button class="actions-menu-item" data-action="export-stock" type="button">
+        <span class="ico">📤</span>
+        <span class="lbl">Export stock</span>
       </button>
     </div>
 
@@ -2495,6 +2563,48 @@
          (not inside any removed workspace) so the import-JS still binds cleanly and the
          menu can trigger a click() on it. -->
     <input type="file" id="importFile" accept=".csv,.tsv,.xlsx,.xls,.ods" style="display:none">
+
+    <!-- ============ Export Stock modal ============
+         Opens from the actions menu ("Export stock"). Lets the user pick a format (CSV / XLSX
+         / ODS) then generates + downloads the file with headers styled bold+centered. Filename
+         includes today's date. Uses SheetJS (already loaded at the top of the page for import). -->
+    <div class="confirm-modal" id="exportStockModal">
+      <div class="confirm-card">
+        <h3>Export current stock</h3>
+        <p>Downloads a file with columns <strong>ID</strong>, <strong>Name</strong>, and <strong>Quantity</strong>.</p>
+        <div class="export-format-group">
+          <label class="export-format-option">
+            <input type="radio" name="exportFormat" value="xlsx" checked>
+            <span class="fmt-name">Excel (.xlsx)</span>
+          </label>
+          <label class="export-format-option">
+            <input type="radio" name="exportFormat" value="ods">
+            <span class="fmt-name">OpenDocument (.ods)</span>
+          </label>
+          <label class="export-format-option">
+            <input type="radio" name="exportFormat" value="csv">
+            <span class="fmt-name">CSV (.csv)</span>
+          </label>
+        </div>
+        <div class="export-option-row">
+          <label class="export-option-label" for="exportSortSelect">Sort by</label>
+          <select id="exportSortSelect" class="export-select">
+            <option value="name" selected>Name (A–Z)</option>
+            <option value="quantity">Quantity (high to low)</option>
+            <option value="id">ID</option>
+          </select>
+        </div>
+        <label class="export-checkbox-row">
+          <input type="checkbox" id="exportIncludeZero">
+          <span>Include products with 0 or less stock</span>
+        </label>
+        <p class="export-filename-hint">Filename: <code id="exportFilenamePreview">stock_YYYY-MM-DD.xlsx</code></p>
+        <div class="confirm-actions">
+          <button class="btn secondary" id="exportStockCancelBtn" type="button">Cancel</button>
+          <button class="btn" id="exportStockConfirmBtn" type="button">Export</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ============ Add Products modal (was: data-workspace="addproducts") ============
          Moved from a full-page workspace into a floating modal that opens from the header's
@@ -3099,7 +3209,7 @@
     // =====================================================================
 
     const DEBUG = true
-    const AUTO_REFRESH_INTERVAL_MS = 60000
+    const AUTO_REFRESH_INTERVAL_MS = 20000
     const OVERLAY_CLOSE_DELAY_MS = 20000
     const OVERLAY_UNCERTAIN_DELAY_MS = 30000
     const OFFLINE_OVERLAY_DELAY_MS = 8000
@@ -6914,9 +7024,194 @@ new events will not be in this file. Re-download periodically.
               const fileInput = document.getElementById('importFile')
               if (fileInput) fileInput.click()
             }
+            else if (action === 'export-stock') openExportStockModal()
           })
         })
       }
+    }
+
+    // ===== Export Stock modal =====
+    // Simple format picker (XLSX / ODS / CSV). Uses SheetJS (loaded globally at page top) to
+    // write the file with headers styled bold + centered. Header row: ID, Name, Quantity.
+    // Filename: stock_YYYY-MM-DD.<ext>.
+    function openExportStockModal() {
+      const modal = document.getElementById('exportStockModal')
+      if (!modal) return
+      modal.classList.add('visible')
+      updateExportFilenamePreview()
+    }
+    function closeExportStockModal() {
+      const modal = document.getElementById('exportStockModal')
+      if (modal) modal.classList.remove('visible')
+    }
+    function todayFilenameStamp() {
+      const d = new Date()
+      const yyyy = d.getFullYear()
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+      return `${yyyy}-${mm}-${dd}`
+    }
+    function getSelectedExportFormat() {
+      const chosen = document.querySelector('input[name="exportFormat"]:checked')
+      return chosen ? chosen.value : 'xlsx'
+    }
+    function updateExportFilenamePreview() {
+      const preview = document.getElementById('exportFilenamePreview')
+      if (!preview) return
+      preview.textContent = `stock_${todayFilenameStamp()}.${getSelectedExportFormat()}`
+    }
+    async function performStockExport() {
+      const fmt = getSelectedExportFormat()
+      const sortBy = document.getElementById('exportSortSelect')?.value || 'name'
+      const includeZero = document.getElementById('exportIncludeZero')?.checked === true
+      const filename = `stock_${todayFilenameStamp()}.${fmt}`
+      // Source data: use `lastGoodStock` (the current_stock view rows). Falls back to a fresh
+      // fetch if not populated yet (shouldn't normally happen — the user is on the stock
+      // workspace with data visible).
+      let rows = lastGoodStock
+      if (!rows || !rows.length) {
+        try {
+          const { data, error } = await supabase.from('current_stock').select('*')
+          if (error) throw error
+          rows = data
+        } catch (err) {
+          await showNotice(`Could not fetch stock: ${err.message || 'unknown error'}`, { title: 'Export failed', variant: 'danger' })
+          return
+        }
+      }
+      // Filter zero/negative stock unless the user opted to include them.
+      let filtered = rows
+      if (!includeZero) filtered = filtered.filter(r => Number(r.current_quantity) > 0)
+      // Sort per user's choice — matches the sort options in the modal.
+      const sorted = [...filtered].sort((a, b) => {
+        if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '')
+        if (sortBy === 'quantity') return (Number(b.current_quantity) || 0) - (Number(a.current_quantity) || 0)
+        return (a.id || '').localeCompare(b.id || '')
+      })
+      const header = ['ID', 'Name', 'Quantity']
+      const dataRows = sorted.map(r => [r.id, r.name, Number(r.current_quantity) || 0])
+      try {
+        // ODS gets its own hand-rolled XML path (below). SheetJS's ODS writer doesn't honor
+        // cell styling reliably — building the ODS ourselves guarantees bold/centered headers
+        // and the same Liberation Sans 10pt font used in the XLSX export.
+        if (fmt === 'ods') {
+          await exportStockAsOds(header, dataRows, filename)
+          closeExportStockModal()
+          return
+        }
+        // XLSX + CSV path via xlsx-js-style. Styling is applied via cell `.s` — supported for
+        // XLSX (bold/centered headers, Liberation Sans 10pt everywhere), ignored for CSV
+        // (format has no styling).
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows])
+        const baseFont = { name: 'Liberation Sans', sz: 10 }
+        const headerStyle = {
+          font: { ...baseFont, bold: true },
+          alignment: { horizontal: 'center', vertical: 'center' }
+        }
+        const dataStyle = { font: baseFont }
+        // Apply header style to A1/B1/C1, data style to every other cell in the sheet.
+        Object.keys(ws).forEach(addr => {
+          if (addr.startsWith('!')) return  // skip metadata (!ref, !cols, etc.)
+          if (addr === 'A1' || addr === 'B1' || addr === 'C1') ws[addr].s = headerStyle
+          else ws[addr].s = dataStyle
+        })
+        ws['!cols'] = [{ wch: 12 }, { wch: 48 }, { wch: 12 }]
+        XLSX.utils.book_append_sheet(wb, ws, 'Products')
+        XLSX.writeFile(wb, filename)
+        closeExportStockModal()
+      } catch (err) {
+        log('error', 'Export failed', err)
+        await showNotice(`Export failed: ${err.message || 'unknown error'}`, { title: 'Export failed', variant: 'danger' })
+      }
+    }
+
+    // Build an ODS file manually from scratch and trigger a download. ODS is a ZIP archive
+    // with three files: `mimetype` (must be uncompressed and first in the ZIP for the format
+    // to be recognized), `META-INF/manifest.xml`, and `content.xml`. We use JSZip (already
+    // loaded at the top of the page) to package them.
+    //
+    // Cell styles defined: HeaderCell (bold + centered + Liberation Sans 10pt) and DataCell
+    // (Liberation Sans 10pt). Column widths mirror the reference file the user uploaded
+    // (narrow / wide / narrow).
+    async function exportStockAsOds(headerCells, dataRows, filename) {
+      // Escape user-supplied strings for XML — avoids injection and handles special chars
+      // that would otherwise break the XML parser (LibreOffice would refuse to open the file).
+      const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]))
+      // Build a table-row for the header (uses HeaderCell style).
+      const headerRowXml = `<table:table-row>${
+        headerCells.map(h =>
+          `<table:table-cell table:style-name="HeaderCell" office:value-type="string" calcext:value-type="string"><text:p>${esc(h)}</text:p></table:table-cell>`
+        ).join('')
+      }</table:table-row>`
+      // Build data rows. First two columns are strings (ID + Name); third is float (Quantity).
+      const dataRowsXml = dataRows.map(row => {
+        const idXml = `<table:table-cell table:style-name="DataCell" office:value-type="string" calcext:value-type="string"><text:p>${esc(row[0])}</text:p></table:table-cell>`
+        const nameXml = `<table:table-cell table:style-name="DataCell" office:value-type="string" calcext:value-type="string"><text:p>${esc(row[1])}</text:p></table:table-cell>`
+        const qty = Number(row[2]) || 0
+        const qtyXml = `<table:table-cell table:style-name="DataCell" office:value-type="float" office:value="${qty}" calcext:value-type="float"><text:p>${qty}</text:p></table:table-cell>`
+        return `<table:table-row>${idXml}${nameXml}${qtyXml}</table:table-row>`
+      }).join('')
+      // content.xml — the actual spreadsheet content plus styles. Uses the same style names
+      // (HeaderCell / DataCell / col-narrow / col-wide) as defined in the automatic-styles block.
+      const contentXml = `<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0" office:version="1.3">
+<office:font-face-decls>
+<style:font-face style:name="Liberation Sans" svg:font-family="&apos;Liberation Sans&apos;" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"/>
+</office:font-face-decls>
+<office:automatic-styles>
+<style:style style:name="col-narrow" style:family="table-column"><style:table-column-properties style:column-width="0.889in"/></style:style>
+<style:style style:name="col-wide" style:family="table-column"><style:table-column-properties style:column-width="4.3307in"/></style:style>
+<style:style style:name="HeaderCell" style:family="table-cell"><style:paragraph-properties fo:text-align="center"/><style:text-properties fo:font-weight="bold" style:font-name="Liberation Sans" fo:font-size="10pt"/></style:style>
+<style:style style:name="DataCell" style:family="table-cell"><style:text-properties style:font-name="Liberation Sans" fo:font-size="10pt"/></style:style>
+</office:automatic-styles>
+<office:body><office:spreadsheet>
+<table:table table:name="Products">
+<table:table-column table:style-name="col-narrow"/>
+<table:table-column table:style-name="col-wide"/>
+<table:table-column table:style-name="col-narrow"/>
+${headerRowXml}${dataRowsXml}
+</table:table>
+</office:spreadsheet></office:body>
+</office:document-content>`
+      // manifest.xml — required by ODS; declares what files the archive contains.
+      const manifestXml = `<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3">
+<manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet" manifest:version="1.3"/>
+<manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+</manifest:manifest>`
+      const mimetype = 'application/vnd.oasis.opendocument.spreadsheet'
+      // Package into a ZIP. `mimetype` MUST be the first file, uncompressed — this is how
+      // ODS-aware software (LibreOffice, Excel, etc.) recognizes the format.
+      const zip = new JSZip()
+      zip.file('mimetype', mimetype, { compression: 'STORE' })
+      zip.file('META-INF/manifest.xml', manifestXml)
+      zip.file('content.xml', contentXml)
+      const blob = await zip.generateAsync({
+        type: 'blob',
+        mimeType: 'application/vnd.oasis.opendocument.spreadsheet',
+        compression: 'DEFLATE'
+      })
+      // Trigger download.
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
+    // Wire up export modal buttons + radio changes (runs at init since elements exist in DOM).
+    {
+      const cancelBtn = document.getElementById('exportStockCancelBtn')
+      const confirmBtn = document.getElementById('exportStockConfirmBtn')
+      if (cancelBtn) cancelBtn.addEventListener('click', closeExportStockModal)
+      if (confirmBtn) confirmBtn.addEventListener('click', performStockExport)
+      // Radio-change → update the filename preview so the user sees the extension update live.
+      document.querySelectorAll('input[name="exportFormat"]').forEach(radio => {
+        radio.addEventListener('change', updateExportFilenamePreview)
+      })
     }
 
     window.switchWorkspace = function(name) {
