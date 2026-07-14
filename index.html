@@ -907,6 +907,18 @@
     .settings-status { font-size: 13px; color: var(--text-muted); }
     .settings-status.success { color: var(--status-online); }
     .settings-status.error { color: var(--status-offline); }
+    /* Preferences row: a checkbox with a label + optional hint below. */
+    .settings-pref-row { margin: 12px 0; }
+    .settings-pref-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text);
+    }
+    .settings-pref-label input[type="checkbox"] { accent-color: var(--accent); margin: 0; cursor: pointer; }
+    .settings-pref-hint { margin: 6px 0 0 26px; font-size: 12px; color: var(--text-muted); line-height: 1.4; }
     @media (max-width: 700px) {
       .settings-modal { padding: 0; }
       .settings-card { max-height: 100vh; border-radius: 0; }
@@ -998,6 +1010,39 @@
       .actions-menu { top: 48px; right: 10px; min-width: 220px; }
     }
     /* ============== END floating-form-modal + actions-menu ============== */
+
+    /* ============== Edit Product modal ============== */
+    .edit-product-card {
+      background: var(--bg);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+    .edit-product-card h3 { margin: 0 0 6px; font-size: 16px; }
+    .edit-product-hint { font-size: 12px; color: var(--text-muted); margin: 0 0 14px; }
+    .edit-product-field { margin-bottom: 12px; }
+    .edit-product-field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .edit-product-field input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    .edit-product-field input:focus { outline: none; border-color: var(--accent); }
+    .edit-product-card .confirm-actions { margin-top: 16px; }
+    /* ============== END Edit Product modal ============== */
 
     /* ============== Export Stock modal ============== */
     .export-format-group {
@@ -1134,19 +1179,113 @@
     }
     .stock-search-bar input:not(:placeholder-shown) ~ .search-clear-btn { display: flex; }
 
-    /* Low-stock row highlight in Current Stock table — matches the dropdown suggestion style
-       for stock-out products (soft pink bg + italic). Applied via the .low-stock class added
-       in renderStock() when current_quantity < 1. */
-    .table-container tbody tr.low-stock { background: #ffebeb; font-style: italic; }
-    .table-container tbody tr.low-stock:hover { background: #ffd6d6; }
-    /* Search-match highlight: subtle light-green background on the substring the user typed.
-       Uses <mark> for semantics + a11y (screen readers announce it as a highlight). */
-    .table-container mark.search-hit {
+    /* ============== Current Stock — bubble-styled list ==============
+       Presents products as a single big gray bubble instead of a plain HTML table. Matches
+       the visual language of history bubbles (rounded card, grid rows, uppercase header,
+       gradient cell backgrounds). Neutral gray palette distinguishes it from event bubbles
+       (sale=green, stock-in=orange) — this is a REFERENCE view, not an event log. */
+    .bubble.stock-list-bubble {
+      max-width: 900px;
+      margin: 0 auto 32px;
+    }
+    .bubble.stock-list-bubble .bubble-card {
+      grid-template-columns: 90px minmax(160px, 1fr) 90px;
+      border-color: #9ca3af;
+      overflow: hidden;
+    }
+    .bubble.stock-list-bubble .row-header {
+      font-size: 11px;
+      font-weight: 600;
+      color: #4b5563;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    /* Header cells get a darker-to-lighter gray gradient, matching sale/stockin header pattern */
+    .bubble.stock-list-bubble .row-header .bubble-cell {
+      background: linear-gradient(to right, #d1d5db, #e5e7eb);
+      padding: 10px 14px;
+    }
+    .bubble.stock-list-bubble .row-header .col-stock { text-align: center; }
+    /* Body rows — one per product. */
+    .bubble.stock-list-bubble .row-body {
+      border-top: 0.5px solid #d1d5db;
+      cursor: default;
+    }
+    /* Body cells get a very-light-gray → white gradient, matching sale/stockin body pattern.
+       Applied per-cell so the gradient is uniform across each cell (rather than one gradient
+       stretching the whole row's width). */
+    .bubble.stock-list-bubble .row-body .bubble-cell {
+      background: linear-gradient(to right, #f3f4f6, #ffffff);
+      transition: background 0.1s ease;
+    }
+    /* Hover + menu-open: slightly darker cell gradient so the row visually "lights up".
+       menu-open persists the highlight while the right-click / long-press context menu is
+       shown, even after the mouse moves off the row (matches the bubble .menu-open pattern). */
+    .bubble.stock-list-bubble .row-body:hover .bubble-cell,
+    .bubble.stock-list-bubble .row-body.menu-open .bubble-cell {
+      background: linear-gradient(to right, #e5e7eb, #f9fafb);
+    }
+    /* Low-stock rows: soft pink gradient + italic. Matches .ac-low-stock in autocomplete dropdowns. */
+    .bubble.stock-list-bubble .row-body.low-stock .bubble-cell {
+      background: linear-gradient(to right, #fecaca, #ffebeb);
+      font-style: italic;
+    }
+    .bubble.stock-list-bubble .row-body.low-stock:hover .bubble-cell,
+    .bubble.stock-list-bubble .row-body.low-stock.menu-open .bubble-cell {
+      background: linear-gradient(to right, #fca5a5, #ffd6d6);
+    }
+    /* Cell styling within a row */
+    .bubble.stock-list-bubble .bubble-cell { padding: 10px 14px; word-break: break-word; overflow-wrap: break-word; }
+    .bubble.stock-list-bubble .col-id {
+      text-align: center;
+      padding-left: 4px;
+      padding-right: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .bubble.stock-list-bubble .col-id span {
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      letter-spacing: -0.1px;
+    }
+    .bubble.stock-list-bubble .col-name { font-size: 14px; color: var(--text); }
+    .bubble.stock-list-bubble .col-stock {
+      text-align: center;
+      font-weight: 500;
+      font-size: 14px;
+      color: var(--text);
+    }
+    /* Stock quantity emphasis: negative/zero rendered red+bold to catch the eye at a glance. */
+    .bubble.stock-list-bubble .col-stock.qty-negative,
+    .bubble.stock-list-bubble .col-stock.qty-zero { color: var(--danger); font-weight: 600; }
+    /* Empty state (no products in DB) */
+    .bubble.stock-list-bubble .stock-empty {
+      grid-column: 1 / -1;
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-style: italic;
+      font-size: 14px;
+      background: linear-gradient(to right, #f3f4f6, #ffffff);
+    }
+    @media (max-width: 600px) {
+      .bubble.stock-list-bubble .bubble-card { grid-template-columns: 60px minmax(120px, 1fr) 60px; }
+      .bubble.stock-list-bubble .row-header { font-size: 10px; letter-spacing: 0.3px; }
+      .bubble.stock-list-bubble .row-header .bubble-cell,
+      .bubble.stock-list-bubble .bubble-cell { padding: 8px 10px; }
+      .bubble.stock-list-bubble .col-id span { font-size: 9px; }
+    }
+    /* Search-match highlight in bubble rows (reuses the same style as before). */
+    .bubble.stock-list-bubble mark.search-hit {
       background: #d4f5e0;
       color: inherit;
       padding: 0 1px;
       border-radius: 2px;
     }
+    /* ============== END Current Stock bubble ============== */
     /* ============== END Current Stock search bar ============== */
     .activity-section { padding: 20px; border-top: 1px solid var(--border); }
     .activity-section h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin: 0 0 16px 0; }
@@ -2564,6 +2703,39 @@
          menu can trigger a click() on it. -->
     <input type="file" id="importFile" accept=".csv,.tsv,.xlsx,.xls,.ods" style="display:none">
 
+    <!-- ============ Edit Product modal ============
+         Opens from the Current Stock row context menu (right-click / long-press) → Edit.
+         Lets the user edit a single product's ID, Name, and Stock.
+         - ID change: UPDATE products SET id=? (may fail if FK constraints don't cascade)
+         - Name change: UPDATE products SET name=?
+         - Stock change: INSERT a stock_in adjustment row with quantity = (new - old)
+         Each change is attempted independently; any failure shows a notice and leaves the
+         modal open so the user can adjust and retry. -->
+    <div class="floating-form-modal" id="editProductModal">
+      <div class="floating-form-modal-card">
+        <div class="edit-product-card">
+          <h3>Edit product</h3>
+          <p class="edit-product-hint">Changes to <strong>Stock</strong> are applied as an adjustment entry (a new stock-in row with the delta), so sales history stays intact.</p>
+          <div class="edit-product-field">
+            <label for="editProductId">ID</label>
+            <input type="text" id="editProductId" autocomplete="off">
+          </div>
+          <div class="edit-product-field">
+            <label for="editProductName">Name</label>
+            <input type="text" id="editProductName" autocomplete="off">
+          </div>
+          <div class="edit-product-field">
+            <label for="editProductStock">Stock</label>
+            <input type="number" id="editProductStock" autocomplete="off">
+          </div>
+          <div class="confirm-actions">
+            <button class="btn secondary" id="editProductCancelBtn" type="button">Cancel</button>
+            <button class="btn" id="editProductSaveBtn" type="button">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ============ Export Stock modal ============
          Opens from the actions menu ("Export stock"). Lets the user pick a format (CSV / XLSX
          / ODS) then generates + downloads the file with headers styled bold+centered. Filename
@@ -2757,6 +2929,26 @@
           <button class="btn secondary small" id="settingsCloseBtn">✕ Close</button>
         </div>
         <div class="settings-body">
+          <section class="settings-category">
+            <h3 class="settings-category-title">⚙️ Preferences</h3>
+            <p class="settings-category-desc">
+              User preferences saved to this browser. They apply immediately and persist across sessions.
+            </p>
+            <div class="settings-pref-row">
+              <label class="settings-pref-label">
+                <input type="checkbox" id="prefHideZeroStock">
+                <span>Hide out-of-stock products from dropdown suggestions</span>
+              </label>
+              <p class="settings-pref-hint">When on, products with 0 or less stock won't appear when typing in the New Sale or Add Products forms. When off (default), they show at the bottom of the suggestions with a red-italic style.</p>
+            </div>
+            <div class="settings-pref-row">
+              <label class="settings-pref-label">
+                <input type="checkbox" id="prefShowDebug">
+                <span>Show debug console button</span>
+              </label>
+              <p class="settings-pref-hint">Enables the 🐛 button (bottom-left) that opens a live log of app activity (fetches, WebSocket events, clicks, errors). Useful for troubleshooting. Draggable — grab and move it wherever. Off by default.</p>
+            </div>
+          </section>
           <section class="settings-category">
             <h3 class="settings-category-title">💾 Backup</h3>
             <p class="settings-category-desc">
@@ -3058,10 +3250,76 @@
         toggleEl = document.createElement('button')
         toggleEl.id = 'debugToggle'
         toggleEl.type = 'button'
-        toggleEl.title = 'Toggle debug console (Ctrl+Shift+D)'
+        toggleEl.title = 'Toggle debug console (Ctrl+Shift+D). Drag to move.'
         toggleEl.textContent = '🐛'
         document.body.appendChild(toggleEl)
         toggleEl.addEventListener('click', toggle)
+
+        // Restore saved position (if user has dragged before). Position is stored as top/left
+        // (with `bottom` cleared) — overrides the CSS default of bottom-left corner.
+        if (saved.togX != null && saved.togY != null) {
+          toggleEl.style.left = `${saved.togX}px`
+          toggleEl.style.top = `${saved.togY}px`
+          toggleEl.style.bottom = 'auto'
+          toggleEl.style.right = 'auto'
+        }
+
+        // ----- draggable toggle button -----
+        // Users can grab the 🐛 button and move it anywhere on screen. Threshold of 5px avoids
+        // accidental drags on click. If moved, the click event is suppressed (so drag-to-move
+        // doesn't also open the panel).
+        {
+          let dragStart = null      // { x, y } — pointer position on pointerdown
+          let initialRect = null    // button's position at drag start
+          let hasMoved = false      // has the pointer traveled beyond the click threshold?
+          const DRAG_THRESHOLD = 5  // pixels — anything under this treated as a click, not a drag
+          toggleEl.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return   // primary button only
+            dragStart = { x: e.clientX, y: e.clientY }
+            initialRect = toggleEl.getBoundingClientRect()
+            hasMoved = false
+            toggleEl.setPointerCapture(e.pointerId)
+          })
+          toggleEl.addEventListener('pointermove', (e) => {
+            if (!dragStart) return
+            const dx = e.clientX - dragStart.x
+            const dy = e.clientY - dragStart.y
+            if (!hasMoved && Math.hypot(dx, dy) > DRAG_THRESHOLD) hasMoved = true
+            if (hasMoved) {
+              // Clamp within viewport bounds
+              const newLeft = Math.max(0, Math.min(window.innerWidth - toggleEl.offsetWidth, initialRect.left + dx))
+              const newTop = Math.max(0, Math.min(window.innerHeight - toggleEl.offsetHeight, initialRect.top + dy))
+              toggleEl.style.left = `${newLeft}px`
+              toggleEl.style.top = `${newTop}px`
+              toggleEl.style.bottom = 'auto'
+              toggleEl.style.right = 'auto'
+            }
+          })
+          toggleEl.addEventListener('pointerup', (e) => {
+            if (!dragStart) return
+            try { toggleEl.releasePointerCapture(e.pointerId) } catch (_) {}
+            if (hasMoved) {
+              // Was a drag → save position + suppress the pending click event so the panel
+              // doesn't open just because the user dragged the button.
+              saveState()
+              const swallowClick = (ev) => {
+                ev.stopPropagation()
+                ev.preventDefault()
+                toggleEl.removeEventListener('click', swallowClick, true)
+              }
+              toggleEl.addEventListener('click', swallowClick, { capture: true, once: true })
+            }
+            // hasMoved false → treat as click; the original click listener fires naturally.
+            dragStart = null
+            initialRect = null
+            hasMoved = false
+          })
+          toggleEl.addEventListener('pointercancel', () => {
+            dragStart = null
+            initialRect = null
+            hasMoved = false
+          })
+        }
 
         // Header buttons
         consoleEl.querySelectorAll('[data-dc-action]').forEach(btn => {
@@ -3095,6 +3353,18 @@
       function setOpen(open) {
         isOpen = open
         if (consoleEl) consoleEl.classList.toggle('open', open)
+        // One-at-a-time UX: while the panel is open, hide the 🐛 button. When the panel
+        // closes, restore the button (but only if the user preference still has it enabled —
+        // access `userPrefs` from the outer module scope; it's initialized by the time setOpen
+        // ever runs since setOpen only fires on user action after DOM is ready).
+        if (toggleEl) {
+          if (open) {
+            toggleEl.style.display = 'none'
+          } else {
+            const prefOn = (typeof userPrefs !== 'undefined') ? !!userPrefs.showDebugConsole : true
+            toggleEl.style.display = prefOn ? 'flex' : 'none'
+          }
+        }
         if (open) renderAll()
         saveState()
       }
@@ -3179,11 +3449,16 @@
       function saveState() {
         if (!consoleEl) return
         try {
+          // Read the toggle button's dragged position from inline styles (only present if
+          // user has actually moved it). Falls back to null → CSS default position on load.
+          const togX = (toggleEl && toggleEl.style.left) ? parseInt(toggleEl.style.left, 10) : null
+          const togY = (toggleEl && toggleEl.style.top) ? parseInt(toggleEl.style.top, 10) : null
           localStorage.setItem(LS_KEY, JSON.stringify({
             x: consoleEl.offsetLeft, y: consoleEl.offsetTop,
             w: consoleEl.offsetWidth, h: consoleEl.offsetHeight,
             open: isOpen,
             filter: filterEl ? filterEl.value : '',
+            togX, togY,
           }))
         } catch (e) {}
       }
@@ -3316,6 +3591,15 @@
     }
 
     window.doSignOut = async function() {
+      // Confirm first — signing out clears session + closes realtime; no undo. Uses the existing
+      // yes/no modal (matches the visual pattern of other confirmations in the app).
+      const ok = await confirmYesNo('Sign out of the app?', {
+        title: 'Sign out?',
+        okLabel: 'Sign out',
+        cancelLabel: 'Cancel',
+        okStyle: 'danger',
+      })
+      if (!ok) return
       log('auth', 'Sign out')
       // Clean up realtime
       if (realtimeChannel) {
@@ -3467,7 +3751,7 @@
       if (loadingState) loadingState.remove()
       // Remove any previously-inserted state-message (prevents duplicates on repeated empty renders)
       main.querySelectorAll('.state-message').forEach(el => el.remove())
-      const existing = main.querySelector('table')
+      const existing = main.querySelector('.bubble.stock-list-bubble')
       if (!rows || rows.length === 0) {
         if (existing) existing.remove()
         const emptyMsg = document.createElement('div')
@@ -3486,33 +3770,32 @@
         if (aLow !== bLow) return aLow ? 1 : -1
         return 0
       })
+      // Emit as a "gray bubble" list (matches the app's visual language). Each product becomes
+       // a body row inside one big bubble; a header row at top labels the columns.
       const html = `
-        <table>
-          <thead><tr>
-            <th>ID</th><th>Name</th>
-            <th class="numeric">Received</th>
-            <th class="numeric">Sold</th>
-            <th class="numeric">In stock</th>
-          </tr></thead>
-          <tbody>
-            ${sorted.map(r => {
-              const qty = Number(r.current_quantity)
-              let cellCls = ''
-              let rowCls = ''
-              // qty < 1 → stock-out or negative → row-level red bg + italic (matches the
-              // .ac-low-stock dropdown suggestion style, keeping the visual language consistent).
-              if (qty < 0) { cellCls = 'qty-negative'; rowCls = 'low-stock' }
-              else if (qty === 0) { cellCls = 'qty-zero'; rowCls = 'low-stock' }
-              return `<tr${rowCls ? ` class="${rowCls}"` : ''}>
-                <td class="id-cell">${escapeHtml(r.id)}</td>
-                <td>${escapeHtml(r.name)}</td>
-                <td class="numeric">${r.total_received}</td>
-                <td class="numeric">${r.total_sold}</td>
-                <td class="numeric ${cellCls}">${qty}</td>
-              </tr>`
-            }).join('')}
-          </tbody>
-        </table>`
+        <div class="bubble stock-list-bubble">
+          <div class="bubble-card">
+            <div class="bubble-row row-header">
+              <div class="bubble-cell col-id">ID</div>
+              <div class="bubble-cell col-name">Name</div>
+              <div class="bubble-cell col-stock">Stock</div>
+            </div>
+            ${sorted.length === 0
+              ? `<div class="stock-empty">No products yet.</div>`
+              : sorted.map(r => {
+                  const qty = Number(r.current_quantity)
+                  let cellCls = ''
+                  let rowCls = ''
+                  if (qty < 0) { cellCls = 'qty-negative'; rowCls = 'low-stock' }
+                  else if (qty === 0) { cellCls = 'qty-zero'; rowCls = 'low-stock' }
+                  return `<div class="bubble-row row-body${rowCls ? ' ' + rowCls : ''}" data-product-id="${escapeHtml(r.id)}" data-product-name="${escapeHtml(r.name)}" data-current-quantity="${qty}">
+                    <div class="bubble-cell col-id"><span>${escapeHtml(r.id)}</span></div>
+                    <div class="bubble-cell col-name">${escapeHtml(r.name)}</div>
+                    <div class="bubble-cell col-stock ${cellCls}">${qty}</div>
+                  </div>`
+                }).join('')}
+          </div>
+        </div>`
       if (existing) existing.outerHTML = html
       else {
         const wrapper = document.createElement('div')
@@ -3532,13 +3815,13 @@
     // "TEST-001 Brand new import product". Each individual matched word is highlighted.
     // Called on `input` events + after renderStock (to preserve filter through data refreshes).
     function filterStockTable(query) {
-      const table = document.querySelector('.workspace[data-workspace="stock"] table')
-      if (!table) return
+      const bubble = document.querySelector('.workspace[data-workspace="stock"] .bubble.stock-list-bubble')
+      if (!bubble) return
       const q = (query || '').toLowerCase().trim()
       const words = q.split(/\s+/).filter(Boolean)
-      table.querySelectorAll('tbody tr').forEach(row => {
-        const idCell = row.querySelector('.id-cell')
-        const nameCell = row.querySelectorAll('td')[1]
+      bubble.querySelectorAll('.row-body[data-product-id]').forEach(row => {
+        const idCell = row.querySelector('.col-id span')
+        const nameCell = row.querySelector('.col-name')
         if (!idCell || !nameCell) return
         // Cache original text on first pass so subsequent filters can restore + re-highlight
         // cleanly without accumulating <mark> spans.
@@ -3606,6 +3889,11 @@
         log('activity', 'reloadActivity skipped — edit in progress')
         return
       }
+      // Note: we DO refresh even when a bubble context menu is open. renderActivity() itself
+      // preserves the .menu-open highlight across re-renders, so user 1 still gets real-time
+      // updates from user 2 without losing the visual state of their open menu.
+      // If the bubble being highlighted was deleted by another user, the menu closes cleanly.
+
       // If user is on the Calendar workspace, refresh THAT feed instead of the Sales History
       // feed. (The user's edits/inserts may or may not fall within the calendar's selected
       // range — loadCalBubbles re-queries with the current selection and re-renders.)
@@ -3727,12 +4015,20 @@
     const QTY_SUFFIX = ''
 
     function renderActivity() {
+      // Remember the bubble that has the context menu open (if any) so we can re-apply the
+      // highlight + ants animation after re-render. Every caller of renderActivity benefits —
+      // auto-refresh, realtime handlers, initial load, and rerenderActivityFeed all get this
+      // preservation for free.
+      const openGroupId = openMenu?.bubbleEl?.dataset?.groupId
       const feedEl = document.getElementById('activityFeed')
       const loadMoreEl = document.getElementById('activityLoadMore')
       if (activityRows.length === 0) {
         feedEl.innerHTML = `<div class="state-message">No activity yet.</div>`
         loadMoreEl.className = 'activity-load-more'
         loadMoreEl.innerHTML = ''
+        // If the bubble that had the menu open is gone from the feed entirely, close the
+        // menu — otherwise it would float above blank content pointing at nothing.
+        if (openGroupId && typeof closeBubbleMenu === 'function') closeBubbleMenu()
         return
       }
       // Reverse to oldest-first for display (latest at bottom)
@@ -3765,6 +4061,18 @@
         loadMoreEl.innerHTML = `<button class="btn secondary small" onclick="window.loadMoreActivityClick()">Load older</button>`
       } else {
         loadMoreEl.innerHTML = `<span style="color: var(--text-faint);">— Beginning of history —</span>`
+      }
+      // Re-apply the menu-open highlight to the new bubble element (if the bubble that had
+      // the menu is still in the fresh data). If the bubble was deleted by another user,
+      // close the menu — otherwise it'd float pointing at nothing.
+      if (openGroupId) {
+        const newBubble = feedEl.querySelector(`.bubble[data-group-id="${CSS.escape(openGroupId)}"]`)
+        if (newBubble) {
+          newBubble.classList.add('menu-open', 'selected')
+          openMenu.bubbleEl = newBubble
+        } else if (typeof closeBubbleMenu === 'function') {
+          closeBubbleMenu()
+        }
       }
     }
 
@@ -4446,7 +4754,10 @@
           const change = productChangesByRow[rowId]
           if (change) {
             update.product_id = change.productId
-            if (!isStockIn) update.freeform_name = change.freeformName
+            // Both sales AND stock_in have freeform_name — mirror the value onto whichever
+            // table this row lives in. Enables editing existing rows that became freeform
+            // via product deletion.
+            update.freeform_name = change.freeformName
           }
           const { error } = await supabase.from(rowTable).update(update).eq('id', rowId)
           if (error) throw error
@@ -4828,7 +5139,11 @@
           const searchable = (p.name + ' ' + p.id).toLowerCase()
           const textMatch = words.every(w => searchable.includes(w))
           if (!textMatch) return false
-          if (hideZeroStock) {
+          // Hide zero-stock either if this specific call requested it (per-call), OR if the
+          // user's preference is set to hide (global). The pref applies across all 4 dropdown
+          // sites uniformly; per-call remains as an escape hatch if a specific site ever needs
+          // to override.
+          if (hideZeroStock || userPrefs.hideZeroStock) {
             const stock = (typeof getCurrentStockById === 'function') ? getCurrentStockById(p.id) : null
             if (stock === null || stock < 1) return false
           }
@@ -6103,10 +6418,70 @@
       const status = document.getElementById('backupStatus')
       status.textContent = ''
       status.className = 'settings-status'
+      // Sync preferences UI to current values (so if pref changed elsewhere, checkbox is right)
+      document.getElementById('prefHideZeroStock').checked = !!userPrefs.hideZeroStock
     }
     document.getElementById('settingsCloseBtn').addEventListener('click', () => {
       document.getElementById('settingsModal').classList.remove('visible')
     })
+
+    // ===== User preferences =====
+    // Persisted to localStorage per browser. Applied immediately on change (no page reload).
+    // Only preference so far: hideZeroStock — flips whether stock-out products show in the
+    // 4 autocomplete dropdowns. When false (default), they show at the bottom in red-italic;
+    // when true, they're filtered out entirely.
+    const USER_PREFS_KEY = 'inv_user_prefs_v1'
+    let userPrefs = {
+      hideZeroStock: false,
+      showDebugConsole: false,   // 🐛 button + debug window hidden by default (opt-in)
+    }
+    try {
+      const stored = localStorage.getItem(USER_PREFS_KEY)
+      if (stored) Object.assign(userPrefs, JSON.parse(stored))
+    } catch (_) { /* localStorage may be blocked */ }
+    function saveUserPrefs() {
+      try { localStorage.setItem(USER_PREFS_KEY, JSON.stringify(userPrefs)) } catch (_) {}
+    }
+    // Apply the debug-visibility preference: show/hide the 🐛 button + close the debug window
+    // if the pref is off. Called on page load and whenever the pref changes in Settings.
+    function applyDebugVisibility() {
+      const btn = document.getElementById('debugToggle')
+      const panel = document.getElementById('debugConsole')
+      if (!btn) return   // debug console IIFE hasn't finished initializing yet
+      if (!userPrefs.showDebugConsole) {
+        btn.style.display = 'none'
+        if (panel) panel.classList.remove('open')
+      } else {
+        // Enabled: show button ONLY when panel isn't currently open (one-at-a-time UX)
+        const panelOpen = panel && panel.classList.contains('open')
+        btn.style.display = panelOpen ? 'none' : 'flex'
+      }
+    }
+    // Apply visibility on load. Debug console IIFE builds its UI on DOMContentLoaded, so we
+    // defer this to the next tick to give it a chance to create the button element first.
+    requestAnimationFrame(applyDebugVisibility)
+    // Wire the hide-zero-stock checkbox
+    {
+      const cb = document.getElementById('prefHideZeroStock')
+      if (cb) {
+        cb.checked = !!userPrefs.hideZeroStock
+        cb.addEventListener('change', () => {
+          userPrefs.hideZeroStock = cb.checked
+          saveUserPrefs()
+          log('prefs', `hideZeroStock=${cb.checked}`)
+        })
+      }
+      const cbDbg = document.getElementById('prefShowDebug')
+      if (cbDbg) {
+        cbDbg.checked = !!userPrefs.showDebugConsole
+        cbDbg.addEventListener('change', () => {
+          userPrefs.showDebugConsole = cbDbg.checked
+          saveUserPrefs()
+          applyDebugVisibility()
+          log('prefs', `showDebugConsole=${cbDbg.checked}`)
+        })
+      }
+    }
 
     document.getElementById('downloadBackupBtn').addEventListener('click', async () => {
       if (!isOnline) {
@@ -6812,6 +7187,9 @@ new events will not be in this file. Re-download periodically.
     // Re-render the calendar feed from current calendarState.bubbleRows (no DB fetch). Used
     // when toggling edit mode on/off — same data, different HTML.
     function renderCalFeed() {
+      // Remember the bubble that has the context menu open (if any) so we can re-apply the
+      // highlight + ants animation after re-render. Matches the same treatment in renderActivity.
+      const openGroupId = openMenu?.bubbleEl?.dataset?.groupId
       const infoEl = document.getElementById('calFeedInfo')
       const feedEl = document.getElementById('calFeed')
       if (!infoEl || !feedEl) return
@@ -6862,6 +7240,17 @@ new events will not be in this file. Re-download periodically.
       attachBubbleHandlers(feedEl)
       infoEl.className = 'cal-feed-info'
       infoEl.textContent = ''
+      // Re-apply the menu-open highlight to the fresh bubble element (matches renderActivity).
+      // If the bubble was deleted by another user, close the menu.
+      if (openGroupId) {
+        const newBubble = feedEl.querySelector(`.bubble[data-group-id="${CSS.escape(openGroupId)}"]`)
+        if (newBubble) {
+          newBubble.classList.add('menu-open', 'selected')
+          openMenu.bubbleEl = newBubble
+        } else if (typeof closeBubbleMenu === 'function') {
+          closeBubbleMenu()
+        }
+      }
     }
     // Query the activity feed for the current APPLIED selection and re-render the bubbles below.
     // Preserves scroll position so realtime auto-updates don't snap user back to the top.
@@ -6922,10 +7311,21 @@ new events will not be in this file. Re-download periodically.
     // Dispatcher: re-render whichever activity feed is currently visible. Used by edit/cancel
     // flows so the right feed gets refreshed without re-fetching when toggling edit mode.
     function rerenderActivityFeed() {
+      // Remember which bubble had the context menu open (if any) so we can re-apply the
+      // highlight + ants animation after re-render. Without this, the auto-refresh (every 20s)
+      // strips the visual state even while the menu is still visibly floating above the feed.
+      const openGroupId = openMenu?.bubbleEl?.dataset?.groupId
       if (currentWorkspace === 'calendar') {
         renderCalFeed()
       } else {
         renderActivity()
+      }
+      if (openGroupId) {
+        const newBubble = document.querySelector(`.bubble[data-group-id="${CSS.escape(openGroupId)}"]`)
+        if (newBubble) {
+          newBubble.classList.add('menu-open', 'selected')
+          openMenu.bubbleEl = newBubble  // re-point to the fresh DOM node
+        }
       }
     }
     // Expose for any external callers (mainly debugging)
@@ -7212,6 +7612,235 @@ ${headerRowXml}${dataRowsXml}
       document.querySelectorAll('input[name="exportFormat"]').forEach(radio => {
         radio.addEventListener('change', updateExportFilenamePreview)
       })
+    }
+
+    // ===== Current Stock row context menu (Edit / Delete) =====
+    // Right-click or long-press a product row in the Current Stock list to open a small
+    // popover with Edit + Delete options. Same visual language as the bubble-menu (reuses
+    // the .bubble-menu CSS class). Product identity is read from data-* attributes stamped
+    // onto the .row-body element in renderStock().
+    //
+    // The row that triggered the menu gets a `.menu-open` class so its highlight persists
+    // while the menu is shown, even if the mouse hovers away. Matches the same pattern used
+    // on activity bubbles.
+    let openStockRowMenu = null  // { menuEl, rowEl } | null
+    function closeStockRowMenu() {
+      if (openStockRowMenu) {
+        openStockRowMenu.menuEl.parentElement?.removeChild(openStockRowMenu.menuEl)
+        if (openStockRowMenu.rowEl) openStockRowMenu.rowEl.classList.remove('menu-open')
+        openStockRowMenu = null
+      }
+    }
+    function openStockRowMenuAt(product, rowEl, anchor) {
+      closeStockRowMenu()
+      const menu = document.createElement('div')
+      menu.className = 'bubble-menu visible'
+      menu.innerHTML = `
+        <div class="bubble-menu-item" data-action="edit"><i style="font-style:normal;">✏️</i> Edit</div>
+        <div class="bubble-menu-item danger" data-action="delete"><i style="font-style:normal;">🗑️</i> Delete</div>
+      `
+      const top = Math.min(anchor.y + 4, window.innerHeight - 100)
+      const left = Math.min(anchor.x, window.innerWidth - 160)
+      menu.style.position = 'fixed'
+      menu.style.top = `${top}px`
+      menu.style.left = `${left}px`
+      document.body.appendChild(menu)
+      if (rowEl) rowEl.classList.add('menu-open')
+      openStockRowMenu = { menuEl: menu, rowEl }
+      menu.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
+        e.stopPropagation()
+        closeStockRowMenu()
+        openEditProductModal(product)
+      })
+      menu.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+        e.stopPropagation()
+        closeStockRowMenu()
+        confirmDeleteProduct(product)
+      })
+    }
+    // Outside-click + Escape closers.
+    document.addEventListener('click', (e) => {
+      if (openStockRowMenu && !e.target.closest('.bubble-menu')) closeStockRowMenu()
+    })
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && openStockRowMenu) closeStockRowMenu()
+    })
+
+    // Event delegation on the stock workspace: right-click / long-press a row to open the
+    // context menu. Delegation means we don't need to re-bind after each renderStock — the
+    // workspace container is permanent in the DOM.
+    {
+      const stockWorkspace = document.querySelector('.workspace[data-workspace="stock"]')
+      if (stockWorkspace) {
+        stockWorkspace.addEventListener('contextmenu', (e) => {
+          const row = e.target.closest('.bubble-row.row-body[data-product-id]')
+          if (!row) return
+          e.preventDefault()
+          openStockRowMenuAt({
+            id: row.dataset.productId,
+            name: row.dataset.productName || '',
+            currentStock: Number(row.dataset.currentQuantity) || 0,
+          }, row, { x: e.clientX, y: e.clientY })
+        })
+        let touchTimer = null
+        stockWorkspace.addEventListener('touchstart', (e) => {
+          const row = e.target.closest('.bubble-row.row-body[data-product-id]')
+          if (!row) return
+          clearTimeout(touchTimer)
+          const touch = e.touches[0]
+          const x = touch.clientX, y = touch.clientY
+          touchTimer = setTimeout(() => {
+            if (navigator.vibrate) try { navigator.vibrate(15) } catch (_) {}
+            openStockRowMenuAt({
+              id: row.dataset.productId,
+              name: row.dataset.productName || '',
+              currentStock: Number(row.dataset.currentQuantity) || 0,
+            }, row, { x, y })
+          }, LONG_PRESS_MS)
+        }, { passive: true })
+        stockWorkspace.addEventListener('touchend', () => clearTimeout(touchTimer), { passive: true })
+        stockWorkspace.addEventListener('touchmove', () => clearTimeout(touchTimer), { passive: true })
+        stockWorkspace.addEventListener('touchcancel', () => clearTimeout(touchTimer), { passive: true })
+      }
+    }
+
+    // ===== Edit Product modal =====
+    // Opened from the row context menu. Prefills ID/Name/Stock with the current values;
+    // Save writes any changed field back to the DB. Cancel closes without saving.
+    let editingProduct = null
+    function openEditProductModal(product) {
+      editingProduct = product
+      document.getElementById('editProductId').value = product.id || ''
+      document.getElementById('editProductName').value = product.name || ''
+      document.getElementById('editProductStock').value = product.currentStock ?? 0
+      const modal = document.getElementById('editProductModal')
+      if (modal) modal.classList.add('visible')
+    }
+    function closeEditProductModal() {
+      editingProduct = null
+      const modal = document.getElementById('editProductModal')
+      if (modal) modal.classList.remove('visible')
+    }
+    async function saveEditedProduct() {
+      if (!editingProduct) return
+      const newId = document.getElementById('editProductId').value.trim()
+      const newName = document.getElementById('editProductName').value.trim()
+      const newStockRaw = document.getElementById('editProductStock').value.trim()
+      const newStock = Number(newStockRaw)
+      if (!newId) { await showNotice('ID cannot be empty.', { title: 'Invalid input' }); return }
+      if (!newName) { await showNotice('Name cannot be empty.', { title: 'Invalid input' }); return }
+      if (newStockRaw === '' || Number.isNaN(newStock)) { await showNotice('Stock must be a number.', { title: 'Invalid input' }); return }
+      const oldId = editingProduct.id
+      const oldName = editingProduct.name
+      const oldStock = Number(editingProduct.currentStock) || 0
+      const idChanged = newId !== oldId
+      const nameChanged = newName !== oldName
+      const stockDelta = newStock - oldStock
+      const stockChanged = stockDelta !== 0
+      if (!idChanged && !nameChanged && !stockChanged) {
+        closeEditProductModal()
+        return
+      }
+      try {
+        // ID + Name: single UPDATE on the products table. If ID changed, the products.id
+        // primary key is updated — this cascades to FK references only if the schema was
+        // set up with ON UPDATE CASCADE. Otherwise it errors out here (caught below).
+        if (idChanged || nameChanged) {
+          const updates = {}
+          if (idChanged) updates.id = newId
+          if (nameChanged) updates.name = newName
+          const { error } = await supabase.from('products').update(updates).eq('id', oldId)
+          if (error) throw error
+        }
+        // Stock change: insert a stock_in adjustment row with the delta. Preserves history —
+        // no silent overwrite of the derived current_stock view.
+        if (stockChanged) {
+          // Use the possibly-new ID for the FK (in case both were changed in the same save)
+          const targetProductId = idChanged ? newId : oldId
+          const { error: stockErr } = await supabase.from('stock_in').insert({
+            product_id: targetProductId,
+            quantity: stockDelta,
+            source: 'Manual adjustment',
+            notes: `Set stock from ${oldStock} to ${newStock} via edit`,
+            received_at: new Date().toISOString(),
+            received_by: currentUser?.id || null,
+            received_by_display: currentUser?.user_metadata?.display_name || currentUser?.email || null,
+            client_uuid: crypto.randomUUID(),
+          })
+          if (stockErr) throw stockErr
+        }
+        closeEditProductModal()
+        // Refresh to reflect changes
+        await loadAll(false)
+      } catch (err) {
+        log('error', 'Save edited product failed', err)
+        await showNotice(`Save failed: ${err.message || 'unknown error'}`, { title: 'Save failed', variant: 'danger' })
+        // Keep modal open so user can adjust
+      }
+    }
+    // Wire up modal buttons (elements exist in DOM at module init).
+    {
+      const cancelBtn = document.getElementById('editProductCancelBtn')
+      const saveBtn = document.getElementById('editProductSaveBtn')
+      if (cancelBtn) cancelBtn.addEventListener('click', closeEditProductModal)
+      if (saveBtn) saveBtn.addEventListener('click', saveEditedProduct)
+    }
+
+    // ===== Delete Product flow =====
+    // Uses the `delete_product_and_freeform` Supabase RPC to atomically convert all sales/
+    // stock_in references to freeform, then delete the product row. The confirmation modal
+    // shows the user exactly how many entries will be affected before they commit.
+    async function confirmDeleteProduct(product) {
+      // Query counts first so we can show the user what they're about to affect.
+      let salesCount = 0
+      let stockInCount = 0
+      try {
+        const [salesRes, stockInRes] = await Promise.all([
+          supabase.from('sales').select('id', { count: 'exact', head: true }).eq('product_id', product.id),
+          supabase.from('stock_in').select('id', { count: 'exact', head: true }).eq('product_id', product.id),
+        ])
+        if (salesRes.error) throw salesRes.error
+        if (stockInRes.error) throw stockInRes.error
+        salesCount = salesRes.count || 0
+        stockInCount = stockInRes.count || 0
+      } catch (err) {
+        log('error', 'Ref count query failed', err)
+        await showNotice(`Could not check references: ${err.message || 'unknown error'}`, { title: 'Delete failed', variant: 'danger' })
+        return
+      }
+      // Build a friendly message that names what's happening in plain language.
+      let refLine = ''
+      if (salesCount === 0 && stockInCount === 0) {
+        refLine = 'No sales or stock-in entries reference this product.'
+      } else {
+        const parts = []
+        if (salesCount) parts.push(`${salesCount} sale${salesCount === 1 ? '' : 's'}`)
+        if (stockInCount) parts.push(`${stockInCount} stock-in ${stockInCount === 1 ? 'entry' : 'entries'}`)
+        refLine = `This product is referenced by ${parts.join(' and ')}. These will be preserved but marked as freeform (unlinked) so history stays intact.`
+      }
+      const msg = `Permanently delete "${product.name}" (${product.id})?\n\n${refLine}\n\nThe product itself will be removed from the catalog.`
+      const ok = await confirmYesNo(msg, {
+        title: 'Delete product?',
+        okLabel: 'Delete',
+        cancelLabel: 'Cancel',
+        okStyle: 'danger',
+      })
+      if (!ok) return
+      // Show a loading overlay while the RPC runs — with 3k+ references the transaction
+      // takes noticeable time (though still typically well under a second).
+      showStockOverlay('Deleting…')
+      try {
+        const { error } = await supabase.rpc('delete_product_and_freeform', { product_id_arg: product.id })
+        if (error) throw error
+        await loadAll(false)
+      } catch (err) {
+        log('error', 'Delete product failed', err)
+        hideStockOverlay()
+        await showNotice(
+          `Could not delete "${product.name}":\n\n${err.message || 'unknown error'}`,
+          { title: 'Delete failed', variant: 'danger' }
+        )
+      }
     }
 
     window.switchWorkspace = function(name) {
