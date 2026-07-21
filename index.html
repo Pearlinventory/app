@@ -2563,14 +2563,14 @@
         <span class="last-updated" id="lastUpdated"></span>
         <!-- Refresh button — shown in most workspaces (Sales, Calendar). Hidden in Current
              Stock where the "+" menu takes its place. Toggling handled in switchWorkspace(). -->
-        <button class="header-icon-btn" id="refreshBtn" onclick="manualRefresh()" aria-label="Refresh" title="Refresh">
+        <button class="header-icon-btn" id="refreshBtn" onclick="manualRefresh()" data-i18n-aria-label="actions.refresh" data-i18n-title="actions.refresh" aria-label="Refresh" title="Refresh">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
         <!-- Actions menu button (3 dots) — Current Stock workspace only. Opens a small popover
              with actions (Add product, Import from spreadsheet, Export stock). Hidden by
              default; shown by switchWorkspace('stock'). Using a universal 3-dots icon rather
              than a "+" since it now hosts non-additive actions like export too. -->
-        <button class="header-icon-btn" id="actionsMenuBtn" onclick="window.toggleActionsMenu()" aria-label="Actions" title="Actions" hidden>
+        <button class="header-icon-btn" id="actionsMenuBtn" onclick="window.toggleActionsMenu()" data-i18n-aria-label="actions.actions" data-i18n-title="actions.actions" aria-label="Actions" title="Actions" hidden>
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
         </button>
       </div>
@@ -2606,7 +2606,7 @@
            happens live on input events; no dropdown, just direct row filtering of the table. -->
       <div class="stock-search-bar">
         <div class="search-input-wrapper">
-          <input type="text" id="stockSearchInput" placeholder="Search products" autocomplete="off" />
+          <input type="text" id="stockSearchInput" data-i18n-placeholder="stock.search_placeholder" placeholder="Search products" autocomplete="off" />
           <!-- Magnifying-glass SVG (simple stroke, no fill) — inline SVG so we can style via currentColor -->
           <svg class="search-icon" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <circle cx="8.5" cy="8.5" r="5.5"/>
@@ -2840,26 +2840,26 @@
     <div class="drawer-backdrop" id="drawerBackdrop" onclick="window.closeDrawer()"></div>
     <aside class="drawer" id="drawer" aria-label="Workspace navigation">
       <div class="drawer-header">
-        <span class="drawer-title">Menu</span>
-        <button class="btn secondary small" onclick="window.closeDrawer()" aria-label="Close menu">✕</button>
+        <span class="drawer-title" data-i18n="drawer.title">Menu</span>
+        <button class="btn secondary small" onclick="window.closeDrawer()" data-i18n-aria-label="drawer.close" aria-label="Close menu">✕</button>
       </div>
       <nav class="drawer-nav">
         <button class="drawer-item" data-workspace="stock" onclick="window.switchWorkspace('stock')">
           <span class="drawer-icon">📊</span>
-          <span class="drawer-label">Current Stock</span>
+          <span class="drawer-label" data-i18n="workspaces.stock">Current Stock</span>
         </button>
         <button class="drawer-item" data-workspace="history" onclick="window.switchWorkspace('history')">
           <span class="drawer-icon">🛒</span>
-          <span class="drawer-label">Sales</span>
+          <span class="drawer-label" data-i18n="workspaces.history">Sales</span>
         </button>
         <button class="drawer-item" data-workspace="calendar" onclick="window.switchWorkspace('calendar')">
           <span class="drawer-icon">📅</span>
-          <span class="drawer-label">Calendar</span>
+          <span class="drawer-label" data-i18n="workspaces.calendar">Calendar</span>
         </button>
         <div class="drawer-divider"></div>
         <button class="drawer-item" onclick="window.openSettings()">
           <span class="drawer-icon">⚙️</span>
-          <span class="drawer-label">Settings</span>
+          <span class="drawer-label" data-i18n="drawer.settings">Settings</span>
         </button>
       </nav>
       <div class="drawer-footer">
@@ -2867,7 +2867,7 @@
           <div class="drawer-user-label">Signed in as</div>
           <div class="drawer-user-name" id="drawerUserName">…</div>
         </div>
-        <button class="btn secondary small drawer-signout-btn" onclick="window.doSignOut()">Sign out</button>
+        <button class="btn secondary small drawer-signout-btn" onclick="window.doSignOut()" data-i18n="drawer.signout">Sign out</button>
       </div>
     </aside>
 
@@ -2930,10 +2930,20 @@
         </div>
         <div class="settings-body">
           <section class="settings-category">
-            <h3 class="settings-category-title">⚙️ Preferences</h3>
-            <p class="settings-category-desc">
+            <h3 class="settings-category-title" data-i18n="settings.section_prefs">⚙️ Preferences</h3>
+            <p class="settings-category-desc" data-i18n="settings.section_prefs_desc">
               User preferences saved to this browser. They apply immediately and persist across sessions.
             </p>
+            <div class="settings-pref-row">
+              <label class="settings-pref-label" for="prefLanguage">
+                <span data-i18n="settings.pref_language">Language</span>
+              </label>
+              <select id="prefLanguage" class="export-select" style="margin-left: 26px; margin-top: 4px;">
+                <option value="bg">Български</option>
+                <option value="en">English</option>
+              </select>
+              <p class="settings-pref-hint" data-i18n="settings.pref_language_hint">Interface language. Applies immediately.</p>
+            </div>
             <div class="settings-pref-row">
               <label class="settings-pref-label">
                 <input type="checkbox" id="prefHideZeroStock">
@@ -2950,7 +2960,7 @@
             </div>
           </section>
           <section class="settings-category">
-            <h3 class="settings-category-title">💾 Backup</h3>
+            <h3 class="settings-category-title" data-i18n="settings.section_backup">💾 Backup</h3>
             <p class="settings-category-desc">
               Download a snapshot of all your inventory data to your computer. The backup is a ZIP file containing three files:
             </p>
@@ -3596,10 +3606,10 @@
       // Close the drawer FIRST so the confirmation modal is unambiguously the active surface
       // (fixes 8.4 UX issue where the modal was appearing but the drawer overlay obscured it).
       if (typeof closeDrawer === 'function') closeDrawer()
-      const ok = await confirmYesNo('Sign out of the app?', {
-        title: 'Sign out?',
-        okLabel: 'Sign out',
-        cancelLabel: 'Cancel',
+      const ok = await confirmYesNo(t('signout.message'), {
+        title: t('signout.title'),
+        okLabel: t('signout.ok'),
+        cancelLabel: t('signout.cancel'),
         okStyle: 'danger',
       })
       if (!ok) return
@@ -6469,6 +6479,7 @@
     let userPrefs = {
       hideZeroStock: false,
       showDebugConsole: false,   // 🐛 button + debug window hidden by default (opt-in)
+      language: 'bg',            // 'bg' | 'en' — Bulgarian is the target production language
     }
     try {
       const stored = localStorage.getItem(USER_PREFS_KEY)
@@ -6477,6 +6488,78 @@
     function saveUserPrefs() {
       try { localStorage.setItem(USER_PREFS_KEY, JSON.stringify(userPrefs)) } catch (_) {}
     }
+
+    // ===== i18n (Phase 1: infrastructure + high-visibility strings) =====
+    // Simple runtime translation via a nested dictionary + a `t(keyPath)` lookup. Elements
+    // marked `data-i18n="section.key"` get their textContent set to the translated string on
+    // page load and on language change; `data-i18n-placeholder` and `data-i18n-aria-label`
+    // handle the input placeholder + button aria attributes.
+    // Bulgarian translations pending review by user; may need tweaks for tone and idiom.
+    const I18N = {
+      en: {
+        workspaces: { stock: 'Current Stock', history: 'Sales', calendar: 'Calendar' },
+        drawer: { title: 'Menu', close: 'Close menu', signout: 'Sign out', settings: 'Settings' },
+        actions: { refresh: 'Refresh', actions: 'Actions' },
+        buttons: { add: 'Add', cancel: 'Cancel', save: 'Save', delete: 'Delete', edit: 'Edit', close: 'Close', ok: 'OK', yes: 'Yes', no: 'No' },
+        signout: { title: 'Sign out?', message: 'Sign out of the app?', ok: 'Sign out', cancel: 'Cancel' },
+        settings: {
+          section_prefs: '⚙️ Preferences',
+          section_prefs_desc: 'User preferences saved to this browser. They apply immediately and persist across sessions.',
+          section_backup: '💾 Backup',
+          pref_language: 'Language',
+          pref_language_hint: 'Interface language. Applies immediately.',
+        },
+        stock: { search_placeholder: 'Search products' },
+      },
+      bg: {
+        workspaces: { stock: 'Наличности', history: 'Продажби', calendar: 'Календар' },
+        drawer: { title: 'Меню', close: 'Затвори менюто', signout: 'Отписване', settings: 'Настройки' },
+        actions: { refresh: 'Обнови', actions: 'Действия' },
+        buttons: { add: 'Добави', cancel: 'Отказ', save: 'Запази', delete: 'Изтрий', edit: 'Редактирай', close: 'Затвори', ok: 'ОК', yes: 'Да', no: 'Не' },
+        signout: { title: 'Отписване?', message: 'Отписване от приложението?', ok: 'Отпиши се', cancel: 'Отказ' },
+        settings: {
+          section_prefs: '⚙️ Предпочитания',
+          section_prefs_desc: 'Потребителски настройки, запазени в този браузър. Прилагат се веднага и се запазват между сесии.',
+          section_backup: '💾 Резервно копие',
+          pref_language: 'Език',
+          pref_language_hint: 'Език на интерфейса. Прилага се веднага.',
+        },
+        stock: { search_placeholder: 'Търси продукти' },
+      },
+    }
+    function t(path) {
+      const lang = (userPrefs && userPrefs.language) || 'bg'
+      const dict = I18N[lang] || I18N.en
+      const val = path.split('.').reduce((o, k) => o != null ? o[k] : undefined, dict)
+      // Fallback to English if the current language is missing this key
+      if (val == null && lang !== 'en') {
+        const fallback = path.split('.').reduce((o, k) => o != null ? o[k] : undefined, I18N.en)
+        return fallback ?? path
+      }
+      return val ?? path
+    }
+    // Walk the DOM and apply translations to all elements marked with data-i18n* attributes.
+    // Called on page load AND whenever language changes in Settings.
+    function applyTranslations() {
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        el.textContent = t(el.dataset.i18n)
+      })
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        el.setAttribute('placeholder', t(el.dataset.i18nPlaceholder))
+      })
+      document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+        el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel))
+      })
+      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        el.setAttribute('title', t(el.dataset.i18nTitle))
+      })
+      // WORKSPACE_TITLES is used by switchWorkspace to set the header — refresh title if visible
+      const titleEl = document.getElementById('workspaceTitle')
+      if (titleEl && currentWorkspace) titleEl.textContent = t(`workspaces.${currentWorkspace}`)
+    }
+    // Apply on load
+    requestAnimationFrame(applyTranslations)
+
     // Apply the debug-visibility preference: show/hide the 🐛 button + close the debug window
     // if the pref is off. Called on page load and whenever the pref changes in Settings.
     function applyDebugVisibility() {
@@ -6514,6 +6597,16 @@
           saveUserPrefs()
           applyDebugVisibility()
           log('prefs', `showDebugConsole=${cbDbg.checked}`)
+        })
+      }
+      const langSel = document.getElementById('prefLanguage')
+      if (langSel) {
+        langSel.value = userPrefs.language || 'bg'
+        langSel.addEventListener('change', () => {
+          userPrefs.language = langSel.value
+          saveUserPrefs()
+          applyTranslations()
+          log('prefs', `language=${langSel.value}`)
         })
       }
     }
@@ -6727,10 +6820,11 @@ new events will not be in this file. Re-download periodically.
     // ============================================================
     // Workspace navigation (V2.1)
     // ============================================================
+    // Workspace titles — now come from I18N dict, look up dynamically via t()
+    function workspaceTitle(name) { return t(`workspaces.${name}`) }
     const WORKSPACE_TITLES = {
-      stock: 'Current Stock',
-      history: 'Sales',       // was 'Sales History' (V2.11: New Sale form now inline here)
-      calendar: 'Calendar',
+      // Kept for compatibility with getStoredWorkspace's validation check (keys, not values)
+      stock: true, history: true, calendar: true,
     }
     const DEFAULT_WORKSPACE = 'history'
     const WORKSPACE_STORAGE_KEY = 'inv_last_workspace'
@@ -7923,7 +8017,7 @@ ${headerRowXml}${dataRowsXml}
       })
 
       // Update header title
-      document.getElementById('workspaceTitle').textContent = WORKSPACE_TITLES[name]
+      document.getElementById('workspaceTitle').textContent = workspaceTitle(name)
 
       // Header buttons: refresh vs "+" actions menu. The "+" menu (Add product, Import) is
       // Current Stock-specific — that's where creating products / bulk importing feels
