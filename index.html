@@ -4075,8 +4075,15 @@
         if (placeholder) {
           placeholder.replaceWith(detachedEditNode)
         } else {
-          // Bubble no longer exists in fresh data — the kick should handle exit. Log for visibility.
-          log('activity', `edit bubble ${editedGroupId} vanished from fresh feed — kick expected`)
+          // Bubble no longer exists in fresh data — the primary kick (V2.7) should have fired
+          // via checkEditKick before we got here. But if for any reason it didn't (e.g., the
+          // realtime event's p.old payload was missing the PK, or replica identity misconfigured),
+          // fire the kick here as a safety net. Otherwise editingRow stays set forever and the
+          // next Edit attempt would prompt "Switch edits?" against a ghost.
+          log('activity', `edit bubble ${editedGroupId} vanished from fresh feed — kick fallback`)
+          if (editingRow && typeof kickFromEdit === 'function') {
+            kickFromEdit('DELETE')
+          }
         }
       }
       // Load-more / end-marker label at the TOP
@@ -7538,10 +7545,15 @@ new events will not be in this file. Re-download periodically.
           alignment: { horizontal: 'center', vertical: 'center' }
         }
         const dataStyle = { font: baseFont }
-        // Apply header style to A1/B1/C1, data style to every other cell in the sheet.
+        // Quantity cells (column C) get left-alignment override — spreadsheet programs auto-
+        // right-align numeric cells by default, which user finds visually odd for inventory
+        // quantities. Left-align matches the ID and Name columns for a consistent look.
+        const numberStyle = { font: baseFont, alignment: { horizontal: 'left' } }
+        // Apply header style to A1/B1/C1; number style to column C data cells; data style to rest.
         Object.keys(ws).forEach(addr => {
           if (addr.startsWith('!')) return  // skip metadata (!ref, !cols, etc.)
           if (addr === 'A1' || addr === 'B1' || addr === 'C1') ws[addr].s = headerStyle
+          else if (/^C\d+$/.test(addr)) ws[addr].s = numberStyle
           else ws[addr].s = dataStyle
         })
         ws['!cols'] = [{ wch: 12 }, { wch: 48 }, { wch: 12 }]
@@ -7592,7 +7604,7 @@ new events will not be in this file. Re-download periodically.
 <style:style style:name="col-wide" style:family="table-column"><style:table-column-properties style:column-width="4.3307in"/></style:style>
 <style:style style:name="HeaderCell" style:family="table-cell"><style:paragraph-properties fo:text-align="center"/><style:text-properties fo:font-weight="bold" style:font-name="Liberation Sans" fo:font-size="10pt"/></style:style>
 <style:style style:name="DataCell" style:family="table-cell"><style:text-properties style:font-name="Liberation Sans" fo:font-size="10pt"/></style:style>
-<style:style style:name="NumberCell" style:family="table-cell"><style:paragraph-properties fo:text-align="end"/><style:text-properties style:font-name="Liberation Sans" fo:font-size="10pt"/></style:style>
+<style:style style:name="NumberCell" style:family="table-cell"><style:paragraph-properties fo:text-align="start"/><style:text-properties style:font-name="Liberation Sans" fo:font-size="10pt"/></style:style>
 </office:automatic-styles>
 <office:body><office:spreadsheet>
 <table:table table:name="Products">
