@@ -933,7 +933,7 @@
     .submit-status { font-size: 14px; color: var(--text); margin-bottom: 4px; }
     .submit-substatus { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; min-height: 16px; }
     .submit-actions { display: flex; gap: 8px; justify-content: center; }
-    .confirm-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 101; }
+    .confirm-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 250; }
     .confirm-modal.visible { display: flex; }
     .confirm-card { background: var(--bg); border-radius: 12px; padding: 24px; min-width: 320px; max-width: 460px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
     .confirm-card h3 { margin: 0 0 12px 0; font-size: 16px; }
@@ -954,7 +954,7 @@
       display: none;
       align-items: flex-start;
       justify-content: center;
-      z-index: 101;
+      z-index: 250;
       overflow-y: auto;
       padding: 40px 16px;
       -webkit-overflow-scrolling: touch;
@@ -3593,6 +3593,9 @@
     window.doSignOut = async function() {
       // Confirm first — signing out clears session + closes realtime; no undo. Uses the existing
       // yes/no modal (matches the visual pattern of other confirmations in the app).
+      // Close the drawer FIRST so the confirmation modal is unambiguously the active surface
+      // (fixes 8.4 UX issue where the modal was appearing but the drawer overlay obscured it).
+      if (typeof closeDrawer === 'function') closeDrawer()
       const ok = await confirmYesNo('Sign out of the app?', {
         title: 'Sign out?',
         okLabel: 'Sign out',
@@ -3883,16 +3886,11 @@
     }
 
     async function reloadActivity() {
-      // Don't disturb an active edit — if user is mid-edit, skip this refresh
-      // so their typed input isn't wiped. Will refresh after they save/cancel.
-      if (editingRow !== null) {
-        log('activity', 'reloadActivity skipped — edit in progress')
-        return
-      }
-      // Note: we DO refresh even when a bubble context menu is open. renderActivity() itself
-      // preserves the .menu-open highlight across re-renders, so user 1 still gets real-time
-      // updates from user 2 without losing the visual state of their open menu.
-      // If the bubble being highlighted was deleted by another user, the menu closes cleanly.
+      // Refresh even during edit — renderActivity() itself detaches the currently-editing
+      // bubble's DOM node before rebuilding the feed, then re-inserts it in its position.
+      // The user's typed input is preserved because the DOM node (with all its inputs) is
+      // kept alive throughout. Fixes Bug 2.3 from the multi-user test pass (feed frozen
+      // for the observing user during their own edit).
 
       // If user is on the Calendar workspace, refresh THAT feed instead of the Sales History
       // feed. (The user's edits/inserts may or may not fall within the calendar's selected
@@ -3906,8 +3904,11 @@
       const wasAtBottom = isNearBottom()
       activityRows = []
       activityHasMore = true
-      editingRow = null
-      await loadMoreActivity({ initial: true, scrollToBottom: wasAtBottom })
+      // Don't reset editingRow here — we want to preserve the edit through this refresh.
+      // (Previously we always set editingRow = null here, which nullified any concurrent edit.)
+      const preserveEdit = editingRow !== null
+      if (!preserveEdit) editingRow = null
+      await loadMoreActivity({ initial: true, scrollToBottom: preserveEdit ? false : wasAtBottom })
     }
 
     function isNearBottom() {
@@ -4022,6 +4023,15 @@
       const openGroupId = openMenu?.bubbleEl?.dataset?.groupId
       const feedEl = document.getElementById('activityFeed')
       const loadMoreEl = document.getElementById('activityLoadMore')
+      // Preserve the currently-editing bubble's DOM node (if any). Detach it BEFORE clearing
+      // the feed so it survives the innerHTML wipe; reinsert later at its new position.
+      // Keeps the user's typed input intact while OTHER bubbles get re-rendered from fresh data.
+      const editedGroupId = editingRow?.group_id
+      let detachedEditNode = null
+      if (editedGroupId) {
+        detachedEditNode = feedEl.querySelector(`.bubble.editing[data-group-id="${CSS.escape(editedGroupId)}"]`)
+        if (detachedEditNode) detachedEditNode.remove()
+      }
       if (activityRows.length === 0) {
         feedEl.innerHTML = `<div class="state-message">No activity yet.</div>`
         loadMoreEl.className = 'activity-load-more'
@@ -4055,6 +4065,20 @@
       `).join('')
       feedEl.innerHTML = html
       attachBubbleHandlers()
+      // Reinsert the preserved editing-bubble node in place of its freshly-rendered placeholder.
+      // If the bubble was DELETED by another user during our edit, the placeholder won't be
+      // present in the fresh HTML — in that case we drop the edited node too (it references
+      // stale state and would be confusing to keep floating). The V2.7 kick will have fired
+      // by then (or should have) to actually exit edit mode.
+      if (detachedEditNode) {
+        const placeholder = feedEl.querySelector(`.bubble[data-group-id="${CSS.escape(editedGroupId)}"]`)
+        if (placeholder) {
+          placeholder.replaceWith(detachedEditNode)
+        } else {
+          // Bubble no longer exists in fresh data — the kick should handle exit. Log for visibility.
+          log('activity', `edit bubble ${editedGroupId} vanished from fresh feed — kick expected`)
+        }
+      }
       // Load-more / end-marker label at the TOP
       loadMoreEl.className = 'activity-load-more'
       if (activityHasMore) {
@@ -4982,8 +5006,12 @@
     function extractAffectedGroupId(p, tableType) {
       if (tableType === 'sales') return p.new?.sale_group_id ?? p.old?.sale_group_id ?? null
       if (tableType === 'stock_in') return p.new?.stock_in_group_id ?? p.old?.stock_in_group_id ?? null
+      // Group tables (sale_groups / stock_in_groups) — the "affected group id" IS the row's
+      // own primary key `id`, not a `group_id` field (there is no such column on these
+      // tables). Previously used `group_id` here, which was always null → kick never fired
+      // on group DELETE events. Bug 2.2 discovered during multi-user test pass.
       if (tableType === 'sale_groups' || tableType === 'stock_in_groups') {
-        return p.new?.group_id ?? p.old?.group_id ?? null
+        return p.new?.id ?? p.old?.id ?? null
       }
       return null
     }
@@ -7549,7 +7577,7 @@ new events will not be in this file. Re-download periodically.
         const idXml = `<table:table-cell table:style-name="DataCell" office:value-type="string" calcext:value-type="string"><text:p>${esc(row[0])}</text:p></table:table-cell>`
         const nameXml = `<table:table-cell table:style-name="DataCell" office:value-type="string" calcext:value-type="string"><text:p>${esc(row[1])}</text:p></table:table-cell>`
         const qty = Number(row[2]) || 0
-        const qtyXml = `<table:table-cell table:style-name="DataCell" office:value-type="float" office:value="${qty}" calcext:value-type="float"><text:p>${qty}</text:p></table:table-cell>`
+        const qtyXml = `<table:table-cell table:style-name="NumberCell" office:value-type="float" office:value="${qty}" calcext:value-type="float"><text:p>${qty}</text:p></table:table-cell>`
         return `<table:table-row>${idXml}${nameXml}${qtyXml}</table:table-row>`
       }).join('')
       // content.xml — the actual spreadsheet content plus styles. Uses the same style names
@@ -7564,6 +7592,7 @@ new events will not be in this file. Re-download periodically.
 <style:style style:name="col-wide" style:family="table-column"><style:table-column-properties style:column-width="4.3307in"/></style:style>
 <style:style style:name="HeaderCell" style:family="table-cell"><style:paragraph-properties fo:text-align="center"/><style:text-properties fo:font-weight="bold" style:font-name="Liberation Sans" fo:font-size="10pt"/></style:style>
 <style:style style:name="DataCell" style:family="table-cell"><style:text-properties style:font-name="Liberation Sans" fo:font-size="10pt"/></style:style>
+<style:style style:name="NumberCell" style:family="table-cell"><style:paragraph-properties fo:text-align="end"/><style:text-properties style:font-name="Liberation Sans" fo:font-size="10pt"/></style:style>
 </office:automatic-styles>
 <office:body><office:spreadsheet>
 <table:table table:name="Products">
