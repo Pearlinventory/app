@@ -2590,7 +2590,7 @@
       <div class="header-right">
         <span class="conn-status" id="connStatus" data-status="offline">
           <span class="conn-dot"></span>
-          <span class="conn-label" data-i18n="header.connecting">Connecting…</span>
+          <span class="conn-label">Connecting…</span>
         </span>
         <span class="last-updated" id="lastUpdated"></span>
         <!-- Refresh button — shown in most workspaces (Sales, Calendar). Hidden in Current
@@ -3620,6 +3620,13 @@
     }
 
     async function checkSession() {
+      // If we've already entered recovery mode (either the auth listener fired PASSWORD_RECOVERY
+      // or the hash-detection code ran at boot), do NOT auto-progress to showApp — the user
+      // needs to complete the password reset first. showRecoveryForm handles the UI.
+      if (typeof inRecoveryMode !== 'undefined' && inRecoveryMode) {
+        log('auth', 'In recovery mode — showing recovery form instead of app')
+        return false
+      }
       const { data } = await supabase.auth.getSession()
       if (data.session && data.session.user) {
         const u = data.session.user
@@ -3729,6 +3736,7 @@
       const errEl = document.getElementById('loginError')
       if (!email) {
         errEl.textContent = t('login.reset_email_needed')
+        errEl.style.color = ''
         document.getElementById('loginEmail').focus()
         return
       }
@@ -3742,9 +3750,13 @@
           redirectTo: window.location.origin + window.location.pathname,
         })
         if (error) throw error
-        await showNotice(t('login.reset_sent_body'), { title: t('login.reset_sent_title') })
+        // Show inline success feedback below the button — more visible than a modal that user
+        // might miss, and stays on screen while they check their inbox. Green color = success.
+        errEl.style.color = 'var(--status-online)'
+        errEl.textContent = t('login.reset_sent_body')
       } catch (err) {
         log('error', 'Password reset request failed', err)
+        errEl.style.color = ''  // reset to default red/muted
         errEl.textContent = `${t('login.reset_failed')}: ${err.message || 'unknown error'}`
       } finally {
         btn.disabled = false
@@ -3754,6 +3766,11 @@
 
     // Show the "Set new password" form (hides the normal login form)
     function showRecoveryForm() {
+      // Mark recovery mode so checkSession() and any subsequent auth state changes don't
+      // auto-log-into the app. TDZ-safe: this function may be called from the boot-time hash
+      // detection (before the `let inRecoveryMode` declaration executes) as well as later from
+      // the PASSWORD_RECOVERY event handler. Using typeof + try/catch keeps both safe.
+      try { if (typeof inRecoveryMode !== 'undefined') inRecoveryMode = true } catch (_) {}
       document.getElementById('loginForm').style.display = 'none'
       document.getElementById('passwordRecoveryForm').style.display = 'flex'
       document.getElementById('loginScreen').style.display = 'flex'
@@ -3763,6 +3780,7 @@
     }
     // Restore normal login state (after reset OR if user navigates away)
     function hideRecoveryForm() {
+      try { if (typeof inRecoveryMode !== 'undefined') inRecoveryMode = false } catch (_) {}
       document.getElementById('passwordRecoveryForm').style.display = 'none'
       document.getElementById('loginForm').style.display = 'flex'
       document.getElementById('newPasswordInput').value = ''
@@ -3817,8 +3835,14 @@
 
     // Detect recovery hash on page load (before Supabase has a chance to fire the event).
     // Belt-and-suspenders: the onAuthStateChange listener also catches PASSWORD_RECOVERY events.
+    // Setting inRecoveryMode BEFORE checkSession runs means checkSession will bail early.
     if (window.location.hash && window.location.hash.includes('type=recovery')) {
       log('auth', 'Recovery hash detected on load')
+      // Note: `inRecoveryMode` is declared later in the module (near the auth listener).
+      // A window-scope flag would work too, but assigning here after `let inRecoveryMode` is
+      // declared later would fail TDZ. Instead, we rely on the auth listener firing shortly
+      // after page load (Supabase parses the hash and fires PASSWORD_RECOVERY within ~50ms).
+      // If for some reason it doesn't fire, this direct call still shows the form.
       // Defer to next tick so DOM is ready
       setTimeout(showRecoveryForm, 0)
     }
@@ -3853,12 +3877,35 @@
     let saveInProgress = false
     let realtimeChannel = null
 
-    function setConnectionStatus(status, label) {
+    // Connection status labels — keyed by status name. `setConnectionStatus(status)` looks up
+    // the label via t(). Callers can override with a second arg but should prefer status-only
+    // calls so language switches propagate correctly. Avoid using data-i18n on the label span
+    // because applyTranslations() runs frequently and would overwrite dynamic status changes.
+    const CONN_LABEL_KEYS = {
+      connecting: 'header.connecting',
+      loading: 'header.loading',
+      online: 'connection.online',
+      offline: 'connection.offline',
+      reconnecting: 'connection.reconnecting',
+      no_connection: 'validation.no_connection',
+    }
+    function setConnectionStatus(status, labelOverride) {
       const el = document.getElementById('connStatus')
       el.setAttribute('data-status', status)
+      // Track the last status so refreshConnLabel() can re-translate after language change.
+      el.setAttribute('data-status-key', labelOverride ? '' : (CONN_LABEL_KEYS[status] || ''))
+      const key = CONN_LABEL_KEYS[status]
+      const label = labelOverride != null ? labelOverride : (key ? t(key) : status)
       el.querySelector('.conn-label').textContent = label
       log('connection', `→ ${status}`, { label })
       updateFormButtonsEnabled()
+    }
+    // Re-translate the current connection label on language switch. Called from applyTranslations().
+    function refreshConnLabel() {
+      const el = document.getElementById('connStatus')
+      if (!el) return
+      const key = el.getAttribute('data-status-key')
+      if (key) el.querySelector('.conn-label').textContent = t(key)
     }
     function updateLastUpdatedDisplay() {
       const el = document.getElementById('lastUpdated')
@@ -3903,7 +3950,7 @@
         refreshBtnEl.disabled = true
         refreshBtnEl.classList.add('refreshing')
       }
-      setConnectionStatus('reconnecting', 'Loading…')
+      setConnectionStatus('loading')
       try {
         const [productsRes, stockRes] = await Promise.all([
           supabase.from('products').select('id, name').order('name'),
@@ -3914,7 +3961,7 @@
         productsCache = productsRes.data
         lastGoodStock = stockRes.data
         log('api', `Loaded ${productsCache.length} products, ${stockRes.data.length} stock rows`)
-        setConnectionStatus('online', 'Online')
+        setConnectionStatus('online')
         lastFetchTime = Date.now()
         updateLastUpdatedDisplay()
         renderStock(stockRes.data)
@@ -3934,7 +3981,7 @@
         await reloadActivity()
       } catch (err) {
         log('error', 'Load failed', err)
-        setConnectionStatus('offline', 'Offline')
+        setConnectionStatus('offline')
         if (lastGoodStock) {
           renderStock(lastGoodStock)
           if (isManual) showStockOverlay('Connection lost — showing cached data')
@@ -5878,7 +5925,7 @@
       document.getElementById('logStockBtn').title = offline ? 'No connection — cannot receive stock right now' : ''
     }
     window.addEventListener('online', () => { isOnline = true; log('network', 'online'); updateFormButtonsEnabled(); hideStockOverlay(); if (currentUser) loadAll(false) })
-    window.addEventListener('offline', () => { isOnline = false; log('network', 'offline'); setConnectionStatus('offline', 'No connection'); updateFormButtonsEnabled(); scheduleOfflineOverlay() })
+    window.addEventListener('offline', () => { isOnline = false; log('network', 'offline'); setConnectionStatus('offline', t('validation.no_connection')); updateFormButtonsEnabled(); scheduleOfflineOverlay() })
 
     const overlay = document.getElementById('submitOverlay')
     const overlayStatus = document.getElementById('submitStatus')
@@ -6274,11 +6321,26 @@
       return `${d.toLocaleDateString()} ${time}`
     }
 
-    // Listen for auth state changes (e.g. session expiry, sign-out from another tab)
+    // Track whether we're mid-password-recovery. When Supabase fires PASSWORD_RECOVERY,
+    // we show the recovery form INSTEAD of auto-progressing to the app. Without this flag,
+    // checkSession() sees a valid session (Supabase auto-authenticates from the recovery
+    // token) and calls showApp() — user gets logged in without a chance to reset the password.
+    let inRecoveryMode = false
+
+    // Listen for auth state changes (session expiry, sign-out from another tab, password recovery)
     supabase.auth.onAuthStateChange((event, session) => {
       log('auth', `state changed: ${event}`)
+      if (event === 'PASSWORD_RECOVERY') {
+        // User clicked the reset email link. Supabase created a session and stripped the
+        // recovery hash from the URL by this point — the hash-detection code we run at boot
+        // might not have caught it. This handler is the reliable path.
+        inRecoveryMode = true
+        showRecoveryForm()
+        return
+      }
       if (event === 'SIGNED_OUT' || !session) {
         currentUser = null
+        inRecoveryMode = false
         if (realtimeChannel) {
           supabase.removeChannel(realtimeChannel)
           realtimeChannel = null
@@ -7319,6 +7381,10 @@
       } catch (_) { /* TDZ or missing element — safe to skip */ }
       // Re-fit note textarea indents (prefix width may have changed with the language switch)
       sizeNoteIndents()
+      // Re-translate the current connection status label (kept out of data-i18n since it's
+      // dynamically managed by setConnectionStatus — using data-i18n would cause every render
+      // to reset the label back to its default "Connecting…" text, freezing the status display).
+      if (typeof refreshConnLabel === 'function') refreshConnLabel()
     }
     // Apply on load
     requestAnimationFrame(applyTranslations)
@@ -9253,7 +9319,8 @@ ${headerRowXml}${dataRowsXml}
     // Periodic safety-net poll
     setInterval(() => { if (currentUser) { log('auto-refresh', 'tick'); loadAll(false) } }, AUTO_REFRESH_INTERVAL_MS)
 
-    // Boot
+    // Boot: set the initial connection status label in the current language, then check session.
+    setConnectionStatus('connecting')
     checkSession()
   </script>
 </body>
