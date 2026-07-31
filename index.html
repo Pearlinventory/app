@@ -72,6 +72,21 @@
     .password-toggle { position: absolute; right: 1px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; background: transparent !important; background-color: transparent !important; border: none !important; cursor: pointer; padding: 0; margin: 0; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; line-height: 0; box-shadow: none !important; outline: none; }
     .password-toggle:hover, .password-toggle:focus, .password-toggle:active { color: var(--text); background: transparent !important; background-color: transparent !important; box-shadow: none !important; }
     .password-toggle svg { width: 20px; height: 20px; display: block; flex-shrink: 0; }
+    /* Plain-link button style — used for "Forgot password?" underneath the sign-in button.
+       Overrides all the accent-green button styling above with a neutral text-only look. */
+    .login-form .link-btn {
+      background: transparent !important;
+      color: var(--text-muted);
+      padding: 4px 0;
+      font-size: 13px;
+      font-weight: 400;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      align-self: center;
+    }
+    .login-form .link-btn:hover { color: var(--text); }
 
     /* ============ Main app ============ */
     .app-shell { display: none; }
@@ -572,7 +587,10 @@
     /* Make room inside the textarea for the prefix overlay — text-indent affects ONLY the
        first visual line. When user-typed text wraps to a second line, the wrapped text
        starts at the textarea's left padding (10px from the textarea edge), so the second
-       line is NOT indented under the prefix — exactly how you'd hand-write it on paper. */
+       line is NOT indented under the prefix — exactly how you'd hand-write it on paper.
+       Base value below is just a fallback — `sizeNoteIndents()` in JS measures the actual
+       rendered prefix width per-textarea and sets `style.textIndent` inline. That way each
+       language gets a snug 6px gap after its own prefix, no matter what the prefix says. */
     .note-input-wrapper .note-edit-input {
       padding-left: 10px;
       text-indent: 60px;
@@ -907,6 +925,9 @@
     .settings-status { font-size: 13px; color: var(--text-muted); }
     .settings-status.success { color: var(--status-online); }
     .settings-status.error { color: var(--status-offline); }
+    /* Stock revision preview: delta cell color-coded so + and - are readable at a glance */
+    .revision-delta.positive { color: var(--pass, #10b981); font-weight: 600; }
+    .revision-delta.negative { color: var(--danger, #ef4444); font-weight: 600; }
     /* Preferences row: a checkbox with a label + optional hint below. */
     .settings-pref-row { margin: 12px 0; }
     .settings-pref-label {
@@ -2529,19 +2550,30 @@
   <!-- ============ Login screen ============ -->
   <div class="login-screen" id="loginScreen">
     <div class="login-card">
+      <!-- Normal login form -->
       <form class="login-form" id="loginForm" onsubmit="return false;">
-        <input type="email" id="loginEmail" placeholder="Email" autocomplete="username" required>
+        <input type="email" id="loginEmail" data-i18n-placeholder="login.email" placeholder="Email" autocomplete="username" required>
         <div class="password-wrap">
-          <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required>
-          <button type="button" class="password-toggle" id="passwordToggle" aria-label="Show password" title="Show password">
+          <input type="password" id="loginPassword" data-i18n-placeholder="login.password" placeholder="Password" autocomplete="current-password" required>
+          <button type="button" class="password-toggle" id="passwordToggle" data-i18n-aria-label="login.show_password" data-i18n-title="login.show_password" aria-label="Show password" title="Show password">
             <svg id="eyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
           </button>
         </div>
-        <button type="submit" id="loginBtn" onclick="window.doLogin()">Sign in</button>
+        <button type="submit" id="loginBtn" onclick="window.doLogin()" data-i18n="login.sign_in">Sign in</button>
         <div class="login-error" id="loginError"></div>
+        <button type="button" class="link-btn" id="forgotPasswordBtn" data-i18n="login.forgot_password">Forgot password?</button>
+      </form>
+      <!-- Password recovery form — shown when user arrives via reset email link -->
+      <form class="login-form" id="passwordRecoveryForm" onsubmit="return false;" style="display: none;">
+        <h3 style="margin: 0 0 8px; font-size: 18px;" data-i18n="login.new_password_title">Set a new password</h3>
+        <p style="margin: 0 0 12px; font-size: 13px; color: var(--text-muted); line-height: 1.5;" data-i18n="login.new_password_hint">You clicked a password reset link. Enter a new password below to finish resetting.</p>
+        <input type="password" id="newPasswordInput" data-i18n-placeholder="login.new_password_placeholder" placeholder="New password" autocomplete="new-password" required minlength="6">
+        <input type="password" id="newPasswordConfirmInput" data-i18n-placeholder="login.new_password_confirm" placeholder="Confirm password" autocomplete="new-password" required minlength="6">
+        <button type="submit" id="newPasswordSaveBtn" data-i18n="login.new_password_save">Save new password</button>
+        <div class="login-error" id="newPasswordError"></div>
       </form>
     </div>
   </div>
@@ -2550,7 +2582,7 @@
   <div class="app-shell" id="appShell">
     <header class="header">
       <div class="header-left">
-        <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu" onclick="window.openDrawer()">
+        <button class="hamburger-btn" id="hamburgerBtn" data-i18n-aria-label="header.open_menu" aria-label="Open menu" onclick="window.openDrawer()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <h1 id="workspaceTitle">New Sale</h1>
@@ -2558,7 +2590,7 @@
       <div class="header-right">
         <span class="conn-status" id="connStatus" data-status="offline">
           <span class="conn-dot"></span>
-          <span class="conn-label">Connecting…</span>
+          <span class="conn-label" data-i18n="header.connecting">Connecting…</span>
         </span>
         <span class="last-updated" id="lastUpdated"></span>
         <!-- Refresh button — shown in most workspaces (Sales, Calendar). Hidden in Current
@@ -2581,15 +2613,19 @@
     <div class="actions-menu" id="actionsMenu">
       <button class="actions-menu-item" data-action="add-product" type="button">
         <span class="ico">📦</span>
-        <span class="lbl">Add product</span>
+        <span class="lbl" data-i18n="actions_menu.add_product">Add product</span>
       </button>
       <button class="actions-menu-item" data-action="import-spreadsheet" type="button">
         <span class="ico">📥</span>
-        <span class="lbl">Import from spreadsheet</span>
+        <span class="lbl" data-i18n="actions_menu.import_spreadsheet">Import from spreadsheet</span>
       </button>
       <button class="actions-menu-item" data-action="export-stock" type="button">
         <span class="ico">📤</span>
-        <span class="lbl">Export stock</span>
+        <span class="lbl" data-i18n="actions_menu.export_stock">Export stock</span>
+      </button>
+      <button class="actions-menu-item" data-action="apply-revision" type="button">
+        <span class="ico">📋</span>
+        <span class="lbl" data-i18n="actions_menu.apply_revision">Apply stock revision</span>
       </button>
     </div>
 
@@ -2616,11 +2652,11 @@
         </div>
       </div>
       <main class="table-container" id="mainContent">
-        <div class="state-message" id="loadingState">Loading…</div>
+        <div class="state-message" id="loadingState" data-i18n="header.loading">Loading…</div>
         <div class="stock-overlay" id="stockOverlay">
           <div class="overlay-card">
             <div class="mini-spinner"></div>
-            <span id="stockOverlayMsg">Loading…</span>
+            <span id="stockOverlayMsg" data-i18n="header.loading">Loading…</span>
           </div>
         </div>
       </main>
@@ -2640,22 +2676,22 @@
              (which auto-scrolls to bottom to show the latest bubbles). Matches the chat-app
              convention of "compose new" being at the bottom below the message list. -->
         <button class="inline-compose-btn" id="inlineComposePlus" type="button">
-          <span class="plus-sign">+</span> New sale
+          <span class="plus-sign">+</span> <span data-i18n="buttons.new_sale">New sale</span>
         </button>
         <div class="inline-compose-form" id="inlineComposeForm" hidden>
           <div class="bubble form-sale">
             <div class="bubble-card">
               <div class="bubble-row row-header">
                 <div class="bubble-cell"></div>
-                <div class="bubble-cell">ID</div>
-                <div class="bubble-cell">Product</div>
-                <div class="bubble-cell">Stock</div>
-                <div class="bubble-cell">Qty</div>
+                <div class="bubble-cell" data-i18n="columns.id">ID</div>
+                <div class="bubble-cell" data-i18n="columns.product">Product</div>
+                <div class="bubble-cell" data-i18n="cols_short.stock">Stock</div>
+                <div class="bubble-cell" data-i18n="cols_short.qty">Qty</div>
               </div>
               <div id="saleRowsContainer"></div>
               <div class="row-add-button">
                 <button class="add-row-btn" id="addSaleRowBtn" type="button">
-                  <span class="plus-sign">+</span> Add another product
+                  <span class="plus-sign">+</span> <span data-i18n="buttons.add_another_product">Add another product</span>
                 </button>
               </div>
               <div class="row-feedback">
@@ -2663,20 +2699,20 @@
               </div>
               <div class="row-form-footer">
                 <div class="footer-note-area" id="saleNoteArea">
-                  <button class="note-icon-btn form-note-icon-btn" id="saleNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
+                  <button class="note-icon-btn form-note-icon-btn" id="saleNoteIconBtn" type="button" data-i18n-aria-label="placeholders.note" data-i18n-title="placeholders.note" aria-label="Add a note" title="Add a note">📝</button>
                   <div class="note-expanded-state" id="saleNoteExpandedState" style="display: none;">
                     <div class="note-x-cell">
-                      <button class="remove-row-btn note-remove-btn" id="saleNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
+                      <button class="remove-row-btn note-remove-btn" id="saleNoteRemoveBtn" type="button" data-i18n-aria-label="bubble_edit.discard_note" data-i18n-title="bubble_edit.discard_note" aria-label="Discard note" title="Discard note">×</button>
                     </div>
                     <div class="note-input-wrapper">
-                      <span class="note-edit-prefix">📝Note:</span>
+                      <span class="note-edit-prefix">📝<span data-i18n="bubble_edit.note_prefix">Note:</span></span>
                       <textarea class="note-edit-input auto-grow" id="saleNoteInput" rows="1"></textarea>
                     </div>
                   </div>
                 </div>
                 <div class="footer-buttons">
-                  <button class="btn danger" id="cancelSaleBtn" type="button">Cancel</button>
-                  <button class="btn" id="logSaleBtn" onclick="submitSale()">Add</button>
+                  <button class="btn danger" id="cancelSaleBtn" type="button" data-i18n="buttons.cancel">Cancel</button>
+                  <button class="btn" id="logSaleBtn" onclick="submitSale()" data-i18n="buttons.add">Add</button>
                 </div>
               </div>
             </div>
@@ -2714,23 +2750,23 @@
     <div class="floating-form-modal" id="editProductModal">
       <div class="floating-form-modal-card">
         <div class="edit-product-card">
-          <h3>Edit product</h3>
-          <p class="edit-product-hint">Changes to <strong>Stock</strong> are applied as an adjustment entry (a new stock-in row with the delta), so sales history stays intact.</p>
+          <h3 data-i18n="edit_product.title">Edit product</h3>
+          <p class="edit-product-hint" data-i18n="edit_product.hint_full">Changes to Stock are applied as an adjustment entry (a new stock-in row with the delta), so sales history stays intact.</p>
           <div class="edit-product-field">
-            <label for="editProductId">ID</label>
+            <label for="editProductId" data-i18n="columns.id">ID</label>
             <input type="text" id="editProductId" autocomplete="off">
           </div>
           <div class="edit-product-field">
-            <label for="editProductName">Name</label>
+            <label for="editProductName" data-i18n="columns.name">Name</label>
             <input type="text" id="editProductName" autocomplete="off">
           </div>
           <div class="edit-product-field">
-            <label for="editProductStock">Stock</label>
+            <label for="editProductStock" data-i18n="columns.stock">Stock</label>
             <input type="number" id="editProductStock" autocomplete="off">
           </div>
           <div class="confirm-actions">
-            <button class="btn secondary" id="editProductCancelBtn" type="button">Cancel</button>
-            <button class="btn" id="editProductSaveBtn" type="button">Save</button>
+            <button class="btn secondary" id="editProductCancelBtn" type="button" data-i18n="buttons.cancel">Cancel</button>
+            <button class="btn" id="editProductSaveBtn" type="button" data-i18n="buttons.save">Save</button>
           </div>
         </div>
       </div>
@@ -2742,8 +2778,8 @@
          includes today's date. Uses SheetJS (already loaded at the top of the page for import). -->
     <div class="confirm-modal" id="exportStockModal">
       <div class="confirm-card">
-        <h3>Export current stock</h3>
-        <p>Downloads a file with columns <strong>ID</strong>, <strong>Name</strong>, and <strong>Quantity</strong>.</p>
+        <h3 data-i18n="export.title">Export current stock</h3>
+        <p data-i18n="settings.section_backup_desc">Downloads a file with columns ID, Name, and Quantity.</p>
         <div class="export-format-group">
           <label class="export-format-option">
             <input type="radio" name="exportFormat" value="xlsx" checked>
@@ -2759,21 +2795,21 @@
           </label>
         </div>
         <div class="export-option-row">
-          <label class="export-option-label" for="exportSortSelect">Sort by</label>
+          <label class="export-option-label" for="exportSortSelect" data-i18n="export.sort_by">Sort by</label>
           <select id="exportSortSelect" class="export-select">
-            <option value="name" selected>Name (A–Z)</option>
-            <option value="quantity">Quantity (high to low)</option>
-            <option value="id">ID</option>
+            <option value="name" selected data-i18n="export.sort_name">Name (A–Z)</option>
+            <option value="quantity" data-i18n="export.sort_quantity">Quantity (high to low)</option>
+            <option value="id" data-i18n="export.sort_id">ID</option>
           </select>
         </div>
         <label class="export-checkbox-row">
           <input type="checkbox" id="exportIncludeZero">
-          <span>Include products with 0 or less stock</span>
+          <span data-i18n="export.include_zero">Include products with 0 or less stock</span>
         </label>
         <p class="export-filename-hint">Filename: <code id="exportFilenamePreview">stock_YYYY-MM-DD.xlsx</code></p>
         <div class="confirm-actions">
-          <button class="btn secondary" id="exportStockCancelBtn" type="button">Cancel</button>
-          <button class="btn" id="exportStockConfirmBtn" type="button">Export</button>
+          <button class="btn secondary" id="exportStockCancelBtn" type="button" data-i18n="buttons.cancel">Cancel</button>
+          <button class="btn" id="exportStockConfirmBtn" type="button" data-i18n="buttons.export">Export</button>
         </div>
       </div>
     </div>
@@ -2788,20 +2824,20 @@
         <div class="bubble form-sale form-stockin">
           <div class="bubble-card">
             <div class="bubble-row row-source">
-              <label for="stockSourceInput">Source / Invoice</label>
+              <label for="stockSourceInput" data-i18n="placeholders.source_invoice">Source / Invoice</label>
               <input type="text" id="stockSourceInput" autocomplete="off">
             </div>
             <div class="bubble-row row-header">
               <div class="bubble-cell"></div>
-              <div class="bubble-cell">ID</div>
-              <div class="bubble-cell">Product</div>
-              <div class="bubble-cell">Stock</div>
-              <div class="bubble-cell">Qty</div>
+              <div class="bubble-cell" data-i18n="columns.id">ID</div>
+              <div class="bubble-cell" data-i18n="columns.product">Product</div>
+              <div class="bubble-cell" data-i18n="cols_short.stock">Stock</div>
+              <div class="bubble-cell" data-i18n="cols_short.qty">Qty</div>
             </div>
             <div id="stockRowsContainer"></div>
             <div class="row-add-button">
               <button class="add-row-btn" id="addStockRowBtn" type="button">
-                <span class="plus-sign">+</span> Add another product
+                <span class="plus-sign">+</span> <span data-i18n="buttons.add_another_product">Add another product</span>
               </button>
             </div>
             <div class="row-feedback">
@@ -2809,20 +2845,20 @@
             </div>
             <div class="row-form-footer">
               <div class="footer-note-area" id="stockNoteArea">
-                <button class="note-icon-btn form-note-icon-btn" id="stockNoteIconBtn" type="button" aria-label="Add a note" title="Add a note">📝</button>
+                <button class="note-icon-btn form-note-icon-btn" id="stockNoteIconBtn" type="button" data-i18n-aria-label="placeholders.note" data-i18n-title="placeholders.note" aria-label="Add a note" title="Add a note">📝</button>
                 <div class="note-expanded-state" id="stockNoteExpandedState" style="display: none;">
                   <div class="note-x-cell">
-                    <button class="remove-row-btn note-remove-btn" id="stockNoteRemoveBtn" type="button" aria-label="Discard note" title="Discard note">×</button>
+                    <button class="remove-row-btn note-remove-btn" id="stockNoteRemoveBtn" type="button" data-i18n-aria-label="bubble_edit.discard_note" data-i18n-title="bubble_edit.discard_note" aria-label="Discard note" title="Discard note">×</button>
                   </div>
                   <div class="note-input-wrapper">
-                    <span class="note-edit-prefix">📝Note:</span>
+                    <span class="note-edit-prefix">📝<span data-i18n="bubble_edit.note_prefix">Note:</span></span>
                     <textarea class="note-edit-input auto-grow" id="stockNoteInput" rows="1"></textarea>
                   </div>
                 </div>
               </div>
               <div class="footer-buttons">
-                <button class="btn danger" id="cancelStockBtn" type="button">Cancel</button>
-                <button class="btn" id="logStockBtn" onclick="submitStockIn()">Add</button>
+                <button class="btn danger" id="cancelStockBtn" type="button" data-i18n="buttons.cancel">Cancel</button>
+                <button class="btn" id="logStockBtn" onclick="submitStockIn()" data-i18n="buttons.add">Add</button>
               </div>
             </div>
           </div>
@@ -2864,7 +2900,7 @@
       </nav>
       <div class="drawer-footer">
         <div class="drawer-user">
-          <div class="drawer-user-label">Signed in as</div>
+          <div class="drawer-user-label" data-i18n="header.signed_in_as">Signed in as</div>
           <div class="drawer-user-name" id="drawerUserName">…</div>
         </div>
         <button class="btn secondary small drawer-signout-btn" onclick="window.doSignOut()" data-i18n="drawer.signout">Sign out</button>
@@ -2875,12 +2911,12 @@
     <div class="import-modal" id="importModal">
       <div class="import-card">
         <div class="import-header">
-          <h2 id="importTitle">Review import</h2>
+          <h2 id="importTitle" data-i18n="import.review_title">Review import</h2>
           <button class="btn secondary small" id="importCloseBtn">✕ Cancel</button>
         </div>
         <div class="import-source-row">
           <label for="importSourceInput">Source / invoice:</label>
-          <input type="text" id="importSourceInput" placeholder="auto-filled from filename">
+          <input type="text" id="importSourceInput" data-i18n-placeholder="import.auto_filled" placeholder="auto-filled from filename">
         </div>
         <div class="import-body" id="importBody">
           <div class="import-section" id="importSecNew" hidden>
@@ -2890,7 +2926,7 @@
           </div>
           <div class="import-section" id="importSecRestock" hidden>
             <h3 class="import-section-title restock">📦 Restocked items <span class="count" id="importSecRestockCount"></span></h3>
-            <p class="import-section-help">Existing products. Current stock → new stock after import.</p>
+            <p class="import-section-help" data-i18n="import.existing_products_help">Existing products. Current stock → new stock after import.</p>
             <div class="import-table-wrap"><table class="import-table" id="importTblRestock"></table></div>
           </div>
           <div class="import-section" id="importSecRenames" hidden>
@@ -2906,8 +2942,8 @@
         </div>
         <div class="import-summary" id="importSummary"></div>
         <div class="import-footer">
-          <button class="btn secondary" id="importCancelBtn">Cancel</button>
-          <button class="btn" id="importConfirmBtn">Confirm Import</button>
+          <button class="btn secondary" id="importCancelBtn" data-i18n="buttons.cancel">Cancel</button>
+          <button class="btn" id="importConfirmBtn" data-i18n="import.confirm_import">Confirm Import</button>
         </div>
       </div>
     </div>
@@ -2916,8 +2952,60 @@
     <div class="submit-overlay" id="importProgressOverlay">
       <div class="submit-card" style="min-width:340px;">
         <div class="spinner"></div>
-        <div class="submit-status" id="importProgressStatus">Importing…</div>
+        <div class="submit-status" id="importProgressStatus" data-i18n="import.importing">Importing…</div>
         <div class="submit-substatus" id="importProgressSubstatus"></div>
+      </div>
+    </div>
+
+    <!-- ============ Stock Revision workflow ============
+         Upload a spreadsheet (xlsx/ods/csv) with 3 columns: ID, Name, Stock (first row header).
+         The app compares each row's Stock against the product's current stock in the DB and
+         shows a preview categorized into 3 sections:
+           1. Differences  → stock will change (delta applied as stock_in adjustment row)
+           2. Not in catalog  → row's ID doesn't match any product; skipped
+           3. Not in file  → products in DB not mentioned in the revision file; stock unchanged
+         On Confirm, all differences get a single stock_in_group with `source = 'Stock revision'`.
+    -->
+    <input type="file" id="revisionFile" accept=".xlsx,.xls,.ods,.csv" style="display: none;">
+    <div class="import-modal" id="revisionModal">
+      <div class="import-card">
+        <div class="import-header">
+          <h2 data-i18n="revision.title">Apply stock revision</h2>
+          <button class="btn secondary small" id="revisionCloseBtn">✕</button>
+        </div>
+        <p class="import-section-help" style="margin: 4px 20px 12px;" data-i18n="revision.hint">Reads the first 3 columns: ID, Name, Stock. First row must be a header.</p>
+        <div class="import-body" id="revisionBody">
+          <div class="import-section" id="revSecDiff" hidden>
+            <h3 class="import-section-title restock"><span data-i18n="revision.diff_section">📝 Stock differences</span> <span class="count" id="revSecDiffCount"></span></h3>
+            <p class="import-section-help" data-i18n="revision.diff_help">Products where the file's stock differs.</p>
+            <div class="import-table-wrap"><table class="import-table" id="revTblDiff"></table></div>
+          </div>
+          <div class="import-section" id="revSecUnknown" hidden>
+            <h3 class="import-section-title skipped"><span data-i18n="revision.unknown_section">⚠️ Not in catalog</span> <span class="count" id="revSecUnknownCount"></span></h3>
+            <p class="import-section-help" data-i18n="revision.unknown_help">Products with IDs not in your catalog.</p>
+            <div class="import-table-wrap"><table class="import-table" id="revTblUnknown"></table></div>
+          </div>
+          <div class="import-section" id="revSecMissing" hidden>
+            <h3 class="import-section-title renames"><span data-i18n="revision.missing_section">❓ Not in file</span> <span class="count" id="revSecMissingCount"></span></h3>
+            <p class="import-section-help" data-i18n="revision.missing_help">Products in the catalog not in the revision file.</p>
+            <div class="import-table-wrap"><table class="import-table" id="revTblMissing"></table></div>
+          </div>
+          <div class="import-section" id="revSecNoDiffs" hidden>
+            <p class="import-section-help" style="text-align: center; font-size: 15px; padding: 20px;" data-i18n="revision.no_diffs">No differences — the file matches your current stock exactly.</p>
+          </div>
+        </div>
+        <div class="import-footer">
+          <button class="btn secondary" id="revisionCancelBtn" data-i18n="buttons.cancel">Cancel</button>
+          <button class="btn" id="revisionConfirmBtn" data-i18n="revision.confirm_button">Apply revision</button>
+        </div>
+      </div>
+    </div>
+    <!-- Revision progress overlay (during execution) -->
+    <div class="submit-overlay" id="revisionProgressOverlay">
+      <div class="submit-card" style="min-width:340px;">
+        <div class="spinner"></div>
+        <div class="submit-status" id="revisionProgressStatus" data-i18n="revision.applying">Applying revision…</div>
+        <div class="submit-substatus" id="revisionProgressSubstatus"></div>
       </div>
     </div>
 
@@ -2925,7 +3013,7 @@
     <div class="settings-modal" id="settingsModal">
       <div class="settings-card">
         <div class="settings-header">
-          <h2>Settings</h2>
+          <h2 data-i18n="drawer.settings">Settings</h2>
           <button class="btn secondary small" id="settingsCloseBtn">✕ Close</button>
         </div>
         <div class="settings-body">
@@ -2947,33 +3035,33 @@
             <div class="settings-pref-row">
               <label class="settings-pref-label">
                 <input type="checkbox" id="prefHideZeroStock">
-                <span>Hide out-of-stock products from dropdown suggestions</span>
+                <span data-i18n="prefs_hints.hide_zero_label">Hide out-of-stock products from dropdown suggestions</span>
               </label>
-              <p class="settings-pref-hint">When on, products with 0 or less stock won't appear when typing in the New Sale or Add Products forms. When off (default), they show at the bottom of the suggestions with a red-italic style.</p>
+              <p class="settings-pref-hint" data-i18n="prefs_hints.hide_zero_hint">When on, products with 0 or less stock won't appear when typing in the New Sale or Add Products forms. When off (default), they show at the bottom of the suggestions with a red-italic style.</p>
             </div>
             <div class="settings-pref-row">
               <label class="settings-pref-label">
                 <input type="checkbox" id="prefShowDebug">
-                <span>Show debug console button</span>
+                <span data-i18n="prefs_hints.show_debug_label">Show debug console button</span>
               </label>
-              <p class="settings-pref-hint">Enables the 🐛 button (bottom-left) that opens a live log of app activity (fetches, WebSocket events, clicks, errors). Useful for troubleshooting. Draggable — grab and move it wherever. Off by default.</p>
+              <p class="settings-pref-hint" data-i18n="prefs_hints.show_debug_hint">Enables the 🐛 button (bottom-left) that opens a live log of app activity (fetches, WebSocket events, clicks, errors). Useful for troubleshooting. Draggable — grab and move it wherever. Off by default.</p>
             </div>
           </section>
           <section class="settings-category">
             <h3 class="settings-category-title" data-i18n="settings.section_backup">💾 Backup</h3>
-            <p class="settings-category-desc">
+            <p class="settings-category-desc" data-i18n="backup.description_intro">
               Download a snapshot of all your inventory data to your computer. The backup is a ZIP file containing three files:
             </p>
             <ul class="settings-list">
-              <li><strong>inventory_backup_FULL_*.json</strong> — complete data including products catalog and all events. Suitable for full disaster recovery.</li>
-              <li><strong>sales_*.csv</strong> — all sales as a flat spreadsheet (opens in Excel, LibreOffice, Google Sheets). Suitable for accounting and analysis.</li>
-              <li><strong>stock_in_*.csv</strong> — all stock receipts as a flat spreadsheet.</li>
+              <li><strong>inventory_backup_FULL_*.json</strong> — <span data-i18n="backup.file_json">complete data including products catalog and all events. Suitable for full disaster recovery.</span></li>
+              <li><strong>sales_*.csv</strong> — <span data-i18n="backup.file_sales">all sales as a flat spreadsheet (opens in Excel, LibreOffice, Google Sheets). Suitable for accounting and analysis.</span></li>
+              <li><strong>stock_in_*.csv</strong> — <span data-i18n="backup.file_stockin">all stock receipts as a flat spreadsheet.</span></li>
             </ul>
-            <p class="settings-category-desc">
+            <p class="settings-category-desc" data-i18n="backup.description_outro">
               Backups are read-only — they don't change anything on the server. Recommended: store the ZIP somewhere safe periodically (your computer, cloud drive, USB stick).
             </p>
             <div class="settings-actions">
-              <button class="btn" id="downloadBackupBtn">📦 Download backup (ZIP)</button>
+              <button class="btn" id="downloadBackupBtn" data-i18n="backup.download_button">📦 Download backup (ZIP)</button>
               <span class="settings-status" id="backupStatus"></span>
             </div>
           </section>
@@ -2992,13 +3080,13 @@
 
     <div class="confirm-modal" id="confirmModal">
       <div class="confirm-card">
-        <h3 id="confirmTitle">Confirm Delete</h3>
-        <p id="confirmMessage">Are you sure you want to delete this?</p>
+        <h3 id="confirmTitle" data-i18n="bubble_delete.title">Confirm Delete</h3>
+        <p id="confirmMessage" data-i18n="bubble_delete.are_you_sure">Are you sure you want to delete this?</p>
         <div class="confirm-detail" id="confirmDetail"></div>
-        <p style="font-size: 12px;">This will permanently delete the record. Stock counts will update accordingly.</p>
+        <p style="font-size: 12px;" data-i18n="bubble_delete.will_permanently_delete">This will permanently delete the record. Stock counts will update accordingly.</p>
         <div class="confirm-actions">
-          <button class="btn secondary" id="confirmCancelBtn">Cancel</button>
-          <button class="btn danger" id="confirmDeleteBtn">Delete</button>
+          <button class="btn secondary" id="confirmCancelBtn" data-i18n="buttons.cancel">Cancel</button>
+          <button class="btn danger" id="confirmDeleteBtn" data-i18n="buttons.delete">Delete</button>
         </div>
       </div>
     </div>
@@ -3027,7 +3115,7 @@
     <!-- Floating scroll-to-bottom button (Sales History + Calendar workspaces only).
          Shown when the user is scrolled far up; click jumps to the bottom of the feed
          (newest entries). See SCROLL_TO_BOTTOM_THRESHOLD_PX in JS for the trigger distance. -->
-    <button type="button" class="scroll-to-bottom-btn" id="scrollToBottomBtn" aria-label="Scroll to bottom of feed">
+    <button type="button" class="scroll-to-bottom-btn" id="scrollToBottomBtn" data-i18n-aria-label="header.scroll_to_bottom" aria-label="Scroll to bottom of feed">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <polyline points="6 13 12 19 18 13"></polyline>
@@ -3572,11 +3660,11 @@
       const btn = document.getElementById('loginBtn')
       errEl.textContent = ''
       if (!email || !password) {
-        errEl.textContent = 'Email and password required.'
+        errEl.textContent = t('login.email_password_required')
         return
       }
       btn.disabled = true
-      btn.textContent = 'Signing in…'
+      btn.textContent = t('login.signing_in')
       try {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
@@ -3596,7 +3684,7 @@
           : `Sign in failed: ${err.message || 'unknown error'}`
       } finally {
         btn.disabled = false
-        btn.textContent = 'Sign in'
+        btn.textContent = t('login.sign_in')
       }
     }
 
@@ -3627,6 +3715,113 @@
     // Allow Enter key in login form
     document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') window.doLogin() })
     document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') window.doLogin() })
+
+    // ===== Password reset flow =====
+    // Two-part UI:
+    //   1. "Forgot password?" link on the login form → asks Supabase to send a reset email.
+    //   2. When the user clicks the emailed link, Supabase redirects back to this same page
+    //      with `#type=recovery&access_token=…` in the URL hash. The client's onAuthStateChange
+    //      fires a `PASSWORD_RECOVERY` event. We swap the normal login form for a "Set new
+    //      password" form and call `updateUser({ password })` when submitted.
+    // Single-page app — no separate reset URL needed.
+    document.getElementById('forgotPasswordBtn').addEventListener('click', async () => {
+      const email = document.getElementById('loginEmail').value.trim()
+      const errEl = document.getElementById('loginError')
+      if (!email) {
+        errEl.textContent = t('login.reset_email_needed')
+        document.getElementById('loginEmail').focus()
+        return
+      }
+      errEl.textContent = ''
+      const btn = document.getElementById('forgotPasswordBtn')
+      const origLabel = btn.textContent
+      btn.disabled = true
+      btn.textContent = t('header.loading')
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + window.location.pathname,
+        })
+        if (error) throw error
+        await showNotice(t('login.reset_sent_body'), { title: t('login.reset_sent_title') })
+      } catch (err) {
+        log('error', 'Password reset request failed', err)
+        errEl.textContent = `${t('login.reset_failed')}: ${err.message || 'unknown error'}`
+      } finally {
+        btn.disabled = false
+        btn.textContent = origLabel
+      }
+    })
+
+    // Show the "Set new password" form (hides the normal login form)
+    function showRecoveryForm() {
+      document.getElementById('loginForm').style.display = 'none'
+      document.getElementById('passwordRecoveryForm').style.display = 'flex'
+      document.getElementById('loginScreen').style.display = 'flex'
+      document.getElementById('appShell').classList.remove('visible')
+      // Focus the new-password field
+      setTimeout(() => document.getElementById('newPasswordInput').focus(), 50)
+    }
+    // Restore normal login state (after reset OR if user navigates away)
+    function hideRecoveryForm() {
+      document.getElementById('passwordRecoveryForm').style.display = 'none'
+      document.getElementById('loginForm').style.display = 'flex'
+      document.getElementById('newPasswordInput').value = ''
+      document.getElementById('newPasswordConfirmInput').value = ''
+      document.getElementById('newPasswordError').textContent = ''
+      // Clean the recovery hash from the URL bar so refreshing doesn't re-trigger the form
+      if (window.location.hash && window.location.hash.includes('type=recovery')) {
+        history.replaceState(null, '', window.location.pathname + window.location.search)
+      }
+    }
+
+    // Submit handler for the new-password form
+    document.getElementById('newPasswordSaveBtn').addEventListener('click', async () => {
+      const pw = document.getElementById('newPasswordInput').value
+      const pwConfirm = document.getElementById('newPasswordConfirmInput').value
+      const errEl = document.getElementById('newPasswordError')
+      errEl.textContent = ''
+      if (pw.length < 6) { errEl.textContent = t('login.new_password_too_short'); return }
+      if (pw !== pwConfirm) { errEl.textContent = t('login.new_password_mismatch'); return }
+      const btn = document.getElementById('newPasswordSaveBtn')
+      const origLabel = btn.textContent
+      btn.disabled = true
+      btn.textContent = t('header.loading')
+      try {
+        const { data, error } = await supabase.auth.updateUser({ password: pw })
+        if (error) throw error
+        // Session is now valid — the auth-state-change listener will fire with SIGNED_IN and
+        // proceed to showApp() via the normal path. Clear the recovery UI first.
+        await showNotice(t('login.new_password_saved_body'), { title: t('login.new_password_saved_title') })
+        hideRecoveryForm()
+        // If a session came back, proceed to the app
+        const { data: sess } = await supabase.auth.getSession()
+        if (sess.session && sess.session.user) {
+          const u = sess.session.user
+          currentUser = {
+            id: u.id, email: u.email,
+            display_name: (u.user_metadata && u.user_metadata.display_name) || u.email,
+          }
+          showApp()
+        }
+      } catch (err) {
+        log('error', 'Password update failed', err)
+        errEl.textContent = `${t('login.new_password_save_failed')}: ${err.message || 'unknown error'}`
+      } finally {
+        btn.disabled = false
+        btn.textContent = origLabel
+      }
+    })
+    // Enter key in the new-password form submits
+    document.getElementById('newPasswordInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('newPasswordSaveBtn').click() })
+    document.getElementById('newPasswordConfirmInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('newPasswordSaveBtn').click() })
+
+    // Detect recovery hash on page load (before Supabase has a chance to fire the event).
+    // Belt-and-suspenders: the onAuthStateChange listener also catches PASSWORD_RECOVERY events.
+    if (window.location.hash && window.location.hash.includes('type=recovery')) {
+      log('auth', 'Recovery hash detected on load')
+      // Defer to next tick so DOM is ready
+      setTimeout(showRecoveryForm, 0)
+    }
 
     // Password visibility toggle
     document.getElementById('passwordToggle').addEventListener('click', () => {
@@ -3746,7 +3941,7 @@
           else scheduleOfflineOverlay()
         } else {
           const loadingState = document.querySelector('#loadingState')
-          if (loadingState) loadingState.textContent = 'Could not connect — click Refresh to retry.'
+          if (loadingState) loadingState.textContent = t('connection.could_not_connect')
         }
       } finally {
         const refreshBtnEl2 = document.getElementById('refreshBtn')
@@ -3769,7 +3964,7 @@
         if (existing) existing.remove()
         const emptyMsg = document.createElement('div')
         emptyMsg.className = 'state-message'
-        emptyMsg.textContent = 'No products found.'
+        emptyMsg.textContent = t('feed.no_products_found')
         main.insertBefore(emptyMsg, overlay)
         return
       }
@@ -3789,12 +3984,12 @@
         <div class="bubble stock-list-bubble">
           <div class="bubble-card">
             <div class="bubble-row row-header">
-              <div class="bubble-cell col-id">ID</div>
-              <div class="bubble-cell col-name">Name</div>
-              <div class="bubble-cell col-stock">Stock</div>
+              <div class="bubble-cell col-id">${escapeHtml(t('columns.id'))}</div>
+              <div class="bubble-cell col-name">${escapeHtml(t('columns.name'))}</div>
+              <div class="bubble-cell col-stock">${escapeHtml(t('columns.stock'))}</div>
             </div>
             ${sorted.length === 0
-              ? `<div class="stock-empty">No products yet.</div>`
+              ? `<div class="stock-empty">${escapeHtml(t('empty.products'))}</div>`
               : sorted.map(r => {
                   const qty = Number(r.current_quantity)
                   let cellCls = ''
@@ -3819,6 +4014,8 @@
       // background refresh (realtime/poll) doesn't visually reset the user's filter.
       const searchInp = document.getElementById('stockSearchInput')
       if (searchInp && searchInp.value.trim()) filterStockTable(searchInp.value.trim())
+      // Freshly-rendered bubble contains data-i18n attributes on column headers, etc.
+      if (typeof applyTranslations === 'function') applyTranslations()
     }
 
     // ===== Current Stock: live search filter =====
@@ -3934,7 +4131,7 @@
       activityLoading = true
       const loadMoreEl = document.getElementById('activityLoadMore')
       loadMoreEl.className = 'activity-load-more loading'
-      loadMoreEl.innerHTML = `<div class="mini-spinner"></div><span>Loading more…</span>`
+      loadMoreEl.innerHTML = `<div class="mini-spinner"></div><span>${escapeHtml(t('feed.loading_more'))}</span>`
       // Remember scroll position before adding older items so we can restore visual position
       const prevScrollHeight = document.documentElement.scrollHeight
       try {
@@ -3964,7 +4161,7 @@
       } catch (err) {
         log('error', 'Activity load failed', err)
         loadMoreEl.className = 'activity-load-more'
-        loadMoreEl.innerHTML = `<span style="color: var(--status-offline);">Could not load activity. <button class="btn small secondary" onclick="window.retryActivity()">Retry</button></span>`
+        loadMoreEl.innerHTML = `<span style="color: var(--status-offline);">${escapeHtml(t('feed.could_not_load'))} <button class="btn small secondary" onclick="window.retryActivity()">${escapeHtml(t('feed.retry'))}</button></span>`
       } finally {
         activityLoading = false
       }
@@ -3980,23 +4177,26 @@
     function dayLabel(iso) {
       const d = new Date(iso)
       const now = new Date()
+      // Locale-aware month + weekday names come from JS's own Intl support (native BG names).
+      // Falls back to 'en' if userPrefs isn't set yet during early init.
+      const locale = (typeof userPrefs !== 'undefined' && userPrefs && userPrefs.language) || 'en'
       const sameDay = d.toDateString() === now.toDateString()
       const yest = new Date(now); yest.setDate(now.getDate() - 1)
       const isYest = d.toDateString() === yest.toDateString()
-      const month = d.toLocaleString('en', { month: 'long' })
+      const month = d.toLocaleString(locale, { month: 'long' })
       const day = d.getDate()
       const sameYear = d.getFullYear() === now.getFullYear()
       // Year first when not current year, e.g. "2025 June 15"
       const dateStr = sameYear ? `${month} ${day}` : `${d.getFullYear()} ${month} ${day}`
-      if (sameDay) return `Today · ${dateStr}`
-      if (isYest) return `Yesterday · ${dateStr}`
+      if (sameDay) return `${t('day.today')} · ${dateStr}`
+      if (isYest) return `${t('day.yesterday')} · ${dateStr}`
       // WhatsApp-style: weekday prefix for the past 7 days (after yesterday).
-      // E.g. "Wednesday · June 17". Older dates show just the bare date.
+      // E.g. "Wednesday · June 17" (EN) / "Сряда · юни 17" (BG). Older dates show bare date.
       const startOfToday = new Date(now); startOfToday.setHours(0,0,0,0)
       const startOfD = new Date(d); startOfD.setHours(0,0,0,0)
       const daysAgo = Math.floor((startOfToday - startOfD) / 86400000)
       if (daysAgo >= 2 && daysAgo <= 6) {
-        const weekday = d.toLocaleString('en', { weekday: 'long' })
+        const weekday = d.toLocaleString(locale, { weekday: 'long' })
         return `${weekday} · ${dateStr}`
       }
       return dateStr
@@ -4016,7 +4216,8 @@
     function formatDateLong(iso) {
       const d = new Date(iso)
       const now = new Date()
-      const month = d.toLocaleString('en', { month: 'long' })
+      const locale = (typeof userPrefs !== 'undefined' && userPrefs && userPrefs.language) || 'en'
+      const month = d.toLocaleString(locale, { month: 'long' })
       const day = d.getDate()
       const sameYear = d.getFullYear() === now.getFullYear()
       // Year first when not current year
@@ -4043,7 +4244,7 @@
         if (detachedEditNode) detachedEditNode.remove()
       }
       if (activityRows.length === 0) {
-        feedEl.innerHTML = `<div class="state-message">No activity yet.</div>`
+        feedEl.innerHTML = `<div class="state-message">${escapeHtml(t('empty.activity'))}</div>`
         loadMoreEl.className = 'activity-load-more'
         loadMoreEl.innerHTML = ''
         // If the bubble that had the menu open is gone from the feed entirely, close the
@@ -4099,10 +4300,14 @@
       // Load-more / end-marker label at the TOP
       loadMoreEl.className = 'activity-load-more'
       if (activityHasMore) {
-        loadMoreEl.innerHTML = `<button class="btn secondary small" onclick="window.loadMoreActivityClick()">Load older</button>`
+        loadMoreEl.innerHTML = `<button class="btn secondary small" onclick="window.loadMoreActivityClick()">${escapeHtml(t('feed.load_older'))}</button>`
       } else {
-        loadMoreEl.innerHTML = `<span style="color: var(--text-faint);">— Beginning of history —</span>`
+        loadMoreEl.innerHTML = `<span style="color: var(--text-faint);">${escapeHtml(t('feed.beginning_of_history'))}</span>`
       }
+      // Re-apply translations to the freshly-rendered content — new bubbles arriving via
+      // realtime or auto-refresh contain data-i18n attributes that need to be resolved.
+      // Cheap: querySelectorAll('[data-i18n]') on the newly-written HTML.
+      if (typeof applyTranslations === 'function') applyTranslations()
       // Re-apply the menu-open highlight to the new bubble element (if the bubble that had
       // the menu is still in the fresh data). If the bubble was deleted by another user,
       // close the menu — otherwise it'd float pointing at nothing.
@@ -4130,7 +4335,7 @@
       if (isStockIn) {
         if (isEditing) {
           // Source becomes editable in edit mode
-          metaRight = `<input type="text" class="cell-edit-input" data-edit-source value="${escapeHtml(r.source || '')}" placeholder="Source / invoice">`
+          metaRight = `<input type="text" class="cell-edit-input" data-edit-source value="${escapeHtml(r.source || '')}" placeholder="${escapeHtml(t('bubble_edit.source_invoice'))}">`
         } else {
           // Stock-in has no `edited` flag (only sales does), so detect edits via updated_at vs created_at:
           // either on the group (source was edited) or any item (qty was edited). Use a small threshold
@@ -4149,7 +4354,7 @@
           if (latestEditTs) {
             const editTime = formatHM(latestEditTs)
             const editDate = formatDateLong(latestEditTs)
-            editedPrefix = `<span class="edited-prefix">edited · ${editTime} — ${editDate}</span>`
+            editedPrefix = `<span class="edited-prefix">${escapeHtml(t('bubble.edited'))} · ${editTime} — ${editDate}</span>`
           }
           const sourceSpan = r.source ? `<span class="meta-right invoice">${escapeHtml(r.source)}</span>` : ''
           if (editedPrefix || sourceSpan) {
@@ -4162,7 +4367,7 @@
         if (editedItem) {
           const editTime = formatHM(editedItem.updated_at)
           const editDate = formatDateLong(editedItem.updated_at)
-          metaRight = `<span class="meta-right edited">edited · ${editTime} — ${editDate}</span>`
+          metaRight = `<span class="meta-right edited">${escapeHtml(t('bubble.edited'))} · ${editTime} — ${editDate}</span>`
         }
       }
       const showStockColumn = isEditing  // Both sale + stock-in get the temp Stock column in edit mode
@@ -4176,7 +4381,7 @@
         ? `<div class="bubble-row row-note">
              <div class="bubble-cell" style="grid-column: 1 / -1;">
                <span class="note-icon">📝</span>
-               <span class="note-prefix">Note:</span>
+               <span class="note-prefix" data-i18n="bubble_edit.note_prefix">Note:</span>
                <span class="note-text">${escapeHtml(r.notes)}</span>
              </div>
            </div>`
@@ -4191,17 +4396,17 @@
                 ? (isLegacyGroupId(r.group_id)
                     ? ''  /* legacy rows have no group to store notes on; hide note UI */
                     : `<div class="note-x-cell">
-                         <button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
+                         <button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" data-i18n-aria-label="bubble_edit.discard_note" data-i18n-title="bubble_edit.discard_note" aria-label="Discard note" title="Discard note">×</button>
                        </div>
                        <div class="note-input-wrapper">
-                         <span class="note-edit-prefix">📝Note:</span>
+                         <span class="note-edit-prefix">📝<span data-i18n="bubble_edit.note_prefix">Note:</span></span>
                          <textarea class="note-edit-input auto-grow" rows="1" data-edit-note>${escapeHtml(r.notes || '')}</textarea>
                        </div>`)
-                : `<button class="note-icon-btn" data-action="expand-note" type="button" aria-label="Add a note" title="Add a note">📝</button>`}
+                : `<button class="note-icon-btn" data-action="expand-note" type="button" data-i18n-aria-label="bubble_edit.add_a_note" data-i18n-title="bubble_edit.add_a_note" aria-label="Add a note" title="Add a note">📝</button>`}
             </div>
             <div class="edit-action-buttons">
-              <button class="btn danger small" data-action="cancel-edit">Cancel</button>
-              <button class="btn small" data-action="save-edit" data-group-id="${escapeHtml(r.group_id)}">Save</button>
+              <button class="btn danger small" data-action="cancel-edit">${escapeHtml(t('buttons.cancel'))}</button>
+              <button class="btn small" data-action="save-edit" data-group-id="${escapeHtml(r.group_id)}">${escapeHtml(t('buttons.save'))}</button>
             </div>
           </div>`
         : ''
@@ -4210,7 +4415,7 @@
       // spans all columns of the bubble's grid via grid-column: 1 / -1.
       const addRowButton = isEditing && !isLegacyGroupId(r.group_id)
         ? `<div class="bubble-row row-add-button-in-edit">
-             <button class="add-row-in-edit-btn" type="button" data-action="add-row-in-edit" data-group-id="${escapeHtml(r.group_id)}">+ Add another product</button>
+             <button class="add-row-in-edit-btn" type="button" data-action="add-row-in-edit" data-group-id="${escapeHtml(r.group_id)}">${escapeHtml(t('buttons.add_another_product'))}</button>
            </div>`
         : ''
       // SVG marching-ants overlay — always rendered in the DOM but hidden via CSS by default.
@@ -4223,10 +4428,10 @@
           <div class="bubble-card">
             <div class="bubble-row row-header">
               ${isEditing ? '<div class="bubble-cell col-row-x"></div>' : ''}
-              <div class="bubble-cell col-id">ID</div>
-              <div class="bubble-cell col-name">Name</div>
-              ${showStockColumn ? '<div class="bubble-cell col-stock-edit">Stock</div>' : ''}
-              <div class="bubble-cell col-qty">Qty</div>
+              <div class="bubble-cell col-id">${escapeHtml(t('columns.id'))}</div>
+              <div class="bubble-cell col-name">${escapeHtml(t('columns.name'))}</div>
+              ${showStockColumn ? `<div class="bubble-cell col-stock-edit">${escapeHtml(t('cols_short.stock'))}</div>` : ''}
+              <div class="bubble-cell col-qty">${escapeHtml(t('cols_short.qty'))}</div>
             </div>
             ${bodyRows}
             ${addRowButton}
@@ -4271,11 +4476,11 @@
         return `
           <div class="bubble-row row-body row-existing" data-row-id="${item.row_id}" data-original-product-id="${escapeHtml(item.product_id || '')}" data-original-freeform-name="${escapeHtml(item.freeform_name || '')}" data-original-quantity="${item.quantity}">
             <div class="bubble-cell col-row-x">
-              <button class="remove-row-btn row-delete-btn" type="button" data-action="toggle-row-delete" data-row-id="${item.row_id}" aria-label="Mark for deletion" title="Mark for deletion">×</button>
+              <button class="remove-row-btn row-delete-btn" type="button" data-action="toggle-row-delete" data-row-id="${item.row_id}" data-i18n-aria-label="bubble_edit.mark_for_deletion" data-i18n-title="bubble_edit.mark_for_deletion" aria-label="Mark for deletion" title="Mark for deletion">×</button>
             </div>
             <div class="bubble-cell col-id" id="bubbleExistingId-${item.row_id}" data-state="${initialDataState}">${initialIdText}</div>
             <div class="bubble-cell col-name">
-              <textarea id="bubbleExistingProduct-${item.row_id}" class="cell-edit-input cell-edit-name auto-grow" rows="1" autocomplete="off" placeholder="Type product name…" data-edit-name data-row-id="${item.row_id}">${escapeHtml(initialName)}</textarea>
+              <textarea id="bubbleExistingProduct-${item.row_id}" class="cell-edit-input cell-edit-name auto-grow" rows="1" autocomplete="off" data-i18n-placeholder="placeholders.product_name" placeholder="${escapeHtml(t('placeholders.product_name'))}" data-edit-name data-row-id="${item.row_id}">${escapeHtml(initialName)}</textarea>
               <div class="autocomplete-list" id="bubbleExistingAcList-${item.row_id}"></div>
             </div>
             <div class="bubble-cell col-stock-edit" id="bubbleExistingStock-${item.row_id}"${item.product_id ? ` data-stock-for="${escapeHtml(item.product_id)}"` : ''}><span>${stockVal}</span></div>
@@ -4321,8 +4526,8 @@
       const menu = document.createElement('div')
       menu.className = 'bubble-menu visible'
       menu.innerHTML = `
-        <div class="bubble-menu-item" data-action="edit"><i style="font-style:normal;">✏️</i> Edit</div>
-        <div class="bubble-menu-item danger" data-action="delete"><i style="font-style:normal;">🗑️</i> Delete</div>
+        <div class="bubble-menu-item" data-action="edit"><i style="font-style:normal;">✏️</i> ${escapeHtml(t('context_menu.edit'))}</div>
+        <div class="bubble-menu-item danger" data-action="delete"><i style="font-style:normal;">🗑️</i> ${escapeHtml(t('context_menu.delete'))}</div>
       `
       // Position relative to bubble: place near the anchor (point coords or element rect)
       let top, left
@@ -4367,9 +4572,12 @@
             <button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
           </div>
           <div class="note-input-wrapper">
-            <span class="note-edit-prefix">📝Note:</span>
+            <span class="note-edit-prefix">📝<span data-i18n="bubble_edit.note_prefix">Note:</span></span>
             <textarea class="note-edit-input auto-grow" rows="1" data-edit-note></textarea>
           </div>`
+        // Newly-inserted content contains data-i18n attributes AND a note prefix that needs
+        // its width measured. applyTranslations() handles both (it calls sizeNoteIndents at the end).
+        if (typeof applyTranslations === 'function') applyTranslations()
         const inp = area.querySelector('textarea')
         if (inp) {
           inp.focus()
@@ -4417,8 +4625,8 @@
       })
       feedEl.querySelectorAll('[data-action="cancel-edit"]').forEach(btn => {
         btn.addEventListener('click', async () => {
-          const ok = await confirmYesNo('Discard your changes to this bubble?', {
-            title: 'Discard changes?', okLabel: 'Discard', cancelLabel: 'Keep editing', okStyle: 'danger'
+          const ok = await confirmYesNo(t('forms.discard_your_changes'), {
+            title: t('forms.discard_your_changes'), okLabel: t('buttons.delete'), cancelLabel: t('buttons.cancel'), okStyle: 'danger'
           })
           if (!ok) return
           exitEditMode()
@@ -4433,9 +4641,11 @@
               <button class="remove-row-btn note-remove-btn" type="button" data-action="discard-note" aria-label="Discard note" title="Discard note">×</button>
             </div>
             <div class="note-input-wrapper">
-              <span class="note-edit-prefix">📝Note:</span>
+              <span class="note-edit-prefix">📝<span data-i18n="bubble_edit.note_prefix">Note:</span></span>
               <textarea class="note-edit-input auto-grow" rows="1" data-edit-note></textarea>
             </div>`
+          // Newly-inserted note area has data-i18n on the prefix. Translate + size the indent.
+          if (typeof applyTranslations === 'function') applyTranslations()
           const inp = area.querySelector('textarea')
           if (inp) {
             inp.focus()
@@ -4555,17 +4765,17 @@
       const idCellHtml = isStockIn
         ? `<div class="bubble-cell new-row-id new-row-id-editable" id="bubbleNewId-${rowId}" data-state="empty">
              <span class="id-display">—</span>
-             <textarea class="id-editor auto-grow" rows="1" placeholder="?" autocomplete="off" maxlength="50" aria-label="Product ID"></textarea>
+             <textarea class="id-editor auto-grow" rows="1" placeholder="?" autocomplete="off" maxlength="50" data-i18n-aria-label="bubble_edit.product_id" aria-label="Product ID"></textarea>
            </div>`
         : `<div class="bubble-cell new-row-id" id="bubbleNewId-${rowId}" data-state="empty">—</div>`
       const qtyAttrs = isStockIn ? `step="1"` : `min="0" step="1"`
       rowEl.innerHTML = `
         <div class="bubble-cell col-row-x">
-          <button class="remove-row-btn" type="button" data-action="remove-new-row" data-new-row-id="${rowId}" aria-label="Remove row" title="Remove this new row">×</button>
+          <button class="remove-row-btn" type="button" data-action="remove-new-row" data-new-row-id="${rowId}" data-i18n-aria-label="bubble_edit.remove_row_aria" data-i18n-title="bubble_edit.remove_new_row" aria-label="Remove row" title="Remove this new row">×</button>
         </div>
         ${idCellHtml}
         <div class="bubble-cell new-row-product">
-          <textarea id="bubbleNewProduct-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Type product name…"></textarea>
+          <textarea id="bubbleNewProduct-${rowId}" class="auto-grow" rows="1" autocomplete="off" data-i18n-placeholder="placeholders.product_name" placeholder="${escapeHtml(t('placeholders.product_name'))}"></textarea>
           <div class="autocomplete-list" id="bubbleNewAcList-${rowId}"></div>
         </div>
         <div class="bubble-cell new-row-stock" id="bubbleNewStock-${rowId}" data-state="empty">—</div>
@@ -4576,6 +4786,8 @@
       // Insert before the "+ Add another product" button row
       const addBtnRow = bubbleEl.querySelector('.row-add-button-in-edit')
       if (addBtnRow) addBtnRow.parentNode.insertBefore(rowEl, addBtnRow)
+      // New row's data-i18n-* attributes (aria + placeholder + title) need translation applied.
+      if (typeof applyTranslations === 'function') applyTranslations()
       // Wire up autocomplete (reuses createAutocomplete; same options as the form bubbles).
       const ac = createAutocomplete(
         `bubbleNewProduct-${rowId}`,
@@ -4655,9 +4867,9 @@
     }
 
     async function saveEdit(groupId) {
-      if (!isOnline) { await showNotice('No connection — cannot save edit right now.', { title: 'No connection' }); return }
+      if (!isOnline) { await showNotice(t('validation.no_conn_save'), { title: t('validation.no_connection') }); return }
       const bubble = findBubble(groupId)
-      if (!bubble) { await showNotice('Could not find this bubble in the current view.', { title: 'Bubble not found' }); return }
+      if (!bubble) { await showNotice(t('validation.bubble_not_found_msg'), { title: t('validation.bubble_not_found') }); return }
       // CRITICAL: scope the bubble lookup to the one currently in edit mode (`.editing` class).
       // Without this, when the same group_id is rendered in BOTH Sales History (#activityFeed)
       // and Calendar (#calFeed) feeds — which happens whenever the user visits both workspaces
@@ -4668,7 +4880,7 @@
       // shows "Saved", and the actual editing inputs in the Calendar bubble are silently
       // discarded. Adding `.editing` to the selector guarantees we read from the right bubble.
       const bubbleEl = document.querySelector(`.bubble.editing[data-group-id="${CSS.escape(groupId)}"]`)
-      if (!bubbleEl) { await showNotice('Bubble element not found.', { title: 'Bubble not found' }); return }
+      if (!bubbleEl) { await showNotice(t('validation.bubble_el_not_found'), { title: t('validation.bubble_not_found') }); return }
       const isStockIn = bubble.event_type === 'stock_in'
       const isLegacy = isLegacyGroupId(groupId)
       // Collect IDs of rows marked for deletion (their X button was clicked).
@@ -4681,7 +4893,7 @@
       // For legacy single-row bubbles: deleting the only row would orphan the bubble; treat as
       // a full bubble-delete by deferring to confirmDelete flow instead.
       if (isLegacy && rowsToDelete.length > 0) {
-        await showNotice('Legacy single-row entries can\'t have their only row deleted from inside the editor — use the bubble menu → Delete to remove the entire entry.', { title: 'Cannot delete row' })
+        await showNotice(t('validation.cannot_delete_last_row'), { title: t('validation.cannot_delete_row') })
         return
       }
       // Collect quantity updates ONLY from rows NOT marked for delete.
@@ -4694,11 +4906,11 @@
         const rowId = parseInt(inp.dataset.rowId, 10)
         const q = parseInt(inp.value, 10)
         const rowEl = inp.closest('.row-body')
-        if (isNaN(q)) { flashRowError(rowEl); await showNotice('Quantity must be a number.', { title: 'Invalid quantity' }); return }
+        if (isNaN(q)) { flashRowError(rowEl); await showNotice(t('validation.quantity_nan'), { title: t('validation.invalid_quantity') }); return }
         if (isStockIn) {
           // Stock-in allows any integer: positive (receipts), negative (corrections), or zero.
         } else {
-          if (q < 0) { flashRowError(rowEl); await showNotice('Sale quantity must be 0 or more.', { title: 'Invalid quantity' }); return }
+          if (q < 0) { flashRowError(rowEl); await showNotice(t('validation.sale_qty_negative'), { title: t('validation.invalid_quantity') }); return }
         }
         newQtyByRow[rowId] = q
         // -- Detect product change on this existing row (user edited the name textarea) --
@@ -4708,7 +4920,7 @@
           const originalProductId = rowEl.dataset.originalProductId || ''
           const originalFreeformName = rowEl.dataset.originalFreeformName || ''
           if (!typedName) {
-            flashRowError(rowEl); await showNotice('Product name cannot be empty. Mark the row × to delete it instead.', { title: 'Missing product name' }); return
+            flashRowError(rowEl); await showNotice(t('validation.product_name_empty'), { title: t('validation.missing_product_name') }); return
           }
           const exact = productsCache.find(p => p.name.toLowerCase() === typedName.toLowerCase())
           if (exact) {
@@ -4719,7 +4931,7 @@
           } else {
             // No catalog match → freeform path
             if (isStockIn) {
-              flashRowError(rowEl); await showNotice(`"${typedName}" is not in the catalog. Pick an existing product, or remove this row and re-add via "+ Add another product" to create a brand-new product.`, { title: 'Unknown product' }); return
+              flashRowError(rowEl); await showNotice(`"${typedName}" ${t('validation.unknown_product_msg')}`, { title: t('validation.unknown_product') }); return
             } else {
               // Sale freeform — only record if name actually changed
               if (originalProductId || originalFreeformName !== typedName) {
@@ -4748,9 +4960,9 @@
         // Skip completely blank rows silently (user clicked + Add but didn't fill anything)
         if (!typedName && qtyRaw === '') continue
         // Validate
-        if (!typedName) { flashRowError(rowEl); await showNotice('New row is missing a product name.', { title: 'Missing product name' }); return }
-        if (isNaN(qtyVal)) { flashRowError(rowEl); await showNotice('New row is missing a quantity.', { title: 'Missing quantity' }); return }
-        if (!isStockIn && qtyVal < 0) { flashRowError(rowEl); await showNotice('Sale quantity must be 0 or more.', { title: 'Invalid quantity' }); return }
+        if (!typedName) { flashRowError(rowEl); await showNotice(t('validation.new_row_no_name'), { title: t('validation.missing_product_name') }); return }
+        if (isNaN(qtyVal)) { flashRowError(rowEl); await showNotice(t('validation.new_row_no_qty'), { title: t('validation.missing_quantity') }); return }
+        if (!isStockIn && qtyVal < 0) { flashRowError(rowEl); await showNotice(t('validation.sale_qty_negative'), { title: t('validation.invalid_quantity') }); return }
         // Resolve product: exact case-insensitive name match against productsCache?
         const exactMatch = productsCache.find(p => p.name.toLowerCase() === typedName.toLowerCase())
         if (isStockIn) {
@@ -4759,7 +4971,7 @@
           } else {
             // No catalog match → user wants to create a brand-new product. Need a typed ID.
             const newId = idEditor ? idEditor.value.trim() : ''
-            if (!newId) { flashRowError(rowEl); await showNotice(`"${typedName}" — to create a new product, type its ID in the ID column.`, { title: 'Missing product ID' }); return }
+            if (!newId) { flashRowError(rowEl); await showNotice(`"${typedName}" — ${t('validation.missing_product_id_msg')}`, { title: t('validation.missing_product_id') }); return }
             newRowsToInsert.push({ kind: 'stockin-new-product', productId: newId, productName: typedName, quantity: qtyVal, rowEl })
           }
         } else {
@@ -4899,7 +5111,7 @@
       } catch (err) {
         log('error', 'Edit failed', err)
         hideSubmitOverlay()
-        await showNotice(`Failed to save edit: ${err.message || 'unknown error'}`, { title: 'Save failed', variant: 'danger' })
+        await showNotice(`${t('notices.save_failed')}: ${err.message || 'unknown error'}`, { title: t('notices.save_failed'), variant: 'danger' })
       } finally {
         // Clear the in-flight flag so the realtime kick logic can resume kicking on subsequent
         // remote edits. We do this last so any trailing realtime events from THIS save (which
@@ -4937,7 +5149,7 @@
     })
     document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
       if (!pendingDelete) return
-      if (!isOnline) { await showNotice('No connection — cannot delete right now.', { title: 'No connection' }); return }
+      if (!isOnline) { await showNotice(t('forms.no_conn_delete'), { title: t('validation.no_connection') }); return }
       const { groupId } = pendingDelete
       pendingDelete = null
       document.getElementById('confirmModal').classList.remove('visible')
@@ -4971,7 +5183,7 @@
       } catch (err) {
         log('error', 'Delete failed', err)
         hideSubmitOverlay()
-        await showNotice(`Failed to delete: ${err.message || 'unknown error'}`, { title: 'Delete failed', variant: 'danger' })
+        await showNotice(`${t('notices.delete_failed')}: ${err.message || 'unknown error'}`, { title: t('notices.delete_failed'), variant: 'danger' })
       }
     })
 
@@ -5012,7 +5224,7 @@
         : 'This entry was just updated by the other user. Your in-progress edit has been discarded.'
       // Use alert for now — blocking + impossible to miss. Could upgrade to a non-blocking toast
       // later if it feels jarring in practice.
-      showNotice(msg, { title: 'Entry changed elsewhere' })
+      showNotice(msg, { title: t('validation.entry_changed_elsewhere') })
     }
     // Extract the group_id affected by a realtime event. Different tables store the group ID
     // in different columns:
@@ -5341,20 +5553,23 @@
       row.setAttribute('data-row-id', rowId)
       row.innerHTML = `
         <div class="bubble-cell col-form-x">
-          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" aria-label="Remove row" title="Remove this product">×</button>
+          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" data-i18n-aria-label="bubble_edit.remove_row_aria" data-i18n-title="bubble_edit.remove_this_product" aria-label="Remove row" title="Remove this product">×</button>
         </div>
         <div class="bubble-cell col-form-id" id="saleIdReadout-${rowId}" data-state="empty">—</div>
         <div class="bubble-cell col-form-product">
-          <textarea id="saleProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Type product name…"></textarea>
+          <textarea id="saleProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" data-i18n-placeholder="placeholders.product_name" placeholder="${escapeHtml(t('placeholders.product_name'))}"></textarea>
           <div class="autocomplete-list" id="saleAcList-${rowId}"></div>
         </div>
-        <div class="bubble-cell col-form-stock" id="saleStockReadout-${rowId}" data-state="empty" title="Current stock for the selected product (read-only)">—</div>
+        <div class="bubble-cell col-form-stock" id="saleStockReadout-${rowId}" data-state="empty" data-i18n-title="bubble_edit.current_stock_tooltip" title="Current stock for the selected product (read-only)">—</div>
         <div class="bubble-cell col-form-qty">
           <input type="number" id="saleQtyInput-${rowId}" min="0" step="1">
         </div>
       `
       // Insert the row at the end of the container (before the add-row button block which lives outside this container)
       container.appendChild(row)
+      // Freshly-inserted row has data-i18n attributes (aria-label / title / placeholder).
+      // Apply now so the row shows in the current language, not the English defaults.
+      if (typeof applyTranslations === 'function') applyTranslations()
       // Wire up an autocomplete instance for this row
       const ac = createAutocomplete(
         `saleProductInput-${rowId}`,
@@ -5425,6 +5640,8 @@
       if (!iconBtn || !expandedState || !input) return
       iconBtn.style.display = 'none'
       expandedState.style.display = ''
+      // Now that the prefix is laid out (was display:none), measure it for the correct indent.
+      if (typeof sizeNoteIndents === 'function') sizeNoteIndents()
       input.focus()
       if (typeof autoGrow === 'function') autoGrow(input)
     }
@@ -5546,8 +5763,8 @@
       }
       if (!hasAnyData && getFormNoteValue('sale')) hasAnyData = true
       if (hasAnyData) {
-        const ok = await confirmYesNo('Discard everything you have entered?', {
-          title: 'Discard sale?', okLabel: 'Discard', cancelLabel: 'Keep editing', okStyle: 'danger'
+        const ok = await confirmYesNo(t('forms.discard_everything'), {
+          title: t('forms.discard_your_changes'), okLabel: t('buttons.delete'), cancelLabel: t('buttons.cancel'), okStyle: 'danger'
         })
         if (!ok) return
       }
@@ -5569,22 +5786,25 @@
       row.setAttribute('data-row-id', rowId)
       row.innerHTML = `
         <div class="bubble-cell col-form-x">
-          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" aria-label="Remove row" title="Remove this product">×</button>
+          <button class="remove-row-btn" type="button" data-remove-row="${rowId}" data-i18n-aria-label="bubble_edit.remove_row_aria" data-i18n-title="bubble_edit.remove_this_product" aria-label="Remove row" title="Remove this product">×</button>
         </div>
         <div class="bubble-cell col-form-id col-form-id-editable" id="stockIdReadout-${rowId}" data-state="empty">
           <span class="id-display">—</span>
-          <textarea class="id-editor auto-grow" rows="1" placeholder="?" autocomplete="off" maxlength="50" aria-label="Product ID"></textarea>
+          <textarea class="id-editor auto-grow" rows="1" placeholder="?" autocomplete="off" maxlength="50" data-i18n-aria-label="bubble_edit.product_id" aria-label="Product ID"></textarea>
         </div>
         <div class="bubble-cell col-form-product">
-          <textarea id="stockProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" placeholder="Type product name…"></textarea>
+          <textarea id="stockProductInput-${rowId}" class="auto-grow" rows="1" autocomplete="off" data-i18n-placeholder="placeholders.product_name" placeholder="${escapeHtml(t('placeholders.product_name'))}"></textarea>
           <div class="autocomplete-list" id="stockAcList-${rowId}"></div>
         </div>
-        <div class="bubble-cell col-form-stock" id="stockStockReadout-${rowId}" data-state="empty" title="Current stock for the selected product">—</div>
+        <div class="bubble-cell col-form-stock" id="stockStockReadout-${rowId}" data-state="empty" data-i18n-title="bubble_edit.current_stock_tooltip" title="Current stock for the selected product">—</div>
         <div class="bubble-cell col-form-qty">
-          <input type="number" id="stockQtyInput-${rowId}" step="1" title="Use negative numbers for corrections (e.g. -7)">
+          <input type="number" id="stockQtyInput-${rowId}" step="1" data-i18n-title="bubble_edit.negative_corrections" title="Use negative numbers for corrections (e.g. -7)">
         </div>
       `
       container.appendChild(row)
+      // Newly-inserted row has data-i18n-* attributes on the remove button + textarea placeholder
+      // + Q input title. Apply now so they show in the current language, not English defaults.
+      if (typeof applyTranslations === 'function') applyTranslations()
       const ac = createAutocomplete(
         `stockProductInput-${rowId}`,
         `stockAcList-${rowId}`,
@@ -5639,8 +5859,8 @@
       if (!hasAnyData) hasAnyData = !!document.getElementById('stockSourceInput').value.trim()
       if (!hasAnyData && getFormNoteValue('stock')) hasAnyData = true
       if (hasAnyData) {
-        const ok = await confirmYesNo('Discard everything you have entered?', {
-          title: 'Discard entries?', okLabel: 'Discard', cancelLabel: 'Keep editing', okStyle: 'danger'
+        const ok = await confirmYesNo(t('forms.discard_everything'), {
+          title: t('forms.discard_your_changes'), okLabel: t('buttons.delete'), cancelLabel: t('buttons.cancel'), okStyle: 'danger'
         })
         if (!ok) return
       }
@@ -5675,14 +5895,14 @@
       overlayActions.innerHTML = ''
       overlay.classList.add('visible')
       overlayTimers.push(setTimeout(() => {
-        overlaySubstatus.textContent = 'Taking longer than usual. Check your connection.'
+        overlaySubstatus.textContent = t('forms.taking_longer')
         if (activeCancel) {
-          overlayActions.innerHTML = `<button class="btn secondary" id="overlayCloseBtn">Close</button>`
+          overlayActions.innerHTML = `<button class="btn secondary" id="overlayCloseBtn">${escapeHtml(t('buttons.close'))}</button>`
           document.getElementById('overlayCloseBtn').onclick = () => { if (activeCancel) activeCancel() }
         }
       }, OVERLAY_CLOSE_DELAY_MS))
       overlayTimers.push(setTimeout(() => {
-        overlaySubstatus.textContent = 'Still trying… you can close this and verify in the list below.'
+        overlaySubstatus.textContent = t('forms.still_trying')
       }, OVERLAY_UNCERTAIN_DELAY_MS))
     }
     function setSubmitOverlaySuccess() {
@@ -5776,7 +5996,7 @@
         cancelled = true
         hideSubmitOverlay()
         feedback.className = 'form-feedback warning'
-        feedback.textContent = 'Stopped waiting. The entry may still arrive — check the list below. Retry is safe.'
+        feedback.textContent = t('forms.stopped_waiting')
         btn.disabled = false
         loadAll(false)
       }
@@ -5845,12 +6065,12 @@
       }
       if (collected.length === 0) {
         feedback.className = 'form-feedback error'
-        feedback.textContent = 'No products to log. Add at least one product first.'
+        feedback.textContent = t('forms.no_products_to_log')
         return
       }
       if (!isOnline) {
         feedback.className = 'form-feedback warning'
-        feedback.textContent = 'No connection — cannot log sale right now.'
+        feedback.textContent = t('forms.no_conn_log')
         return
       }
       log('sale', `Submitting sale (group + ${collected.length} item${collected.length>1?'s':''})`, collected.map(c => ({ product: c.productName, qty: c.quantity })))
@@ -5962,12 +6182,12 @@
       }
       if (collected.length === 0) {
         feedback.className = 'form-feedback error'
-        feedback.textContent = 'No products to receive. Add at least one product first.'
+        feedback.textContent = t('forms.no_products_to_receive')
         return
       }
       if (!isOnline) {
         feedback.className = 'form-feedback warning'
-        feedback.textContent = 'No connection — cannot receive stock right now.'
+        feedback.textContent = t('forms.no_conn_receive')
         return
       }
       log('stock_in', `Submitting stock_in (group + ${collected.length} item${collected.length>1?'s':''})`, { source, items: collected.map(c => ({ product: c.productName, qty: c.quantity, isNew: c.isNew })) })
@@ -6092,7 +6312,7 @@
       try {
         const rows = await parseSpreadsheetFile(file)
         if (!rows || rows.length === 0) {
-          await showNotice('The file appears to be empty or could not be read.', { title: 'Empty file' })
+          await showNotice(t('import.empty_file_msg'), { title: t('import.empty_file') })
           document.getElementById('importFile').value = ''
           return
         }
@@ -6109,9 +6329,9 @@
         log('error', 'Import parse failed', err)
         const msg = (err && err.message) || 'Unknown error'
         if (file.name.toLowerCase().endsWith('.ods')) {
-          await showNotice(`Couldn't parse this ODS file: ${msg}\n\nTip: ODS files vary between tools. If this keeps failing, try saving the file as CSV in LibreOffice or Excel and importing that instead.`, { title: 'ODS parse error', variant: 'danger' })
+          await showNotice(`${t('import.could_not_parse_ods')}: ${msg}\n\n${t('import.ods_parse_tip')}`, { title: t('import.ods_parse_error'), variant: 'danger' })
         } else {
-          await showNotice(`Couldn't parse this file: ${msg}`, { title: 'Parse error', variant: 'danger' })
+          await showNotice(`${t('import.could_not_parse')}: ${msg}`, { title: t('import.parse_error'), variant: 'danger' })
         }
         document.getElementById('importFile').value = ''
       }
@@ -6225,7 +6445,7 @@
         secNew.hidden = false
         secNewCount.textContent = `(${plan.newRows.length})`
         tblNew.innerHTML = `
-          <thead><tr><th>Code</th><th>Name</th><th class="numeric">Quantity</th></tr></thead>
+          <thead><tr><th>${escapeHtml(t('import.code'))}</th><th>${escapeHtml(t('columns.name'))}</th><th class="numeric">${escapeHtml(t('import.quantity'))}</th></tr></thead>
           <tbody>${plan.newRows.map(r => `
             <tr>
               <td class="code-cell">${escapeHtml(r.code)}</td>
@@ -6243,7 +6463,7 @@
         secR.hidden = false
         secRCount.textContent = `(${plan.restockRows.length})`
         tblR.innerHTML = `
-          <thead><tr><th>Code</th><th>Name</th><th class="numeric">Adding</th><th class="numeric">Current</th><th></th><th class="numeric">New</th></tr></thead>
+          <thead><tr><th>${escapeHtml(t('import.code'))}</th><th>${escapeHtml(t('columns.name'))}</th><th class="numeric">${escapeHtml(t('import.adding'))}</th><th class="numeric">${escapeHtml(t('import.current'))}</th><th></th><th class="numeric">${escapeHtml(t('import.new_col'))}</th></tr></thead>
           <tbody>${plan.restockRows.map(r => `
             <tr>
               <td class="code-cell">${escapeHtml(r.code)}</td>
@@ -6264,7 +6484,7 @@
         secRn.hidden = false
         secRnCount.textContent = `(${plan.renameRows.length})`
         tblRn.innerHTML = `
-          <thead><tr><th>Code</th><th>Old name</th><th>→</th><th>New name</th></tr></thead>
+          <thead><tr><th>${escapeHtml(t('import.code'))}</th><th>${escapeHtml(t('import.old_name'))}</th><th>→</th><th>${escapeHtml(t('import.new_name'))}</th></tr></thead>
           <tbody>${plan.renameRows.map(r => `
             <tr>
               <td class="code-cell">${escapeHtml(r.code)}</td>
@@ -6283,7 +6503,7 @@
         secSk.hidden = false
         secSkCount.textContent = `(${plan.skippedRows.length})`
         tblSk.innerHTML = `
-          <thead><tr><th>Row #</th><th>Code</th><th>Name</th><th>Qty</th><th>Reason</th></tr></thead>
+          <thead><tr><th>${escapeHtml(t('import.row_number'))}</th><th>${escapeHtml(t('import.code'))}</th><th>${escapeHtml(t('columns.name'))}</th><th>${escapeHtml(t('columns.qty'))}</th><th>${escapeHtml(t('import.reason'))}</th></tr></thead>
           <tbody>${plan.skippedRows.map(r => `
             <tr>
               <td class="numeric">${r.rowIndex}</td>
@@ -6318,7 +6538,7 @@
 
     async function executeImport() {
       if (!importPlan) return
-      if (!isOnline) { await showNotice('No connection — cannot import right now.', { title: 'No connection' }); return }
+      if (!isOnline) { await showNotice(t('import.no_conn_import'), { title: t('validation.no_connection') }); return }
 
       const plan = importPlan
       const sourceText = document.getElementById('importSourceInput').value.trim() || plan.sourceText
@@ -6329,7 +6549,7 @@
       const status = document.getElementById('importProgressStatus')
       const substatus = document.getElementById('importProgressSubstatus')
       overlay.classList.add('visible')
-      status.textContent = 'Importing…'
+      status.textContent = t('import.importing')
 
       let successCount = 0
       let failCount = 0
@@ -6339,7 +6559,7 @@
       try {
         // 1. Insert new products
         if (plan.newRows.length > 0) {
-          status.textContent = 'Creating new products…'
+          status.textContent = t('import.creating_products')
           substatus.textContent = `0 / ${plan.newRows.length}`
           for (let i = 0; i < plan.newRows.length; i++) {
             const r = plan.newRows[i]
@@ -6357,7 +6577,7 @@
 
         // 2. Apply rename updates
         if (plan.renameRows.length > 0) {
-          status.textContent = 'Updating product names…'
+          status.textContent = t('import.updating_names')
           substatus.textContent = `0 / ${plan.renameRows.length}`
           for (let i = 0; i < plan.renameRows.length; i++) {
             const r = plan.renameRows[i]
@@ -6381,7 +6601,7 @@
         ]
         let importGroupId = null
         if (allStockIns.length > 0) {
-          status.textContent = 'Creating import batch…'
+          status.textContent = t('import.creating_batch')
           substatus.textContent = ''
           try {
             const groupRow = {
@@ -6402,7 +6622,7 @@
 
         // 4. Insert stock_in rows referencing the group
         if (allStockIns.length > 0) {
-          status.textContent = 'Adding stock receipts…'
+          status.textContent = t('import.adding_receipts')
           substatus.textContent = `0 / ${allStockIns.length}`
           for (let i = 0; i < allStockIns.length; i++) {
             const r = allStockIns[i]
@@ -6449,7 +6669,7 @@
       } catch (err) {
         log('error', 'Import execute failed', err)
         overlay.classList.remove('visible')
-        await showNotice(`Import failed: ${err.message || 'unknown error'}\n\nSome rows may have been imported. Check the stock list. Retrying is safe.`,
+        await showNotice(`${t('import.import_failed')}: ${err.message || 'unknown error'}\n\n${t('import.import_failed_details')}`,
           { title: 'Import failed', variant: 'danger' })
       }
     }
@@ -6500,43 +6720,577 @@
         workspaces: { stock: 'Current Stock', history: 'Sales', calendar: 'Calendar' },
         drawer: { title: 'Menu', close: 'Close menu', signout: 'Sign out', settings: 'Settings' },
         actions: { refresh: 'Refresh', actions: 'Actions' },
-        buttons: { add: 'Add', cancel: 'Cancel', save: 'Save', delete: 'Delete', edit: 'Edit', close: 'Close', ok: 'OK', yes: 'Yes', no: 'No' },
+        buttons: {
+          add: 'Add', cancel: 'Cancel', save: 'Save', delete: 'Delete', edit: 'Edit',
+          close: 'Close', ok: 'OK', yes: 'Yes', no: 'No', export: 'Export',
+          add_another_product: 'Add another product',
+          new_sale: 'New sale',
+        },
+        columns: {
+          id: 'ID', name: 'Name', product: 'Product',
+          stock: 'Stock', qty: 'Qty', in_stock: 'In stock',
+        },
+        // Compact abbreviated variants for tight column headers (form bubbles)
+        cols_short: {
+          id: 'ID', name: 'Name', stock: 'Stock', qty: 'Qty',
+        },
+        placeholders: {
+          product_name: 'Type product name…',
+          note: 'Add a note',
+          source_invoice: 'Source / Invoice',
+        },
+        empty: {
+          products: 'No products yet.',
+          activity: 'No activity yet.',
+          loading: 'Loading…',
+        },
         signout: { title: 'Sign out?', message: 'Sign out of the app?', ok: 'Sign out', cancel: 'Cancel' },
         settings: {
           section_prefs: '⚙️ Preferences',
           section_prefs_desc: 'User preferences saved to this browser. They apply immediately and persist across sessions.',
           section_backup: '💾 Backup',
+          section_backup_desc: 'Downloads a file with columns ID, Name, and Quantity.',
           pref_language: 'Language',
           pref_language_hint: 'Interface language. Applies immediately.',
         },
         stock: { search_placeholder: 'Search products' },
+        export: {
+          title: 'Export current stock',
+          format: 'Format',
+          sort_by: 'Sort by',
+          sort_name: 'Name (A–Z)',
+          sort_quantity: 'Quantity (high to low)',
+          sort_id: 'ID',
+          include_zero: 'Include products with 0 or less stock',
+          filename_preview: 'Filename:',
+        },
+        edit_product: {
+          title: 'Edit product',
+          hint_full: 'Changes to Stock are applied as an adjustment entry (a new stock-in row with the delta), so sales history stays intact.',
+        },
+        // Relative day labels used in feed day-separators. Weekday names indexed by JS Date.getDay() (0=Sunday).
+        day: {
+          today: 'Today',
+          yesterday: 'Yesterday',
+          weekdays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+        },
+        notices: {
+          save_failed: 'Save failed',
+          delete_failed: 'Delete failed',
+          invalid_input: 'Invalid input',
+          id_empty: 'ID cannot be empty.',
+          name_empty: 'Name cannot be empty.',
+          stock_nan: 'Stock must be a number.',
+          not_connected: 'No connection — please retry when online.',
+          could_not_check_refs: 'Could not check references',
+        },
+        confirm: {
+          delete_product_title: 'Delete product?',
+          delete_product_perm_prefix: 'Permanently delete',
+          delete_product_no_refs: 'No sales or stock-in entries reference this product.',
+          delete_product_refs_prefix: 'This product is referenced by',
+          delete_product_refs_suffix: 'These will be preserved but marked as freeform (unlinked) so history stays intact.',
+          delete_product_perm: 'The product itself will be removed from the catalog.',
+          and: 'and',
+          sale_singular: 'sale', sale_plural: 'sales',
+          stockin_singular: 'stock-in entry', stockin_plural: 'stock-in entries',
+        },
+        login: {
+          email: 'Email',
+          password: 'Password',
+          sign_in: 'Sign in',
+          signing_in: 'Signing in…',
+          show_password: 'Show password',
+          hide_password: 'Hide password',
+          email_password_required: 'Email and password required.',
+          forgot_password: 'Forgot password?',
+          reset_email_prompt: 'Enter your email to receive a password reset link.',
+          reset_email_needed: 'Please enter your email address first.',
+          reset_sent_title: 'Check your email',
+          reset_sent_body: 'If an account exists for that email, we sent a password reset link. Click the link in the email to set a new password.',
+          reset_failed: 'Could not send reset email',
+          new_password_title: 'Set a new password',
+          new_password_hint: 'You clicked a password reset link. Enter a new password below to finish resetting.',
+          new_password_placeholder: 'New password',
+          new_password_confirm: 'Confirm password',
+          new_password_save: 'Save new password',
+          new_password_too_short: 'Password must be at least 6 characters.',
+          new_password_mismatch: 'Passwords do not match.',
+          new_password_saved_title: 'Password updated',
+          new_password_saved_body: 'Your password has been updated. You are now signed in.',
+          new_password_save_failed: 'Could not update password',
+        },
+        header: {
+          connecting: 'Connecting…',
+          loading: 'Loading…',
+          signed_in_as: 'Signed in as',
+          open_menu: 'Open menu',
+          scroll_to_bottom: 'Scroll to bottom of feed',
+        },
+        actions_menu: {
+          add_product: 'Add product',
+          import_spreadsheet: 'Import from spreadsheet',
+          export_stock: 'Export stock',
+          apply_revision: 'Apply stock revision',
+        },
+        revision: {
+          title: 'Apply stock revision',
+          hint: 'Reads the first 3 columns: ID, Name, Stock. First row must be a header.',
+          diff_section: '📝 Stock differences',
+          diff_help: "Products where the file's stock differs from your current stock. Corrections apply as adjustment entries (a new stock-in row with the delta), so sales history stays intact.",
+          unknown_section: '⚠️ Not in catalog',
+          unknown_help: 'Products in the revision file whose ID does not match any product in your catalog. These will be skipped. If you need them, add them via "Add product" first.',
+          missing_section: '❓ Not in file',
+          missing_help: 'Products in your catalog that are not in the revision file. Their stock will NOT be changed. Listed here so you know what was not audited.',
+          no_diffs: '✓ No differences — the file matches your current stock exactly. Nothing to apply.',
+          confirm_button: 'Apply revision',
+          applying: 'Applying revision…',
+          complete: 'Revision applied',
+          failed: 'Revision failed',
+          source_label: 'Stock revision',
+          col_current: 'Current',
+          col_new: 'New',
+          col_delta: 'Δ',
+          skipped_invalid: 'Skipped',
+          skipped_help: 'Rows with an empty or invalid stock value.',
+          count_diffs: 'differences',
+          count_unknown: 'unknown',
+          count_missing: 'missing',
+        },
+        context_menu: { edit: 'Edit', delete: 'Delete' },
+        calendar: {
+          quick_select: 'Quick Select',
+          day: 'Day', range: 'Range', quick: 'Event', apply: 'Apply',
+          today: 'Today', this_week: 'This Week', this_month: 'This Month',
+          pick_date: 'Pick a date or range above to see activity.',
+          pick_a_date: 'Pick a date',
+          pick_a_date_range: 'Pick a date range',
+          previous_month: 'Previous month', next_month: 'Next month',
+          previous_year: 'Previous year', next_year: 'Next year',
+          close_calendar: 'Close calendar', close: 'Close',
+          loading: 'Loading…',
+          could_not_load: 'Could not load activity. Try again later.',
+        },
+        bubble: { edited: 'edited' },
+        bubble_edit: {
+          cancel: 'Cancel', save: 'Save',
+          add_another_product: '+ Add another product',
+          mark_for_deletion: 'Mark for deletion',
+          remove_new_row: 'Remove this new row',
+          product_id: 'Product ID',
+          source_invoice: 'Source / invoice',
+          note_prefix: 'Note:',
+          discard_note: 'Discard note',
+          add_a_note: 'Add a note',
+          remove_row_aria: 'Remove row',
+          remove_this_product: 'Remove this product',
+          current_stock_tooltip: 'Current stock for the selected product (read-only)',
+          negative_corrections: 'Use negative numbers for corrections (e.g. -7)',
+        },
+        validation: {
+          quantity_nan: 'Quantity must be a number.',
+          invalid_quantity: 'Invalid quantity',
+          sale_qty_negative: 'Sale quantity must be 0 or more.',
+          product_name_empty: 'Product name cannot be empty. Mark the row × to delete it instead.',
+          missing_product_name: 'Missing product name',
+          unknown_product_msg: 'is not in the catalog. Pick an existing product, or remove this row and re-add via "+ Add another product" to create a brand-new product.',
+          unknown_product: 'Unknown product',
+          missing_product_id_msg: 'to create a new product, type its ID in the ID column.',
+          missing_product_id: 'Missing product ID',
+          new_row_no_name: 'New row is missing a product name.',
+          new_row_no_qty: 'New row is missing a quantity.',
+          missing_quantity: 'Missing quantity',
+          no_conn_save: 'No connection — cannot save edit right now.',
+          no_connection: 'No connection',
+          bubble_not_found_msg: 'Could not find this bubble in the current view.',
+          bubble_not_found: 'Bubble not found',
+          bubble_el_not_found: 'Bubble element not found.',
+          cannot_delete_last_row: 'Legacy single-row entries can\'t have their only row deleted from inside the editor — use the bubble menu → Delete to remove the entire entry.',
+          cannot_delete_row: 'Cannot delete row',
+          entry_changed_elsewhere: 'Entry changed elsewhere',
+        },
+        bubble_delete: {
+          title: 'Confirm Delete',
+          are_you_sure: 'Are you sure you want to delete this?',
+          will_permanently_delete: 'This will permanently delete the record. Stock counts will update accordingly.',
+        },
+        forms: {
+          discard_your_changes: 'Discard your changes to this bubble?',
+          no_products_to_log: 'No products to log. Add at least one product first.',
+          no_products_to_receive: 'No products to receive. Add at least one product first.',
+          no_conn_log: 'No connection — cannot log sale right now.',
+          no_conn_receive: 'No connection — cannot receive stock right now.',
+          no_conn_delete: 'No connection — cannot delete right now.',
+          discard_everything: 'Discard everything you have entered?',
+          taking_longer: 'Taking longer than usual. Check your connection.',
+          still_trying: 'Still trying… you can close this and verify in the list below.',
+          stopped_waiting: 'Stopped waiting. The entry may still arrive — check the list below. Retry is safe.',
+        },
+        import: {
+          review_title: 'Review import',
+          auto_filled: 'auto-filled from filename',
+          existing_products_help: 'Existing products. Current stock → new stock after import.',
+          confirm_import: 'Confirm Import',
+          importing: 'Importing…',
+          code: 'Code', quantity: 'Quantity',
+          adding: 'Adding', current: 'Current', new_col: 'New',
+          row_number: 'Row #', old_name: 'Old name', new_name: 'New name',
+          reason: 'Reason',
+          empty_file_msg: 'The file appears to be empty or could not be read.',
+          empty_file: 'Empty file',
+          ods_parse_error: 'ODS parse error',
+          ods_parse_tip: 'ODS files vary between tools. If this keeps failing, try saving the file as CSV in LibreOffice or Excel and importing that instead.',
+          parse_error: 'Parse error',
+          could_not_parse_ods: 'Couldn\'t parse this ODS file',
+          could_not_parse: 'Couldn\'t parse this file',
+          no_conn_import: 'No connection — cannot import right now.',
+          creating_products: 'Creating new products…',
+          updating_names: 'Updating product names…',
+          creating_batch: 'Creating import batch…',
+          adding_receipts: 'Adding stock receipts…',
+          import_failed: 'Import failed',
+          import_failed_details: 'Some rows may have been imported. Check the stock list. Retrying is safe.',
+        },
+        prefs_hints: {
+          hide_zero_label: 'Hide out-of-stock products from dropdown suggestions',
+          hide_zero_hint: 'When on, products with 0 or less stock won\'t appear when typing in the New Sale or Add Products forms. When off (default), they show at the bottom of the suggestions with a red-italic style.',
+          show_debug_label: 'Show debug console button',
+          show_debug_hint: 'Enables the 🐛 button (bottom-left) that opens a live log of app activity (fetches, WebSocket events, clicks, errors). Useful for troubleshooting. Draggable — grab and move it wherever. Off by default.',
+        },
+        backup: {
+          description_intro: 'Download a snapshot of all your inventory data to your computer. The backup is a ZIP file containing three files:',
+          file_json: 'complete data including products catalog and all events. Suitable for full disaster recovery.',
+          file_sales: 'all sales as a flat spreadsheet (opens in Excel, LibreOffice, Google Sheets). Suitable for accounting and analysis.',
+          file_stockin: 'all stock receipts as a flat spreadsheet.',
+          description_outro: 'Backups are read-only — they don\'t change anything on the server. Recommended: store the ZIP somewhere safe periodically (your computer, cloud drive, USB stick).',
+          download_button: '📦 Download backup (ZIP)',
+          no_conn: 'No connection — cannot fetch data for backup.',
+          fetching: 'Fetching data…',
+        },
+        connection: {
+          online: 'Online', offline: 'Offline',
+          reconnecting: 'Reconnecting', loading: 'Loading…',
+          could_not_connect: 'Could not connect — click Refresh to retry.',
+        },
+        feed: {
+          loading_more: 'Loading more…',
+          could_not_load: 'Could not load activity.',
+          retry: 'Retry',
+          beginning_of_history: '— Beginning of history —',
+          load_older: 'Load older',
+          no_products_found: 'No products found.',
+        },
+        export_errors: {
+          export_failed: 'Export failed',
+          could_not_fetch_stock: 'Could not fetch stock',
+        },
       },
       bg: {
-        workspaces: { stock: 'Наличности', history: 'Продажби', calendar: 'Календар' },
+        workspaces: { stock: 'Наличност', history: 'Продажби', calendar: 'Календар' },
         drawer: { title: 'Меню', close: 'Затвори менюто', signout: 'Отписване', settings: 'Настройки' },
         actions: { refresh: 'Обнови', actions: 'Действия' },
-        buttons: { add: 'Добави', cancel: 'Отказ', save: 'Запази', delete: 'Изтрий', edit: 'Редактирай', close: 'Затвори', ok: 'ОК', yes: 'Да', no: 'Не' },
+        buttons: {
+          add: 'Добави', cancel: 'Отказ', save: 'Запази', delete: 'Изтрий', edit: 'Редактирай',
+          close: 'Затвори', ok: 'ОК', yes: 'Да', no: 'Не', export: 'Изнеси',
+          add_another_product: 'Добави още продукти',
+          new_sale: 'Нова продажба',
+        },
+        columns: {
+          id: 'ID', name: 'Име', product: 'Продукт',
+          stock: 'Налич.', qty: 'Кол.', in_stock: 'Налич.',
+        },
+        // In tight form-bubble headers the stock column is narrower — use shorter abbreviation
+        cols_short: {
+          id: 'ID', name: 'Име', stock: 'Нал.', qty: 'Кол.',
+        },
+        placeholders: {
+          product_name: 'Въведи име на продукт…',
+          note: 'Добави бележка',
+          source_invoice: 'Източник / Фактура',
+        },
+        empty: {
+          products: 'Все още няма продукти.',
+          activity: 'Все още няма активност.',
+          loading: 'Зареждане…',
+        },
         signout: { title: 'Отписване?', message: 'Отписване от приложението?', ok: 'Отпиши се', cancel: 'Отказ' },
         settings: {
           section_prefs: '⚙️ Предпочитания',
           section_prefs_desc: 'Потребителски настройки, запазени в този браузър. Прилагат се веднага и се запазват между сесии.',
           section_backup: '💾 Резервно копие',
+          section_backup_desc: 'Изтегля файл с колони ID, Име и Количество.',
           pref_language: 'Език',
           pref_language_hint: 'Език на интерфейса. Прилага се веднага.',
         },
         stock: { search_placeholder: 'Търси продукти' },
+        export: {
+          title: 'Изнеси наличността',
+          format: 'Формат',
+          sort_by: 'Подреди по',
+          sort_name: 'Име (А–Я)',
+          sort_quantity: 'Количество (от най-много)',
+          sort_id: 'ID',
+          include_zero: 'Включи продукти с 0 или по-малко наличност',
+          filename_preview: 'Име на файл:',
+        },
+        edit_product: {
+          title: 'Редакция на продукт',
+          hint_full: 'Промените в Наличност се прилагат като коригиращ запис (нов ред за постъпване с разликата), така че историята на продажбите остава непокътната.',
+        },
+        day: {
+          today: 'Днес',
+          yesterday: 'Вчера',
+          weekdays: ['Неделя', 'Понеделник', 'Вторник', 'Сряда', 'Четвъртък', 'Петък', 'Събота'],
+        },
+        notices: {
+          save_failed: 'Запазването се провали',
+          delete_failed: 'Изтриването се провали',
+          invalid_input: 'Невалидна стойност',
+          id_empty: 'ID не може да е празно.',
+          name_empty: 'Името не може да е празно.',
+          stock_nan: 'Наличността трябва да е число.',
+          not_connected: 'Няма връзка — опитайте отново, когато сте онлайн.',
+          could_not_check_refs: 'Неуспешна проверка на връзките',
+        },
+        confirm: {
+          delete_product_title: 'Изтриване на продукт?',
+          delete_product_perm_prefix: 'Окончателно изтриване на',
+          delete_product_no_refs: 'Няма продажби или постъпвания, свързани с този продукт.',
+          delete_product_refs_prefix: 'Този продукт е свързан с',
+          delete_product_refs_suffix: 'Те ще бъдат запазени, но отбелязани като свободен текст (без връзка), за да остане историята непокътната.',
+          delete_product_perm: 'Самият продукт ще бъде премахнат от каталога.',
+          and: 'и',
+          sale_singular: 'продажба', sale_plural: 'продажби',
+          stockin_singular: 'постъпване', stockin_plural: 'постъпвания',
+        },
+        login: {
+          email: 'Имейл',
+          password: 'Парола',
+          sign_in: 'Вход',
+          signing_in: 'Влизане…',
+          show_password: 'Покажи паролата',
+          hide_password: 'Скрий паролата',
+          email_password_required: 'Изисква се имейл и парола.',
+          forgot_password: 'Забравена парола?',
+          reset_email_prompt: 'Въведете вашия имейл, за да получите връзка за възстановяване на паролата.',
+          reset_email_needed: 'Моля, въведете първо имейла си.',
+          reset_sent_title: 'Проверете имейла си',
+          reset_sent_body: 'Ако съществува акаунт за този имейл, изпратихме връзка за възстановяване на парола. Кликнете върху връзката в имейла, за да зададете нова парола.',
+          reset_failed: 'Изпращането на имейл за възстановяване не успя',
+          new_password_title: 'Задаване на нова парола',
+          new_password_hint: 'Кликнахте върху връзка за възстановяване на парола. Въведете нова парола по-долу, за да завършите възстановяването.',
+          new_password_placeholder: 'Нова парола',
+          new_password_confirm: 'Потвърди паролата',
+          new_password_save: 'Запази новата парола',
+          new_password_too_short: 'Паролата трябва да е поне 6 символа.',
+          new_password_mismatch: 'Паролите не съвпадат.',
+          new_password_saved_title: 'Паролата е обновена',
+          new_password_saved_body: 'Вашата парола е обновена. Вече сте вписани.',
+          new_password_save_failed: 'Обновяването на паролата не успя',
+        },
+        header: {
+          connecting: 'Свързване…',
+          loading: 'Зареждане…',
+          signed_in_as: 'Влязохте като',
+          open_menu: 'Отвори менюто',
+          scroll_to_bottom: 'Скролни до долу',
+        },
+        actions_menu: {
+          add_product: 'Добави продукт',
+          import_spreadsheet: 'Импорт от таблица',
+          export_stock: 'Експорт наличност',
+          apply_revision: 'Приложи ревизия',
+        },
+        revision: {
+          title: 'Прилагане на ревизия',
+          hint: 'Чете първите 3 колони: ID, Име, Наличност. Първият ред трябва да е заглавен.',
+          diff_section: '📝 Разлики в наличността',
+          diff_help: 'Продукти, чиято наличност във файла се различава от текущата. Корекциите се прилагат като коригиращи записи (нов ред за постъпване с разликата), така че историята на продажбите остава непокътната.',
+          unknown_section: '⚠️ Не са в каталога',
+          unknown_help: 'Продукти във файла на ревизията, чието ID не съответства на нито един продукт в каталога. Тези ще бъдат пропуснати. Ако са ви необходими, първо ги добавете чрез "Добави продукт".',
+          missing_section: '❓ Не са във файла',
+          missing_help: 'Продукти в каталога, които не са във файла на ревизията. Тяхната наличност НЯМА да бъде променена. Изброени тук, за да знаете какво не е обхванато от инвентаризацията.',
+          no_diffs: '✓ Няма разлики — файлът съвпада точно с текущата наличност. Няма какво да се прилага.',
+          confirm_button: 'Приложи ревизия',
+          applying: 'Прилагане на ревизия…',
+          complete: 'Ревизията е приложена',
+          failed: 'Ревизията се провали',
+          source_label: 'Ревизия на наличност',
+          col_current: 'Текущо',
+          col_new: 'Ново',
+          col_delta: 'Δ',
+          skipped_invalid: 'Пропуснати',
+          skipped_help: 'Редове с празна или невалидна стойност за наличност.',
+          count_diffs: 'разлики',
+          count_unknown: 'непознати',
+          count_missing: 'липсващи',
+        },
+        context_menu: { edit: 'Редактирай', delete: 'Изтрий' },
+        calendar: {
+          quick_select: 'Бърз избор',
+          day: 'Ден', range: 'Период', quick: 'Събитие', apply: 'Приложи',
+          today: 'Днес', this_week: 'Тази седмица', this_month: 'Този месец',
+          pick_date: 'Изберете дата или период отгоре, за да видите активността.',
+          pick_a_date: 'Изберете дата',
+          pick_a_date_range: 'Изберете период',
+          previous_month: 'Предишен месец', next_month: 'Следващ месец',
+          previous_year: 'Предишна година', next_year: 'Следваща година',
+          close_calendar: 'Затвори календара', close: 'Затвори',
+          loading: 'Зареждане…',
+          could_not_load: 'Активността не може да бъде заредена. Опитайте по-късно.',
+        },
+        bubble: { edited: 'редактирано' },
+        bubble_edit: {
+          cancel: 'Отказ', save: 'Запази',
+          add_another_product: '+ Добави още продукти',
+          mark_for_deletion: 'Маркирай за изтриване',
+          remove_new_row: 'Премахни този нов ред',
+          product_id: 'ID на продукта',
+          source_invoice: 'Източник / фактура',
+          note_prefix: 'Бележка:',
+          discard_note: 'Отхвърли бележката',
+          add_a_note: 'Добави бележка',
+          remove_row_aria: 'Премахни ред',
+          remove_this_product: 'Премахни този продукт',
+          current_stock_tooltip: 'Текуща наличност на избрания продукт (само за четене)',
+          negative_corrections: 'Използвайте отрицателни числа за корекции (напр. -7)',
+        },
+        validation: {
+          quantity_nan: 'Количеството трябва да е число.',
+          invalid_quantity: 'Невалидно количество',
+          sale_qty_negative: 'Количеството за продажба трябва да е 0 или повече.',
+          product_name_empty: 'Името на продукта не може да е празно. Маркирайте реда × за изтриване.',
+          missing_product_name: 'Липсва име на продукт',
+          unknown_product_msg: 'не е в каталога. Изберете съществуващ продукт или премахнете този ред и го добавете отново чрез "+ Добави още продукти", за да създадете нов продукт.',
+          unknown_product: 'Непознат продукт',
+          missing_product_id_msg: 'за да създадете нов продукт, въведете неговото ID в колоната ID.',
+          missing_product_id: 'Липсва ID на продукт',
+          new_row_no_name: 'Новият ред е без име на продукт.',
+          new_row_no_qty: 'Новият ред е без количество.',
+          missing_quantity: 'Липсва количество',
+          no_conn_save: 'Няма връзка — редакцията не може да бъде запазена в момента.',
+          no_connection: 'Няма връзка',
+          bubble_not_found_msg: 'Този запис не може да бъде намерен в текущия изглед.',
+          bubble_not_found: 'Записът не е намерен',
+          bubble_el_not_found: 'Елементът на записа не е намерен.',
+          cannot_delete_last_row: 'Стари записи с един ред не могат да имат единствения си ред изтрит от редактора — използвайте менюто на записа → Изтрий, за да премахнете целия запис.',
+          cannot_delete_row: 'Редът не може да бъде изтрит',
+          entry_changed_elsewhere: 'Записът е променен другаде',
+        },
+        bubble_delete: {
+          title: 'Потвърди изтриване',
+          are_you_sure: 'Сигурни ли сте, че искате да изтриете това?',
+          will_permanently_delete: 'Това ще изтрие записа окончателно. Наличностите ще бъдат обновени съответно.',
+        },
+        forms: {
+          discard_your_changes: 'Да отхвърля ли промените в този запис?',
+          no_products_to_log: 'Няма продукти за отчитане. Добавете поне един продукт първо.',
+          no_products_to_receive: 'Няма продукти за приемане. Добавете поне един продукт първо.',
+          no_conn_log: 'Няма връзка — продажбата не може да бъде записана в момента.',
+          no_conn_receive: 'Няма връзка — постъпването не може да бъде записано в момента.',
+          no_conn_delete: 'Няма връзка — изтриването не може да се извърши в момента.',
+          discard_everything: 'Да отхвърля ли всичко въведено?',
+          taking_longer: 'Отнема повече от обичайното. Проверете връзката си.',
+          still_trying: 'Все още опитва… можете да затворите този прозорец и да проверите в списъка отдолу.',
+          stopped_waiting: 'Спряно чакане. Записът все още може да пристигне — проверете в списъка отдолу. Повторният опит е безопасен.',
+        },
+        import: {
+          review_title: 'Преглед на внасяне',
+          auto_filled: 'автоматично попълнено от името на файла',
+          existing_products_help: 'Съществуващи продукти. Текуща наличност → нова наличност след внасянето.',
+          confirm_import: 'Потвърди внасяне',
+          importing: 'Внасяне…',
+          code: 'Код', quantity: 'Количество',
+          adding: 'Добавяне', current: 'Текущо', new_col: 'Ново',
+          row_number: 'Ред #', old_name: 'Старо име', new_name: 'Ново име',
+          reason: 'Причина',
+          empty_file_msg: 'Файлът изглежда празен или не може да бъде прочетен.',
+          empty_file: 'Празен файл',
+          ods_parse_error: 'Грешка при четене на ODS',
+          ods_parse_tip: 'ODS файловете варират между инструментите. Ако това продължава да се проваля, опитайте да запазите файла като CSV в LibreOffice или Excel и внесете него.',
+          parse_error: 'Грешка при четене',
+          could_not_parse_ods: 'Този ODS файл не може да бъде прочетен',
+          could_not_parse: 'Този файл не може да бъде прочетен',
+          no_conn_import: 'Няма връзка — внасянето не може да се извърши в момента.',
+          creating_products: 'Създаване на нови продукти…',
+          updating_names: 'Обновяване на имена на продукти…',
+          creating_batch: 'Създаване на партида за внасяне…',
+          adding_receipts: 'Добавяне на постъпвания…',
+          import_failed: 'Внасянето се провали',
+          import_failed_details: 'Някои редове може да са внесени. Проверете списъка с наличности. Повторният опит е безопасен.',
+        },
+        prefs_hints: {
+          hide_zero_label: 'Скрий продуктите без наличност от предложенията в падащите менюта',
+          hide_zero_hint: 'Когато е включено, продукти с 0 или по-малко наличност няма да се показват при въвеждане в формите Нова продажба или Добави продукти. Когато е изключено (по подразбиране), те се показват в долната част на предложенията с червен курсив стил.',
+          show_debug_label: 'Покажи бутона за конзолата за откриване на грешки',
+          show_debug_hint: 'Активира бутона 🐛 (долу вляво), който отваря лог на активността на приложението (заявки, WebSocket събития, кликвания, грешки). Полезно за отстраняване на проблеми. Може да се влачи — хванете и преместете където желаете. По подразбиране изключено.',
+        },
+        backup: {
+          description_intro: 'Изтеглете снимка на всички ваши данни за инвентара на вашия компютър. Резервното копие е ZIP файл, съдържащ три файла:',
+          file_json: 'пълни данни, включително каталог на продуктите и всички събития. Подходящ за пълно възстановяване след бедствие.',
+          file_sales: 'всички продажби като плоска електронна таблица (отваря се в Excel, LibreOffice, Google Sheets). Подходящ за счетоводство и анализ.',
+          file_stockin: 'всички постъпвания на стока като плоска електронна таблица.',
+          description_outro: 'Резервните копия са само за четене — не променят нищо на сървъра. Препоръчително: периодично съхранявайте ZIP файла на безопасно място (компютъра ви, облачно хранилище, USB стик).',
+          download_button: '📦 Изтегли резервно копие (ZIP)',
+          no_conn: 'Няма връзка — данните за резервното копие не могат да бъдат заредени.',
+          fetching: 'Зареждане на данни…',
+        },
+        connection: {
+          online: 'Онлайн', offline: 'Офлайн',
+          reconnecting: 'Повторно свързване', loading: 'Зареждане…',
+          could_not_connect: 'Няма връзка — натиснете Обнови, за да опитате отново.',
+        },
+        feed: {
+          loading_more: 'Зареждане на още…',
+          could_not_load: 'Активността не може да бъде заредена.',
+          retry: 'Опитай отново',
+          beginning_of_history: '— Начало на историята —',
+          load_older: 'Зареди по-стари',
+          no_products_found: 'Няма намерени продукти.',
+        },
+        export_errors: {
+          export_failed: 'Изнасянето се провали',
+          could_not_fetch_stock: 'Наличността не може да бъде заредена',
+        },
       },
     }
     function t(path) {
-      const lang = (userPrefs && userPrefs.language) || 'bg'
-      const dict = I18N[lang] || I18N.en
-      const val = path.split('.').reduce((o, k) => o != null ? o[k] : undefined, dict)
-      // Fallback to English if the current language is missing this key
-      if (val == null && lang !== 'en') {
-        const fallback = path.split('.').reduce((o, k) => o != null ? o[k] : undefined, I18N.en)
-        return fallback ?? path
+      // TDZ-safe: this function can be called during module init BEFORE `userPrefs` and
+      // `I18N` (declared later in this script) have been initialized. Access via try/catch
+      // so we return a sensible fallback (the raw key) instead of throwing — because a throw
+      // would halt the entire module load and freeze the app at "Connecting…".
+      // Once initialization completes, applyTranslations() re-walks the DOM and fixes up
+      // any elements that got the fallback text on first render.
+      try {
+        const lang = (userPrefs && userPrefs.language) || 'bg'
+        const dict = I18N[lang] || I18N.en
+        const val = path.split('.').reduce((o, k) => o != null ? o[k] : undefined, dict)
+        // Fallback to English if the current language is missing this key
+        if (val == null && lang !== 'en') {
+          const fallback = path.split('.').reduce((o, k) => o != null ? o[k] : undefined, I18N.en)
+          return fallback ?? path
+        }
+        return val ?? path
+      } catch (_) {
+        return path
       }
-      return val ?? path
+    }
+    // Measure the actual pixel width of each .note-edit-prefix overlay and set its sibling
+    // textarea's text-indent to fit exactly (with a 6px breathing gap). Called after every
+    // translation pass so switching language re-fits the indent to the new prefix width.
+    // Handles: form bubbles (New Sale / Add Products) + edit-mode bubbles + newly-expanded
+    // note textareas anywhere in the DOM.
+    function sizeNoteIndents() {
+      document.querySelectorAll('.note-edit-prefix').forEach(prefix => {
+        const wrapper = prefix.closest('.note-input-wrapper')
+        if (!wrapper) return
+        const textarea = wrapper.querySelector('.note-edit-input')
+        if (!textarea) return
+        // offsetWidth returns 0 if the prefix isn't laid out yet (e.g. inside a hidden section).
+        // In that case leave the CSS fallback in place — will re-measure on next visible pass.
+        const w = prefix.offsetWidth
+        if (w > 0) textarea.style.textIndent = `${w + 6}px`
+      })
     }
     // Walk the DOM and apply translations to all elements marked with data-i18n* attributes.
     // Called on page load AND whenever language changes in Settings.
@@ -6553,9 +7307,18 @@
       document.querySelectorAll('[data-i18n-title]').forEach(el => {
         el.setAttribute('title', t(el.dataset.i18nTitle))
       })
-      // WORKSPACE_TITLES is used by switchWorkspace to set the header — refresh title if visible
-      const titleEl = document.getElementById('workspaceTitle')
-      if (titleEl && currentWorkspace) titleEl.textContent = t(`workspaces.${currentWorkspace}`)
+      // WORKSPACE_TITLES is used by switchWorkspace to set the header — refresh title if visible.
+      // TDZ-safe: currentWorkspace is declared later in the module. This function can be called
+      // from top-level module-init code (e.g. addSaleRow's initial empty row), so we must not
+      // throw when currentWorkspace hasn't been initialized yet. `typeof` check is the safest
+      // way to test a possibly-in-TDZ variable without throwing.
+      try {
+        const cw = (typeof currentWorkspace !== 'undefined') ? currentWorkspace : null
+        const titleEl = document.getElementById('workspaceTitle')
+        if (titleEl && cw) titleEl.textContent = t(`workspaces.${cw}`)
+      } catch (_) { /* TDZ or missing element — safe to skip */ }
+      // Re-fit note textarea indents (prefix width may have changed with the language switch)
+      sizeNoteIndents()
     }
     // Apply on load
     requestAnimationFrame(applyTranslations)
@@ -6606,6 +7369,20 @@
           userPrefs.language = langSel.value
           saveUserPrefs()
           applyTranslations()
+          // Re-render locale-dependent content that isn't attribute-driven:
+          //   - Calendar (month name in header, weekday abbreviations, quick preview labels)
+          //   - Activity feed (bubble footer dates, "edited" label, day-separator labels)
+          //   - Stock list (day-separator not applicable, but has some t()-driven headers)
+          if (typeof calendarState !== 'undefined' && calendarState && calendarState.initialized) {
+            if (typeof renderCalWidget === 'function') renderCalWidget()
+            if (typeof renderCalFeed === 'function') renderCalFeed()
+          }
+          if (typeof renderActivity === 'function' && typeof activityRows !== 'undefined' && activityRows.length) {
+            renderActivity()
+          }
+          if (typeof renderStock === 'function' && typeof lastGoodStock !== 'undefined' && lastGoodStock) {
+            renderStock(lastGoodStock)
+          }
           log('prefs', `language=${langSel.value}`)
         })
       }
@@ -6614,7 +7391,7 @@
     document.getElementById('downloadBackupBtn').addEventListener('click', async () => {
       if (!isOnline) {
         const status = document.getElementById('backupStatus')
-        status.textContent = 'No connection — cannot fetch data for backup.'
+        status.textContent = t('backup.no_conn')
         status.className = 'settings-status error'
         return
       }
@@ -6622,7 +7399,7 @@
       const status = document.getElementById('backupStatus')
       btn.disabled = true
       status.className = 'settings-status'
-      status.textContent = 'Fetching data…'
+      status.textContent = t('backup.fetching')
       try {
         const result = await buildAndDownloadBackup()
         status.textContent = `✓ Saved ${result.filename} (${formatBytes(result.size)})`
@@ -6879,9 +7656,38 @@ new events will not be in this file. Re-download periodically.
       loading: false,
       initialized: false,
     }
-    const CAL_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    const CAL_MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-    const CAL_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    // Locale-aware calendar labels. Read the current userPrefs.language and use JS's built-in
+    // Intl support to produce native weekday/month names — no hand-maintained BG dictionary
+    // needed. Falls back to 'en' if userPrefs isn't set yet (early boot / TDZ safety).
+    function calLocale() {
+      return (typeof userPrefs !== 'undefined' && userPrefs && userPrefs.language) || 'en'
+    }
+    // Monday-first weekday abbreviations (Mon/Tue/... in EN; Пон/Вто/... in BG).
+    // Rebuilt each call so it reflects the current locale.
+    function calWeekdays() {
+      // Use ISO Monday = 2024-01-01 (a known Monday) as anchor
+      const monday = new Date(Date.UTC(2024, 0, 1))
+      const arr = []
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday); d.setUTCDate(monday.getUTCDate() + i)
+        arr.push(d.toLocaleString(calLocale(), { weekday: 'short', timeZone: 'UTC' }))
+      }
+      return arr
+    }
+    function calMonthsFull() {
+      const arr = []
+      for (let m = 0; m < 12; m++) {
+        arr.push(new Date(2024, m, 1).toLocaleString(calLocale(), { month: 'long' }))
+      }
+      return arr
+    }
+    function calMonthsShort() {
+      const arr = []
+      for (let m = 0; m < 12; m++) {
+        arr.push(new Date(2024, m, 1).toLocaleString(calLocale(), { month: 'short' }))
+      }
+      return arr
+    }
     // Format a local Date object as 'YYYY-MM-DD' (avoiding toISOString which uses UTC and can shift days)
     function calLocalDateKey(d) {
       const y = d.getFullYear()
@@ -6915,7 +7721,7 @@ new events will not be in this file. Re-download periodically.
     function calPrettyDate(key) {
       if (!key) return ''
       const [y, m, d] = key.split('-').map(Number)
-      return `${CAL_MONTHS_FULL[m - 1]} ${d}, ${y}`
+      return `${calMonthsFull()[m - 1]} ${d}, ${y}`
     }
     // First call sets up state (auto-select today). Subsequent calls just re-render.
     function renderCalWidget() {
@@ -6932,6 +7738,12 @@ new events will not be in this file. Re-download periodically.
       if (!widget) return
       widget.innerHTML = calendarState.expanded ? renderCalExpanded() : renderCalCollapsed()
       attachCalHandlers()
+      // Freshly-rendered calendar HTML has data-i18n attributes on the mode buttons, quick
+      // preview labels, nav aria-labels, close button, etc. Without this call, they'd show
+      // their default English text until some OTHER re-render triggers a translation pass.
+      // (Previously visible as a bug: switching to Event mode showed English "Quick Select"
+      // header until the app auto-refreshed a moment later.)
+      if (typeof applyTranslations === 'function') applyTranslations()
     }
     function renderCalCollapsed() {
       // Header showing the APPLIED selection (not the pending pick-in-progress). Click to expand.
@@ -6939,11 +7751,11 @@ new events will not be in this file. Re-download periodically.
       const a = calendarState.applied
       if (a.mode === 'day') {
         if (a.day) label = calPrettyDate(a.day)
-        else { label = 'Pick a date'; isEmpty = true }
+        else { label = t('calendar.pick_a_date'); isEmpty = true }
       } else {
         if (a.rangeStart && a.rangeEnd) {
           label = `${calPrettyDate(a.rangeStart)} → ${calPrettyDate(a.rangeEnd)}`
-        } else { label = 'Pick a date range'; isEmpty = true }
+        } else { label = t('calendar.pick_a_date_range'); isEmpty = true }
       }
       return `
         <div class="cal-collapsed" data-action="cal-expand">
@@ -6963,23 +7775,23 @@ new events will not be in this file. Re-download periodically.
       if (calendarState.selectionMode === 'quick') {
         header = `
           <div class="cal-header cal-header-quick">
-            <span class="cal-header-title">Quick Select</span>
-            <button class="cal-close-btn" data-action="cal-collapse" aria-label="Close calendar" title="Close">✕</button>
+            <span class="cal-header-title" data-i18n="calendar.quick_select">Quick Select</span>
+            <button class="cal-close-btn" data-action="cal-collapse" data-i18n-aria-label="calendar.close_calendar" data-i18n-title="calendar.close" aria-label="Close calendar" title="Close">✕</button>
           </div>`
       } else if (calendarState.pickerMode === 'days') {
         header = `
           <div class="cal-header">
-            <button class="cal-nav-btn" data-action="cal-prev" aria-label="Previous month">‹</button>
-            <button class="cal-month-label" data-action="cal-show-months">${CAL_MONTHS_FULL[calendarState.viewMonth]} ${calendarState.viewYear}</button>
-            <button class="cal-nav-btn" data-action="cal-next" aria-label="Next month">›</button>
+            <button class="cal-nav-btn" data-action="cal-prev" data-i18n-aria-label="calendar.previous_month" aria-label="Previous month">‹</button>
+            <button class="cal-month-label" data-action="cal-show-months">${calMonthsFull()[calendarState.viewMonth]} ${calendarState.viewYear}</button>
+            <button class="cal-nav-btn" data-action="cal-next" data-i18n-aria-label="calendar.next_month" aria-label="Next month">›</button>
             <button class="cal-close-btn" data-action="cal-collapse" aria-label="Close calendar" title="Close">✕</button>
           </div>`
       } else {
         header = `
           <div class="cal-header">
-            <button class="cal-nav-btn" data-action="cal-prev-year" aria-label="Previous year">‹</button>
+            <button class="cal-nav-btn" data-action="cal-prev-year" data-i18n-aria-label="calendar.previous_year" aria-label="Previous year">‹</button>
             <button class="cal-year-label" data-action="cal-show-days">${calendarState.viewYear}</button>
-            <button class="cal-nav-btn" data-action="cal-next-year" aria-label="Next year">›</button>
+            <button class="cal-nav-btn" data-action="cal-next-year" data-i18n-aria-label="calendar.next_year" aria-label="Next year">›</button>
             <button class="cal-close-btn" data-action="cal-collapse" aria-label="Close calendar" title="Close">✕</button>
           </div>`
       }
@@ -7003,19 +7815,19 @@ new events will not be in this file. Re-download periodically.
       // Short detail labels shown beneath each preset's title.
       const todayDetail = calPrettyDate(today)
       const weekDetail = `${calPrettyDate(week.start)} → ${calPrettyDate(week.end)}`
-      const monthDetail = `${CAL_MONTHS_FULL[parseInt(month.start.split('-')[1], 10) - 1]} ${month.start.split('-')[0]}`
+      const monthDetail = `${calMonthsFull()[parseInt(month.start.split('-')[1], 10) - 1]} ${month.start.split('-')[0]}`
       return `
         <div class="cal-quick-grid">
           <button class="cal-quick-btn ${c === 'today' ? 'selected' : ''}" data-action="cal-pick-quick" data-choice="today">
-            <span class="cal-quick-label">Today</span>
+            <span class="cal-quick-label" data-i18n="calendar.today">Today</span>
             <span class="cal-quick-detail">${escapeHtml(todayDetail)}</span>
           </button>
           <button class="cal-quick-btn ${c === 'week' ? 'selected' : ''}" data-action="cal-pick-quick" data-choice="week">
-            <span class="cal-quick-label">This Week</span>
+            <span class="cal-quick-label" data-i18n="calendar.this_week">This Week</span>
             <span class="cal-quick-detail">${escapeHtml(weekDetail)}</span>
           </button>
           <button class="cal-quick-btn ${c === 'month' ? 'selected' : ''}" data-action="cal-pick-quick" data-choice="month">
-            <span class="cal-quick-label">This Month</span>
+            <span class="cal-quick-label" data-i18n="calendar.this_month">This Month</span>
             <span class="cal-quick-detail">${escapeHtml(monthDetail)}</span>
           </button>
         </div>`
@@ -7058,7 +7870,7 @@ new events will not be in this file. Re-download periodically.
         const tYear  = month + 1 > 11 ? year + 1 : year
         cells.push({ day: nextDay, year: tYear, month: tMonth, otherMonth: true })
       }
-      const weekdaysHtml = CAL_WEEKDAYS.map(w => `<div class="cal-weekday">${w}</div>`).join('')
+      const weekdaysHtml = calWeekdays().map(w => `<div class="cal-weekday">${w}</div>`).join('')
       const cellsHtml = cells.map(c => {
         const key = `${c.year}-${String(c.month + 1).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`
         const isToday = key === today
@@ -7083,7 +7895,7 @@ new events will not be in this file. Re-download periodically.
     function renderCalMonthsGrid() {
       const today = new Date()
       const currentY = today.getFullYear(), currentM = today.getMonth()
-      const cells = CAL_MONTHS_SHORT.map((name, idx) => {
+      const cells = calMonthsShort().map((name, idx) => {
         const isCurrent = (calendarState.viewYear === currentY) && (idx === currentM)
         // Highlight the month that contains the current selection (if any)
         let isSelectedMonth = false
@@ -7110,11 +7922,11 @@ new events will not be in this file. Re-download periodically.
       return `
         <div class="cal-mode-row">
           <div class="cal-mode-toggle">
-            <button class="cal-mode-btn ${m === 'day' ? 'active' : ''}" data-action="cal-mode-day">Day</button>
-            <button class="cal-mode-btn ${m === 'range' ? 'active' : ''}" data-action="cal-mode-range">Range</button>
-            <button class="cal-mode-btn ${m === 'quick' ? 'active' : ''}" data-action="cal-mode-quick">Quick</button>
+            <button class="cal-mode-btn ${m === 'day' ? 'active' : ''}" data-action="cal-mode-day">${escapeHtml(t('calendar.day'))}</button>
+            <button class="cal-mode-btn ${m === 'range' ? 'active' : ''}" data-action="cal-mode-range">${escapeHtml(t('calendar.range'))}</button>
+            <button class="cal-mode-btn ${m === 'quick' ? 'active' : ''}" data-action="cal-mode-quick">${escapeHtml(t('calendar.quick'))}</button>
           </div>
-          <button class="cal-apply-btn" data-action="cal-apply" ${canApply ? '' : 'disabled'}>Apply</button>
+          <button class="cal-apply-btn" data-action="cal-apply" ${canApply ? '' : 'disabled'}>${escapeHtml(t('calendar.apply'))}</button>
         </div>`
     }
     function attachCalHandlers() {
@@ -7332,7 +8144,7 @@ new events will not be in this file. Re-download periodically.
       }
       if (!startKey || !endKey) {
         infoEl.className = 'cal-feed-info empty'
-        infoEl.textContent = 'Pick a date or range above to see activity.'
+        infoEl.textContent = t('calendar.pick_date')
         feedEl.innerHTML = ''
         return
       }
@@ -7380,6 +8192,7 @@ new events will not be in this file. Re-download periodically.
           closeBubbleMenu()
         }
       }
+      if (typeof applyTranslations === 'function') applyTranslations()
     }
     // Query the activity feed for the current APPLIED selection and re-render the bubbles below.
     // Preserves scroll position so realtime auto-updates don't snap user back to the top.
@@ -7411,7 +8224,7 @@ new events will not be in this file. Re-download periodically.
       const isFirstLoad = !feedEl.innerHTML.trim()
       if (isFirstLoad) {
         infoEl.className = 'cal-feed-info loading'
-        infoEl.textContent = 'Loading…'
+        infoEl.textContent = t('header.loading')
       }
       calendarState.loading = true
       try {
@@ -7432,7 +8245,7 @@ new events will not be in this file. Re-download periodically.
       } catch (err) {
         log('error', 'Calendar load failed', err)
         infoEl.className = 'cal-feed-info empty'
-        infoEl.textContent = 'Could not load activity. Try again later.'
+        infoEl.textContent = t('calendar.could_not_load')
       } finally {
         calendarState.loading = false
       }
@@ -7554,8 +8367,292 @@ new events will not be in this file. Re-download periodically.
               if (fileInput) fileInput.click()
             }
             else if (action === 'export-stock') openExportStockModal()
+            else if (action === 'apply-revision') {
+              const fileInput = document.getElementById('revisionFile')
+              if (fileInput) fileInput.click()
+            }
           })
         })
+      }
+    }
+
+    // ===== Stock Revision workflow =====
+    // User uploads a spreadsheet (xlsx/ods/csv) that represents a physical inventory count.
+    // We compare each row against current stock in the DB. Preview categorizes into 3 sections
+    // (differences / not in catalog / not in file). Confirming applies each difference as a
+    // stock_in adjustment row (quantity = new - current) inside a single stock_in_group, so
+    // the entire revision is one atomic history event with source = 'Stock revision'.
+    let revisionPlan = null   // Populated after file parsed. Shape: { diffs, unknowns, missing, skipped }
+
+    document.getElementById('revisionFile').addEventListener('change', handleRevisionFileSelected)
+    document.getElementById('revisionCancelBtn').addEventListener('click', closeRevisionModal)
+    document.getElementById('revisionCloseBtn').addEventListener('click', closeRevisionModal)
+    document.getElementById('revisionConfirmBtn').addEventListener('click', executeRevision)
+
+    function closeRevisionModal() {
+      document.getElementById('revisionModal').classList.remove('visible')
+      document.getElementById('revisionFile').value = ''
+      revisionPlan = null
+    }
+
+    async function handleRevisionFileSelected(e) {
+      const file = e.target.files[0]
+      if (!file) return
+      log('revision', `File selected: ${file.name} (${file.size} bytes)`)
+      try {
+        const rows = await parseSpreadsheetFile(file)
+        if (!rows || rows.length === 0) {
+          await showNotice(t('import.empty_file_msg'), { title: t('import.empty_file') })
+          document.getElementById('revisionFile').value = ''
+          return
+        }
+        // Fetch fresh current_stock — the modal preview must reflect what the DB looks like
+        // RIGHT NOW, not stale state from an old refresh.
+        const { data: stockRows, error: stockErr } = await supabase
+          .from('current_stock').select('*')
+        if (stockErr) throw stockErr
+
+        const plan = classifyRevisionRows(rows, stockRows || [])
+        revisionPlan = plan
+        renderRevisionPlan(plan)
+        document.getElementById('revisionModal').classList.add('visible')
+      } catch (err) {
+        log('error', 'Revision parse failed', err)
+        const msg = (err && err.message) || 'Unknown error'
+        if (file.name.toLowerCase().endsWith('.ods')) {
+          await showNotice(`${t('import.could_not_parse_ods')}: ${msg}\n\n${t('import.ods_parse_tip')}`, { title: t('import.ods_parse_error'), variant: 'danger' })
+        } else {
+          await showNotice(`${t('import.could_not_parse')}: ${msg}`, { title: t('import.parse_error'), variant: 'danger' })
+        }
+        document.getElementById('revisionFile').value = ''
+      }
+    }
+
+    // Compare parsed rows against current_stock. Fixed column mapping: col[0]=ID, col[1]=Name, col[2]=Stock.
+    // (Unlike the Import workflow, we don't try to auto-detect columns — the user has been
+    // told upfront that the first 3 columns are ID/Name/Stock in that order.)
+    function classifyRevisionRows(rows, stockRows) {
+      // Header is always row 0 — skip it.
+      const dataRows = rows.slice(1)
+
+      // Build a lookup from product_id → { name, current_quantity }
+      const stockById = new Map()
+      stockRows.forEach(r => {
+        stockById.set(String(r.id).trim(), { name: r.name, current: Number(r.current_quantity) || 0 })
+      })
+
+      const diffs = []      // { id, name, current, new, delta }
+      const unknowns = []   // { id, name, stock }  — from file, not in catalog
+      const skipped = []    // { id, name, stock, reason }  — invalid data, ignored
+      const seenIds = new Set()
+
+      for (const row of dataRows) {
+        const id = String(row[0] || '').trim()
+        const nameFromFile = String(row[1] || '').trim()
+        const stockCell = row[2]
+        if (!id) continue   // empty row / no ID → skip silently
+        seenIds.add(id)
+
+        // Try to parse the stock value. Accept numbers with or without spaces, decimal or integer.
+        // Treat blank / non-numeric as invalid.
+        const parsedStock = (stockCell === '' || stockCell == null) ? NaN : Number(String(stockCell).replace(/\s+/g, ''))
+        if (!Number.isFinite(parsedStock)) {
+          skipped.push({ id, name: nameFromFile, stock: String(stockCell || ''), reason: 'invalid stock' })
+          continue
+        }
+
+        const catalog = stockById.get(id)
+        if (!catalog) {
+          unknowns.push({ id, name: nameFromFile, stock: parsedStock })
+          continue
+        }
+
+        // Row is valid and matches a catalog product. Compare stock.
+        const delta = parsedStock - catalog.current
+        if (delta !== 0) {
+          diffs.push({ id, name: catalog.name, current: catalog.current, new: parsedStock, delta })
+        }
+        // Same-as-current products don't appear in any section (informational only, no action).
+      }
+
+      // Section 3: products in catalog that were NOT in the file
+      const missing = []
+      stockRows.forEach(r => {
+        const id = String(r.id).trim()
+        if (!seenIds.has(id)) {
+          missing.push({ id, name: r.name, current: Number(r.current_quantity) || 0 })
+        }
+      })
+
+      return { diffs, unknowns, missing, skipped }
+    }
+
+    // Render preview modal from a plan. Reuses .import-table styles.
+    function renderRevisionPlan(plan) {
+      const secDiff = document.getElementById('revSecDiff')
+      const secUnknown = document.getElementById('revSecUnknown')
+      const secMissing = document.getElementById('revSecMissing')
+      const secNoDiffs = document.getElementById('revSecNoDiffs')
+      const confirmBtn = document.getElementById('revisionConfirmBtn')
+
+      // Section 1: differences
+      if (plan.diffs.length > 0) {
+        secDiff.hidden = false
+        document.getElementById('revSecDiffCount').textContent = `${plan.diffs.length} ${t('revision.count_diffs')}`
+        const rowsHtml = plan.diffs.map(d => {
+          const deltaClass = d.delta > 0 ? 'positive' : 'negative'
+          const deltaStr = (d.delta > 0 ? '+' : '') + d.delta
+          return `<tr>
+            <td>${escapeHtml(d.id)}</td>
+            <td>${escapeHtml(d.name)}</td>
+            <td class="numeric">${d.current}</td>
+            <td class="numeric revision-delta ${deltaClass}">${deltaStr}</td>
+            <td class="numeric"><strong>${d.new}</strong></td>
+          </tr>`
+        }).join('')
+        document.getElementById('revTblDiff').innerHTML = `
+          <thead><tr>
+            <th>${escapeHtml(t('columns.id'))}</th>
+            <th>${escapeHtml(t('columns.name'))}</th>
+            <th class="numeric">${escapeHtml(t('revision.col_current'))}</th>
+            <th class="numeric">${escapeHtml(t('revision.col_delta'))}</th>
+            <th class="numeric">${escapeHtml(t('revision.col_new'))}</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>`
+      } else {
+        secDiff.hidden = true
+      }
+
+      // Section 2: unknown (not in catalog)
+      if (plan.unknowns.length > 0) {
+        secUnknown.hidden = false
+        document.getElementById('revSecUnknownCount').textContent = `${plan.unknowns.length} ${t('revision.count_unknown')}`
+        const rowsHtml = plan.unknowns.map(u => `<tr>
+          <td>${escapeHtml(u.id)}</td>
+          <td>${escapeHtml(u.name)}</td>
+          <td class="numeric">${u.stock}</td>
+        </tr>`).join('')
+        document.getElementById('revTblUnknown').innerHTML = `
+          <thead><tr>
+            <th>${escapeHtml(t('columns.id'))}</th>
+            <th>${escapeHtml(t('columns.name'))}</th>
+            <th class="numeric">${escapeHtml(t('columns.stock'))}</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>`
+      } else {
+        secUnknown.hidden = true
+      }
+
+      // Section 3: missing from file
+      if (plan.missing.length > 0) {
+        secMissing.hidden = false
+        document.getElementById('revSecMissingCount').textContent = `${plan.missing.length} ${t('revision.count_missing')}`
+        const rowsHtml = plan.missing.map(m => `<tr>
+          <td>${escapeHtml(m.id)}</td>
+          <td>${escapeHtml(m.name)}</td>
+          <td class="numeric">${m.current}</td>
+        </tr>`).join('')
+        document.getElementById('revTblMissing').innerHTML = `
+          <thead><tr>
+            <th>${escapeHtml(t('columns.id'))}</th>
+            <th>${escapeHtml(t('columns.name'))}</th>
+            <th class="numeric">${escapeHtml(t('revision.col_current'))}</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>`
+      } else {
+        secMissing.hidden = true
+      }
+
+      // No-diffs empty state (only when there are ZERO diffs, regardless of unknowns/missing)
+      if (plan.diffs.length === 0) {
+        secNoDiffs.hidden = false
+        confirmBtn.disabled = true
+      } else {
+        secNoDiffs.hidden = true
+        confirmBtn.disabled = false
+      }
+
+      // Re-translate any freshly-rendered data-i18n content in the tables (headers use inline t())
+      if (typeof applyTranslations === 'function') applyTranslations()
+    }
+
+    async function executeRevision() {
+      if (!revisionPlan || revisionPlan.diffs.length === 0) return
+      if (!isOnline) {
+        await showNotice(t('import.no_conn_import'), { title: t('validation.no_connection') })
+        return
+      }
+      const overlay = document.getElementById('revisionProgressOverlay')
+      const status = document.getElementById('revisionProgressStatus')
+      const substatus = document.getElementById('revisionProgressSubstatus')
+      status.textContent = t('revision.applying')
+      substatus.textContent = ''
+      overlay.classList.add('visible')
+      document.getElementById('revisionModal').classList.remove('visible')
+
+      const displayName = currentUser.user_metadata?.display_name || currentUser.email
+      const failures = []
+      let successCount = 0
+      const sourceText = t('revision.source_label')
+
+      try {
+        // Create a single stock_in_group so the entire revision shows as one bubble in the feed
+        let groupId = null
+        try {
+          const groupRow = {
+            received_by: currentUser.email,
+            received_by_display: displayName,
+            received_at: new Date().toISOString(),
+            source: sourceText,
+            client_uuid: crypto.randomUUID(),
+          }
+          const { data: groupData, error: groupErr } = await supabase
+            .from('stock_in_groups').insert(groupRow).select().single()
+          if (groupErr && groupErr.code !== '23505') throw groupErr
+          groupId = groupData?.id
+        } catch (err) {
+          failures.push(`Create revision group: ${err.message}`)
+        }
+
+        // Insert one stock_in adjustment row per diff (quantity = new - current = delta)
+        substatus.textContent = `0 / ${revisionPlan.diffs.length}`
+        for (let i = 0; i < revisionPlan.diffs.length; i++) {
+          const d = revisionPlan.diffs[i]
+          substatus.textContent = `${i + 1} / ${revisionPlan.diffs.length} — ${d.id}`
+          try {
+            const insertRow = {
+              product_id: d.id,
+              quantity: d.delta,
+              received_by: currentUser.email,
+              received_by_display: displayName,
+              source: sourceText,
+              notes: `Set stock from ${d.current} to ${d.new} via revision`,
+              client_uuid: crypto.randomUUID(),
+            }
+            if (groupId) insertRow.stock_in_group_id = groupId
+            const { error } = await supabase.from('stock_in').insert(insertRow)
+            if (error && error.code !== '23505') throw error
+            successCount++
+          } catch (err) {
+            failures.push(`${d.id}: ${err.message}`)
+          }
+        }
+
+        overlay.classList.remove('visible')
+        if (failures.length === 0) {
+          await showNotice(`✓ ${successCount} adjustment(s) applied.`, { title: t('revision.complete') })
+        } else {
+          await showNotice(
+            `${successCount} applied, ${failures.length} failed:\n\n` + failures.slice(0, 10).join('\n'),
+            { title: t('revision.failed'), variant: 'danger' }
+          )
+        }
+        closeRevisionModal()
+        await loadAll(false)
+      } catch (err) {
+        overlay.classList.remove('visible')
+        log('error', 'Revision execute failed', err)
+        await showNotice(`${t('revision.failed')}: ${err.message || 'unknown error'}`, { title: t('revision.failed'), variant: 'danger' })
       }
     }
 
@@ -7604,7 +8701,7 @@ new events will not be in this file. Re-download periodically.
           if (error) throw error
           rows = data
         } catch (err) {
-          await showNotice(`Could not fetch stock: ${err.message || 'unknown error'}`, { title: 'Export failed', variant: 'danger' })
+          await showNotice(`${t('export_errors.could_not_fetch_stock')}: ${err.message || 'unknown error'}`, { title: t('export_errors.export_failed'), variant: 'danger' })
           return
         }
       }
@@ -7656,7 +8753,7 @@ new events will not be in this file. Re-download periodically.
         closeExportStockModal()
       } catch (err) {
         log('error', 'Export failed', err)
-        await showNotice(`Export failed: ${err.message || 'unknown error'}`, { title: 'Export failed', variant: 'danger' })
+        await showNotice(`${t('export_errors.export_failed')}: ${err.message || 'unknown error'}`, { title: t('export_errors.export_failed'), variant: 'danger' })
       }
     }
 
@@ -7771,8 +8868,8 @@ ${headerRowXml}${dataRowsXml}
       const menu = document.createElement('div')
       menu.className = 'bubble-menu visible'
       menu.innerHTML = `
-        <div class="bubble-menu-item" data-action="edit"><i style="font-style:normal;">✏️</i> Edit</div>
-        <div class="bubble-menu-item danger" data-action="delete"><i style="font-style:normal;">🗑️</i> Delete</div>
+        <div class="bubble-menu-item" data-action="edit"><i style="font-style:normal;">✏️</i> ${escapeHtml(t('context_menu.edit'))}</div>
+        <div class="bubble-menu-item danger" data-action="delete"><i style="font-style:normal;">🗑️</i> ${escapeHtml(t('context_menu.delete'))}</div>
       `
       const top = Math.min(anchor.y + 4, window.innerHeight - 100)
       const left = Math.min(anchor.x, window.innerWidth - 160)
@@ -7862,9 +8959,9 @@ ${headerRowXml}${dataRowsXml}
       const newName = document.getElementById('editProductName').value.trim()
       const newStockRaw = document.getElementById('editProductStock').value.trim()
       const newStock = Number(newStockRaw)
-      if (!newId) { await showNotice('ID cannot be empty.', { title: 'Invalid input' }); return }
-      if (!newName) { await showNotice('Name cannot be empty.', { title: 'Invalid input' }); return }
-      if (newStockRaw === '' || Number.isNaN(newStock)) { await showNotice('Stock must be a number.', { title: 'Invalid input' }); return }
+      if (!newId) { await showNotice(t('notices.id_empty'), { title: t('notices.invalid_input') }); return }
+      if (!newName) { await showNotice(t('notices.name_empty'), { title: t('notices.invalid_input') }); return }
+      if (newStockRaw === '' || Number.isNaN(newStock)) { await showNotice(t('notices.stock_nan'), { title: t('notices.invalid_input') }); return }
       const oldId = editingProduct.id
       const oldName = editingProduct.name
       const oldStock = Number(editingProduct.currentStock) || 0
@@ -7909,7 +9006,7 @@ ${headerRowXml}${dataRowsXml}
         await loadAll(false)
       } catch (err) {
         log('error', 'Save edited product failed', err)
-        await showNotice(`Save failed: ${err.message || 'unknown error'}`, { title: 'Save failed', variant: 'danger' })
+        await showNotice(`${t('notices.save_failed')}: ${err.message || 'unknown error'}`, { title: t('notices.save_failed'), variant: 'danger' })
         // Keep modal open so user can adjust
       }
     }
@@ -7940,24 +9037,26 @@ ${headerRowXml}${dataRowsXml}
         stockInCount = stockInRes.count || 0
       } catch (err) {
         log('error', 'Ref count query failed', err)
-        await showNotice(`Could not check references: ${err.message || 'unknown error'}`, { title: 'Delete failed', variant: 'danger' })
+        await showNotice(`${t('notices.could_not_check_refs')}: ${err.message || 'unknown error'}`, { title: t('notices.delete_failed'), variant: 'danger' })
         return
       }
       // Build a friendly message that names what's happening in plain language.
       let refLine = ''
       if (salesCount === 0 && stockInCount === 0) {
-        refLine = 'No sales or stock-in entries reference this product.'
+        refLine = t('confirm.delete_product_no_refs')
       } else {
         const parts = []
-        if (salesCount) parts.push(`${salesCount} sale${salesCount === 1 ? '' : 's'}`)
-        if (stockInCount) parts.push(`${stockInCount} stock-in ${stockInCount === 1 ? 'entry' : 'entries'}`)
-        refLine = `This product is referenced by ${parts.join(' and ')}. These will be preserved but marked as freeform (unlinked) so history stays intact.`
+        if (salesCount) parts.push(`${salesCount} ${salesCount === 1 ? t('confirm.sale_singular') : t('confirm.sale_plural')}`)
+        if (stockInCount) parts.push(`${stockInCount} ${stockInCount === 1 ? t('confirm.stockin_singular') : t('confirm.stockin_plural')}`)
+        // "and" (EN) / "и" (BG) — join word between the two reference-type phrases
+        const joiner = t('confirm.and')
+        refLine = `${t('confirm.delete_product_refs_prefix')} ${parts.join(' ' + joiner + ' ')}. ${t('confirm.delete_product_refs_suffix')}`
       }
-      const msg = `Permanently delete "${product.name}" (${product.id})?\n\n${refLine}\n\nThe product itself will be removed from the catalog.`
+      const msg = `${t('confirm.delete_product_perm_prefix')} "${product.name}" (${product.id})?\n\n${refLine}\n\n${t('confirm.delete_product_perm')}`
       const ok = await confirmYesNo(msg, {
-        title: 'Delete product?',
-        okLabel: 'Delete',
-        cancelLabel: 'Cancel',
+        title: t('confirm.delete_product_title'),
+        okLabel: t('buttons.delete'),
+        cancelLabel: t('buttons.cancel'),
         okStyle: 'danger',
       })
       if (!ok) return
