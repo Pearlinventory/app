@@ -3018,6 +3018,27 @@
         </div>
         <div class="settings-body">
           <section class="settings-category">
+            <h3 class="settings-category-title" data-i18n="settings.section_account">👤 Account</h3>
+            <p class="settings-category-desc" data-i18n="settings.section_account_desc">Your account details. Changes apply to future entries only — past sales and stock receipts keep the name that was set when they were recorded.</p>
+            <div class="settings-pref-row">
+              <label class="settings-pref-label" for="accountEmailDisplay">
+                <span data-i18n="settings.account_email">Email</span>
+              </label>
+              <input type="email" id="accountEmailDisplay" readonly disabled style="margin-left: 26px; margin-top: 4px; width: calc(100% - 26px); box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elevated); color: var(--text-muted); font-family: inherit; font-size: 13px;">
+            </div>
+            <div class="settings-pref-row">
+              <label class="settings-pref-label" for="accountDisplayNameInput">
+                <span data-i18n="settings.account_display_name">Display name</span>
+              </label>
+              <input type="text" id="accountDisplayNameInput" maxlength="60" autocomplete="name" style="margin-left: 26px; margin-top: 4px; width: calc(100% - 26px); box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg); color: var(--text); font-family: inherit; font-size: 13px;">
+              <p class="settings-pref-hint" data-i18n="settings.account_display_name_hint">Shown on your bubbles in the feed. If empty, your email is used instead.</p>
+              <div style="margin-left: 26px; margin-top: 8px; display: flex; align-items: center; gap: 12px;">
+                <button class="btn small" id="accountSaveBtn" data-i18n="settings.account_save">Save</button>
+                <span class="settings-status" id="accountStatus"></span>
+              </div>
+            </div>
+          </section>
+          <section class="settings-category">
             <h3 class="settings-category-title" data-i18n="settings.section_prefs">⚙️ Preferences</h3>
             <p class="settings-category-desc" data-i18n="settings.section_prefs_desc">
               User preferences saved to this browser. They apply immediately and persist across sessions.
@@ -4230,7 +4251,9 @@
       const sameDay = d.toDateString() === now.toDateString()
       const yest = new Date(now); yest.setDate(now.getDate() - 1)
       const isYest = d.toDateString() === yest.toDateString()
-      const month = d.toLocaleString(locale, { month: 'long' })
+      // BG Intl returns lowercase; UI displays capitalized. Inline TDZ-safe capFirst fallback.
+      const cap = (s) => (typeof capFirst === 'function') ? capFirst(s) : (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+      const month = cap(d.toLocaleString(locale, { month: 'long' }))
       const day = d.getDate()
       const sameYear = d.getFullYear() === now.getFullYear()
       // Year first when not current year, e.g. "2025 June 15"
@@ -4243,7 +4266,7 @@
       const startOfD = new Date(d); startOfD.setHours(0,0,0,0)
       const daysAgo = Math.floor((startOfToday - startOfD) / 86400000)
       if (daysAgo >= 2 && daysAgo <= 6) {
-        const weekday = d.toLocaleString(locale, { weekday: 'long' })
+        const weekday = cap(d.toLocaleString(locale, { weekday: 'long' }))
         return `${weekday} · ${dateStr}`
       }
       return dateStr
@@ -4251,6 +4274,32 @@
     function formatHM(iso) {
       const d = new Date(iso)
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+    // Display-time translation of internal source strings. Detects the English constants that
+    // Edit Product + Stock Revision write into the `source` field and swaps in the localized
+    // version. Also handles the legacy Bulgarian value from an earlier revision code path so
+    // old bubbles (stored as BG) still translate correctly. User-entered sources (invoice
+    // numbers etc.) pass through unchanged.
+    function translateInternalSource(source) {
+      if (!source) return source
+      if (source === 'Manual adjustment' || source === 'Ръчна корекция') return t('internal.manual_adjustment')
+      if (source === 'Stock revision' || source === 'Ревизия на наличност') return t('internal.stock_revision')
+      return source
+    }
+    // Display-time translation of internal note strings. Detects the two auto-generated note
+    // patterns ("Set stock from X to Y via edit/revision") and swaps in the localized version
+    // with X/Y interpolated. Free-text user notes pass through unchanged.
+    function translateInternalNote(note) {
+      if (!note) return note
+      const editMatch = note.match(/^Set stock from (-?\d+(?:\.\d+)?) to (-?\d+(?:\.\d+)?) via edit$/)
+      if (editMatch) {
+        return t('internal.note_stock_edit').replace('{old}', editMatch[1]).replace('{new}', editMatch[2])
+      }
+      const revMatch = note.match(/^Set stock from (-?\d+(?:\.\d+)?) to (-?\d+(?:\.\d+)?) via revision$/)
+      if (revMatch) {
+        return t('internal.note_stock_revision').replace('{old}', revMatch[1]).replace('{new}', revMatch[2])
+      }
+      return note
     }
     // Insert <wbr> tags after natural break characters in an ID.
     // The browser prefers these break points before falling back to
@@ -4264,7 +4313,10 @@
       const d = new Date(iso)
       const now = new Date()
       const locale = (typeof userPrefs !== 'undefined' && userPrefs && userPrefs.language) || 'en'
-      const month = d.toLocaleString(locale, { month: 'long' })
+      // Bulgarian's Intl output is lowercase ("юли") — capitalize the first letter for UI display.
+      // TDZ-safe: capFirst is declared later; use inline fallback if not yet defined.
+      const rawMonth = d.toLocaleString(locale, { month: 'long' })
+      const month = (typeof capFirst === 'function') ? capFirst(rawMonth) : (rawMonth ? rawMonth.charAt(0).toUpperCase() + rawMonth.slice(1) : rawMonth)
       const day = d.getDate()
       const sameYear = d.getFullYear() === now.getFullYear()
       // Year first when not current year
@@ -4403,7 +4455,7 @@
             const editDate = formatDateLong(latestEditTs)
             editedPrefix = `<span class="edited-prefix">${escapeHtml(t('bubble.edited'))} · ${editTime} — ${editDate}</span>`
           }
-          const sourceSpan = r.source ? `<span class="meta-right invoice">${escapeHtml(r.source)}</span>` : ''
+          const sourceSpan = r.source ? `<span class="meta-right invoice">${escapeHtml(translateInternalSource(r.source))}</span>` : ''
           if (editedPrefix || sourceSpan) {
             metaRight = `<span class="meta-right-group">${editedPrefix}${sourceSpan}</span>`
           }
@@ -4429,7 +4481,7 @@
              <div class="bubble-cell" style="grid-column: 1 / -1;">
                <span class="note-icon">📝</span>
                <span class="note-prefix" data-i18n="bubble_edit.note_prefix">Note:</span>
-               <span class="note-text">${escapeHtml(r.notes)}</span>
+               <span class="note-text">${escapeHtml(translateInternalNote(r.notes))}</span>
              </div>
            </div>`
         : ''
@@ -6745,11 +6797,68 @@
       const status = document.getElementById('backupStatus')
       status.textContent = ''
       status.className = 'settings-status'
+      // Reset account status message + populate current values
+      const acctStatus = document.getElementById('accountStatus')
+      if (acctStatus) { acctStatus.textContent = ''; acctStatus.className = 'settings-status' }
+      // Populate the read-only email and editable display-name field with current user values.
+      // display_name might be null (never set) — in that case, leave the input empty; on save,
+      // an empty value clears it back to null (falls back to email in bubbles).
+      if (currentUser) {
+        document.getElementById('accountEmailDisplay').value = currentUser.email || ''
+        // Only pre-fill display_name if it's actually different from the email (Supabase falls
+        // back to email in our checkSession, so we can't blindly write it back — that would
+        // create a "display_name = email" record which is functionally the same as null but
+        // hides the "using email fallback" state.
+        const dn = currentUser.display_name
+        const isRealName = dn && dn !== currentUser.email
+        document.getElementById('accountDisplayNameInput').value = isRealName ? dn : ''
+      }
       // Sync preferences UI to current values (so if pref changed elsewhere, checkbox is right)
       document.getElementById('prefHideZeroStock').checked = !!userPrefs.hideZeroStock
     }
     document.getElementById('settingsCloseBtn').addEventListener('click', () => {
       document.getElementById('settingsModal').classList.remove('visible')
+    })
+
+    // ===== Display name save =====
+    // Updates `user_metadata.display_name` via Supabase auth.updateUser. That's the same field
+    // the rest of the app reads at login. Only affects FUTURE bubbles — past `sold_by_display` /
+    // `received_by_display` values are stored per-row and stay as-is (historical accuracy).
+    document.getElementById('accountSaveBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('accountSaveBtn')
+      const status = document.getElementById('accountStatus')
+      const input = document.getElementById('accountDisplayNameInput')
+      if (!currentUser) return
+      const newName = input.value.trim()
+      const origLabel = btn.textContent
+      btn.disabled = true
+      btn.textContent = t('settings.account_saving')
+      status.textContent = ''
+      status.className = 'settings-status'
+      try {
+        // Supabase treats empty string as "clear it" in user_metadata. Pass null explicitly
+        // when the user wants no display name (empty input) so the app falls back to email.
+        const { data, error } = await supabase.auth.updateUser({
+          data: { display_name: newName || null }
+        })
+        if (error) throw error
+        // Update local state: currentUser.display_name is used by ALL subsequent inserts.
+        // If newName is empty, fall back to email — matches the login-time resolution logic.
+        currentUser.display_name = newName || currentUser.email
+        // Refresh the drawer's user label so the change is visible immediately
+        const drawerName = document.getElementById('drawerUserName')
+        if (drawerName) drawerName.textContent = displayName(currentUser.email)
+        status.textContent = t('settings.account_saved')
+        status.className = 'settings-status success'
+        log('account', `display_name updated to "${newName || '(cleared)'}"`)
+      } catch (err) {
+        log('error', 'display_name update failed', err)
+        status.textContent = `${t('settings.account_save_failed')}: ${err.message || 'unknown error'}`
+        status.className = 'settings-status error'
+      } finally {
+        btn.disabled = false
+        btn.textContent = origLabel
+      }
     })
 
     // ===== User preferences =====
@@ -6812,6 +6921,15 @@
           section_prefs_desc: 'User preferences saved to this browser. They apply immediately and persist across sessions.',
           section_backup: '💾 Backup',
           section_backup_desc: 'Downloads a file with columns ID, Name, and Quantity.',
+          section_account: '👤 Account',
+          section_account_desc: 'Your account details. Changes apply to future entries only — past sales and stock receipts keep the name that was set when they were recorded.',
+          account_email: 'Email',
+          account_display_name: 'Display name',
+          account_display_name_hint: 'Shown on your bubbles in the feed. If empty, your email is used instead.',
+          account_save: 'Save',
+          account_saving: 'Saving…',
+          account_saved: 'Saved',
+          account_save_failed: 'Could not save',
           pref_language: 'Language',
           pref_language_hint: 'Interface language. Applies immediately.',
         },
@@ -7046,6 +7164,18 @@
           export_failed: 'Export failed',
           could_not_fetch_stock: 'Could not fetch stock',
         },
+        // "Internal" values are strings that the app writes into DB fields (source, notes) for
+        // auto-generated bubbles from Edit Product + Stock Revision workflows. These are stored
+        // as English constants at insert time; the render code translates them at display time
+        // so language switches (and historical bubbles created in a different language) show
+        // consistently in the user's current language. Free-text user input in these fields
+        // (e.g. an invoice number in `source`) is rendered as-is.
+        internal: {
+          manual_adjustment: 'Manual adjustment',
+          stock_revision: 'Stock revision',
+          note_stock_edit: 'Set stock from {old} to {new} via edit',
+          note_stock_revision: 'Set stock from {old} to {new} via revision',
+        },
       },
       bg: {
         workspaces: { stock: 'Наличност', history: 'Продажби', calendar: 'Календар' },
@@ -7081,6 +7211,15 @@
           section_prefs_desc: 'Потребителски настройки, запазени в този браузър. Прилагат се веднага и се запазват между сесии.',
           section_backup: '💾 Резервно копие',
           section_backup_desc: 'Изтегля файл с колони ID, Име и Количество.',
+          section_account: '👤 Профил',
+          section_account_desc: 'Данни за вашия профил. Промените се прилагат само към бъдещите записи — миналите продажби и постъпвания запазват името, което е било зададено при създаването им.',
+          account_email: 'Имейл',
+          account_display_name: 'Показвано име',
+          account_display_name_hint: 'Показва се върху вашите записи в лентата. Ако е празно, се използва имейлът ви.',
+          account_save: 'Запази',
+          account_saving: 'Запазване…',
+          account_saved: 'Запазено',
+          account_save_failed: 'Запазването се провали',
           pref_language: 'Език',
           pref_language_hint: 'Език на интерфейса. Прилага се веднага.',
         },
@@ -7313,6 +7452,12 @@
         export_errors: {
           export_failed: 'Изнасянето се провали',
           could_not_fetch_stock: 'Наличността не може да бъде заредена',
+        },
+        internal: {
+          manual_adjustment: 'Ръчна корекция',
+          stock_revision: 'Ревизия на наличност',
+          note_stock_edit: 'Наличността е променена от {old} на {new} чрез редакция',
+          note_stock_revision: 'Наличността е променена от {old} на {new} чрез ревизия',
         },
       },
     }
@@ -7728,6 +7873,15 @@ new events will not be in this file. Re-download periodically.
     function calLocale() {
       return (typeof userPrefs !== 'undefined' && userPrefs && userPrefs.language) || 'en'
     }
+    // Uppercase the first letter of a locale-produced day/month name. Bulgarian's official
+    // orthography keeps months + weekdays lowercase, but for display in a UI header users
+    // strongly prefer them capitalized ("Юли 30" not "юли 30"). Applied everywhere we render
+    // month or weekday names to the user. English is unaffected — its names are already
+    // capitalized by Intl. Falls back gracefully on empty strings.
+    function capFirst(s) {
+      if (!s) return s
+      return s.charAt(0).toUpperCase() + s.slice(1)
+    }
     // Monday-first weekday abbreviations (Mon/Tue/... in EN; Пон/Вто/... in BG).
     // Rebuilt each call so it reflects the current locale.
     function calWeekdays() {
@@ -7736,21 +7890,21 @@ new events will not be in this file. Re-download periodically.
       const arr = []
       for (let i = 0; i < 7; i++) {
         const d = new Date(monday); d.setUTCDate(monday.getUTCDate() + i)
-        arr.push(d.toLocaleString(calLocale(), { weekday: 'short', timeZone: 'UTC' }))
+        arr.push(capFirst(d.toLocaleString(calLocale(), { weekday: 'short', timeZone: 'UTC' })))
       }
       return arr
     }
     function calMonthsFull() {
       const arr = []
       for (let m = 0; m < 12; m++) {
-        arr.push(new Date(2024, m, 1).toLocaleString(calLocale(), { month: 'long' }))
+        arr.push(capFirst(new Date(2024, m, 1).toLocaleString(calLocale(), { month: 'long' })))
       }
       return arr
     }
     function calMonthsShort() {
       const arr = []
       for (let m = 0; m < 12; m++) {
-        arr.push(new Date(2024, m, 1).toLocaleString(calLocale(), { month: 'short' }))
+        arr.push(capFirst(new Date(2024, m, 1).toLocaleString(calLocale(), { month: 'short' })))
       }
       return arr
     }
@@ -8656,10 +8810,13 @@ new events will not be in this file. Re-download periodically.
       overlay.classList.add('visible')
       document.getElementById('revisionModal').classList.remove('visible')
 
-      const displayName = currentUser.user_metadata?.display_name || currentUser.email
+      const displayName = currentUser.display_name || currentUser.email
       const failures = []
       let successCount = 0
-      const sourceText = t('revision.source_label')
+      // Store the English constant "Stock revision" in the DB. The bubble renderer detects this
+      // via translateInternalSource() and displays the localized version. This way, revisions
+      // created in different languages / with future language switches all render consistently.
+      const sourceText = 'Stock revision'
 
       try {
         // Create a single stock_in_group so the entire revision shows as one bubble in the feed
@@ -9061,8 +9218,8 @@ ${headerRowXml}${dataRowsXml}
             source: 'Manual adjustment',
             notes: `Set stock from ${oldStock} to ${newStock} via edit`,
             received_at: new Date().toISOString(),
-            received_by: currentUser?.id || null,
-            received_by_display: currentUser?.user_metadata?.display_name || currentUser?.email || null,
+            received_by: currentUser?.email || null,
+            received_by_display: currentUser?.display_name || currentUser?.email || null,
             client_uuid: crypto.randomUUID(),
           })
           if (stockErr) throw stockErr
