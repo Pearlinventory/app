@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bg">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1313,6 +1313,34 @@
 
     /* Activity feed: centered linear feed of bubble-cards */
     .activity-feed { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+    /* Log workspace feed: simpler, single-line entries. Each row shows actor · action summary
+       with timestamp on the right. Uses the same 600px column width as other feeds. */
+    .logs-feed { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 4px; }
+    .log-entry {
+      padding: 10px 14px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; display: flex; align-items: baseline; gap: 12px;
+      font-size: 13px; line-height: 1.4;
+    }
+    .log-entry .log-actor {
+      font-weight: 600; color: var(--text); white-space: nowrap; flex-shrink: 0;
+    }
+    .log-entry .log-summary { color: var(--text); flex: 1; word-break: break-word; }
+    .log-entry .log-time { color: var(--text-muted); font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+    /* Product IDs in log summaries: italic, monospaced, subtly muted — makes them visually
+       distinguishable from names + prose without shouting for attention. */
+    .log-entry .log-id {
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-style: italic;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .logs-feed .day-separator {
+      text-align: center; color: var(--text-muted); font-size: 12px; text-transform: uppercase;
+      letter-spacing: 0.5px; padding: 12px 0 6px; font-weight: 500;
+    }
+    .logs-feed .feed-empty, .logs-feed .feed-loading, .logs-feed .feed-error {
+      text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: 14px;
+    }
 
     /* =================================================================================
        Calendar widget — used by the Calendar workspace to filter the activity feed by
@@ -2588,11 +2616,14 @@
         <h1 id="workspaceTitle">New Sale</h1>
       </div>
       <div class="header-right">
+        <!-- "Updated Xs ago" label — appears LEFT of the connection status. Only shown when the
+             connection has an issue (offline / reconnecting / could-not-connect). When everything
+             is healthy (online), it's hidden — no visual noise for the normal case. -->
+        <span class="last-updated" id="lastUpdated"></span>
         <span class="conn-status" id="connStatus" data-status="offline">
           <span class="conn-dot"></span>
           <span class="conn-label">Connecting…</span>
         </span>
-        <span class="last-updated" id="lastUpdated"></span>
         <!-- Refresh button — shown in most workspaces (Sales, Calendar). Hidden in Current
              Stock where the "+" menu takes its place. Toggling handled in switchWorkspace(). -->
         <button class="header-icon-btn" id="refreshBtn" onclick="manualRefresh()" data-i18n-aria-label="actions.refresh" data-i18n-title="actions.refresh" aria-label="Refresh" title="Refresh">
@@ -2731,6 +2762,17 @@
         <div class="cal-widget" id="calWidget"></div>
         <div class="cal-feed-info" id="calFeedInfo"></div>
         <div class="activity-feed" id="calFeed"></div>
+      </section>
+    </div>
+
+    <!-- Log workspace: chronological feed of every mutation across the app (create/edit/delete
+         of sales/stock-in/products, revisions, imports, display-name changes). Rows are
+         inserted by logAction() at each mutation site. Data comes from the `action_logs` DB
+         table (RLS: all authenticated users see all logs). Rows auto-expire after 30 days via
+         a pg_cron job (server-side, no client involvement). -->
+    <div class="workspace" data-workspace="logs">
+      <section class="activity-section">
+        <div class="logs-feed" id="logsFeed"></div>
       </section>
     </div>
 
@@ -2892,6 +2934,14 @@
           <span class="drawer-icon">📅</span>
           <span class="drawer-label" data-i18n="workspaces.calendar">Calendar</span>
         </button>
+        <button class="drawer-item" data-workspace="logs" onclick="window.switchWorkspace('logs')">
+          <span class="drawer-icon">📜</span>
+          <span class="drawer-label" data-i18n="workspaces.logs">Log</span>
+        </button>
+        <!-- Flex spacer: pushes Settings down to the bottom of the drawer, visually separating
+             workspace-navigation from settings-configuration. flex:1 absorbs all remaining
+             vertical space in the flex-column drawer-nav. -->
+        <div class="drawer-spacer" style="flex: 1;"></div>
         <div class="drawer-divider"></div>
         <button class="drawer-item" onclick="window.openSettings()">
           <span class="drawer-icon">⚙️</span>
@@ -3603,7 +3653,7 @@
     // =====================================================================
 
     const DEBUG = true
-    const AUTO_REFRESH_INTERVAL_MS = 20000
+    const AUTO_REFRESH_INTERVAL_MS = 30000
     const OVERLAY_CLOSE_DELAY_MS = 20000
     const OVERLAY_UNCERTAIN_DELAY_MS = 30000
     const OFFLINE_OVERLAY_DELAY_MS = 8000
@@ -3920,6 +3970,9 @@
       el.querySelector('.conn-label').textContent = label
       log('connection', `→ ${status}`, { label })
       updateFormButtonsEnabled()
+      // Refresh the "Updated Xs ago" label immediately — its visibility depends on connection
+      // status (hidden when online). Without this it'd only update on the next 1s tick.
+      if (typeof updateLastUpdatedDisplay === 'function') updateLastUpdatedDisplay()
     }
     // Re-translate the current connection label on language switch. Called from applyTranslations().
     function refreshConnLabel() {
@@ -3930,14 +3983,27 @@
     }
     function updateLastUpdatedDisplay() {
       const el = document.getElementById('lastUpdated')
-      if (!lastFetchTime) { el.textContent = ''; return }
+      if (!el) return
+      // Only show the "Updated Xs ago" label when the connection has an issue. When the app
+      // is online + healthy, this label is visual noise that constantly ticks — better to
+      // hide it and keep the header clean. The label reappears the moment the connection
+      // degrades (offline / reconnecting / could-not-connect) so the user has context about
+      // how stale the visible data might be.
+      const connEl = document.getElementById('connStatus')
+      const status = connEl ? connEl.getAttribute('data-status') : null
+      const isHealthy = status === 'online'
+      if (isHealthy || !lastFetchTime) { el.textContent = ''; return }
       const sec = Math.floor((Date.now() - lastFetchTime) / 1000)
+      // Locale-aware "Updated Xs ago" via t() with placeholder — falls back to English if
+      // key missing. Kept simple: unit letters ("s", "m", "h") stay English since they read
+      // fine in either language and Bulgarian's translated equivalents are just as short.
       let txt
-      if (sec < 5) txt = 'just now'
-      else if (sec < 60) txt = `${sec}s ago`
-      else if (sec < 3600) txt = `${Math.floor(sec / 60)}m ago`
-      else txt = `${Math.floor(sec / 3600)}h ago`
-      el.textContent = `Updated ${txt}`
+      if (sec < 5) txt = t('header.updated_just_now')
+      else if (sec < 60) txt = `${sec}s`
+      else if (sec < 3600) txt = `${Math.floor(sec / 60)}m`
+      else txt = `${Math.floor(sec / 3600)}h`
+      const prefix = t('header.updated_prefix')
+      el.textContent = sec < 5 ? txt : `${prefix} ${txt}`
     }
     setInterval(updateLastUpdatedDisplay, 1000)
 
@@ -4000,6 +4066,13 @@
           if (ac && ac.refreshStock) ac.refreshStock()
         })
         await reloadActivity()
+        // If the Log workspace is currently visible, refresh it too — otherwise the manual
+        // refresh button + auto-refresh polls wouldn't update logs. Silent no-op elsewhere:
+        // switchWorkspace('logs') itself calls loadLogs() so the log data stays fresh even
+        // if the user is on another workspace when a log entry is inserted.
+        if (currentWorkspace === 'logs' && typeof loadLogs === 'function') {
+          loadLogs({ replace: true })
+        }
       } catch (err) {
         log('error', 'Load failed', err)
         setConnectionStatus('offline')
@@ -5203,6 +5276,10 @@
         // 5) Clear the new-row state map (DOM rows are wiped by the upcoming reloadActivity)
         clearBubbleNewRows(); clearBubbleExistingRows()
         log(bubble.event_type, 'Edit saved')
+        // Log the edit for the Log workspace. `bubble.event_type` is 'sale' or 'stock_in'.
+        logAction(bubble.event_type === 'stock_in' ? 'stockin_edited' : 'sale_edited', {
+          group_id: bubble.group_id,
+        })
         setSubmitOverlaySuccess()
         editingRow = null
         await reloadActivity()
@@ -5276,6 +5353,11 @@
           if (groupErr) throw groupErr
         }
         log(bubble.event_type, 'Deleted')
+        // Log this action so it appears in the Log workspace for both users
+        logAction(isStockIn ? 'stockin_deleted' : 'sale_deleted', {
+          count: (bubble.items || []).length,
+          group_id: groupId,
+        })
         setSubmitOverlaySuccess()
         await reloadActivity()
         await loadAll(false)
@@ -5378,6 +5460,23 @@
           (p) => { log('realtime', 'stock_in_groups changed', p.eventType); checkEditKick(p, 'stock_in_groups'); loadAll(false) })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' },
           (p) => { log('realtime', 'products changed', p.eventType); loadAll(false) })
+        // Log table: refresh the Log workspace feed if visible. INSERT-only in practice
+        // (nothing edits/deletes logs from clients — expiry is server-side pg_cron).
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'action_logs' },
+          (p) => {
+            log('realtime', 'action_logs INSERT')
+            if (!p.new) return
+            // Always merge into logsState (regardless of current workspace) so that when the
+            // user later switches to Log, the new entry is already there. Only re-render if
+            // the Log workspace is actually visible right now.
+            if (logsState.initialized) {
+              const exists = logsState.rows.some(r => r.id === p.new.id)
+              if (!exists) {
+                logsState.rows = [p.new, ...logsState.rows]
+                if (currentWorkspace === 'logs') renderLogsFeed()
+              }
+            }
+          })
         .subscribe((status, err) => {
           // Use console.warn so the status is visible even if filtered. SUBSCRIBED = good.
           // CHANNEL_ERROR / TIMED_OUT / CLOSED = realtime not delivering events; check whether
@@ -6205,6 +6304,7 @@
           if (itemErr && itemErr.code !== '23505') throw itemErr
         }
         log('sale', `Sale inserted: ${collected.length} item(s) in group ${groupId}`)
+        logAction('sale_created', { count: collected.length, group_id: groupId })
         setSubmitOverlaySuccess()
         feedback.className = 'form-feedback success'
         feedback.textContent = `✓ Sale logged with ${collected.length} product${collected.length>1?'s':''}.`
@@ -6305,6 +6405,11 @@
             // Continue — the existing product is fine to use.
             if (prodErr && prodErr.code !== '23505') throw prodErr
             log('stock_in', `Created new product: ${c.newId} / ${c.productName}`)
+            // Log the product creation for the Log workspace (only if the insert actually
+            // succeeded — code '23505' means another user just created it, no log needed).
+            if (!prodErr) {
+              logAction('product_added', { id: c.newId, name: c.productName })
+            }
           }
         }
         // Step 1: create the group (with optional source + note)
@@ -6336,6 +6441,7 @@
           if (itemErr && itemErr.code !== '23505') throw itemErr
         }
         log('stock_in', `Stock_in inserted: ${collected.length} item(s) in group ${groupId}`)
+        logAction('stockin_created', { count: collected.length, group_id: groupId })
         setSubmitOverlaySuccess()
         feedback.className = 'form-feedback success'
         feedback.textContent = `✓ Received ${collected.length} product${collected.length>1?'s':''}.`
@@ -6764,6 +6870,10 @@
         // Show results
         overlay.classList.remove('visible')
         if (failures.length === 0) {
+          logAction('import_executed', {
+            new_count: plan.newRows.length,
+            update_count: plan.renameRows.length + successCount,
+          })
           await showNotice(`✓ Import complete.\n\n` +
             `${plan.newRows.length} new product(s) created\n` +
             `${plan.renameRows.length} rename(s) applied\n` +
@@ -6842,9 +6952,17 @@
           data: { display_name: newName || null }
         })
         if (error) throw error
+        // Capture old name BEFORE overwriting for the log entry
+        const oldDisplayName = currentUser.display_name || currentUser.email
         // Update local state: currentUser.display_name is used by ALL subsequent inserts.
         // If newName is empty, fall back to email — matches the login-time resolution logic.
         currentUser.display_name = newName || currentUser.email
+        // Log the change for the Log workspace (with both old + new so the summary reads
+        // like "changed name from Old to New" rather than just "changed to New")
+        logAction('display_name_changed', {
+          old: oldDisplayName,
+          new: newName || currentUser.email,
+        })
         // Refresh the drawer's user label so the change is visible immediately
         const drawerName = document.getElementById('drawerUserName')
         if (drawerName) drawerName.textContent = displayName(currentUser.email)
@@ -6888,7 +7006,7 @@
     // Bulgarian translations pending review by user; may need tweaks for tone and idiom.
     const I18N = {
       en: {
-        workspaces: { stock: 'Current Stock', history: 'Sales', calendar: 'Calendar' },
+        workspaces: { stock: 'Current Stock', history: 'Sales', calendar: 'Calendar', logs: 'Log' },
         drawer: { title: 'Menu', close: 'Close menu', signout: 'Sign out', settings: 'Settings' },
         actions: { refresh: 'Refresh', actions: 'Actions' },
         buttons: {
@@ -7006,6 +7124,8 @@
           signed_in_as: 'Signed in as',
           open_menu: 'Open menu',
           scroll_to_bottom: 'Scroll to bottom of feed',
+          updated_prefix: 'Updated',
+          updated_just_now: 'just updated',
         },
         actions_menu: {
           add_product: 'Add product',
@@ -7176,9 +7296,40 @@
           note_stock_edit: 'Set stock from {old} to {new} via edit',
           note_stock_revision: 'Set stock from {old} to {new} via revision',
         },
+        // Action Log workspace. Each `action_*` key is a template with {placeholders}. The
+        // display-time renderer substitutes actual values from the log row's `details` JSON.
+        // Stored in DB as English action_type constants; translated at display time so old
+        // logs render correctly in the current language and language switching works.
+        logs: {
+          empty: 'No log entries yet. Activity will appear here as you and others use the app.',
+          loading: 'Loading log…',
+          load_older: 'Load older',
+          beginning: '— Beginning of log —',
+          could_not_load: 'Could not load log.',
+          retry: 'Retry',
+          action_sale_created: 'Created a sale with {count} product(s)',
+          action_sale_edited: 'Edited a sale bubble',
+          action_sale_deleted: 'Deleted a sale bubble ({count} product(s))',
+          action_stockin_created: 'Recorded stock-in with {count} product(s)',
+          action_stockin_edited: 'Edited a stock-in bubble',
+          action_stockin_deleted: 'Deleted a stock-in bubble ({count} product(s))',
+          action_product_added: 'Added product {id} — {name}',
+          action_product_edited: 'Edited product {id} — {name}',
+          action_product_deleted: 'Deleted product {id} — {name}',
+          action_revision_applied: 'Applied stock revision ({count} adjustment(s))',
+          action_import_executed: 'Imported spreadsheet ({new_count} new, {update_count} updated)',
+          action_display_name_changed: 'Changed display name to "{name}"',
+          action_unknown: '{type}',
+          // Field labels + prefixes used by the richer per-change formatters
+          field_id: 'ID',
+          field_name: 'name',
+          field_stock: 'stock',
+          product_edited_prefix: 'Edited product',
+          display_name_changed_prefix: 'Changed display name from',
+        },
       },
       bg: {
-        workspaces: { stock: 'Наличност', history: 'Продажби', calendar: 'Календар' },
+        workspaces: { stock: 'Наличност', history: 'Продажби', calendar: 'Календар', logs: 'Лог' },
         drawer: { title: 'Меню', close: 'Затвори менюто', signout: 'Отписване', settings: 'Настройки' },
         actions: { refresh: 'Обнови', actions: 'Действия' },
         buttons: {
@@ -7295,6 +7446,8 @@
           signed_in_as: 'Влязохте като',
           open_menu: 'Отвори менюто',
           scroll_to_bottom: 'Скролни до долу',
+          updated_prefix: 'Обновено преди',
+          updated_just_now: 'току-що обновено',
         },
         actions_menu: {
           add_product: 'Добави продукт',
@@ -7459,6 +7612,32 @@
           note_stock_edit: 'Наличността е променена от {old} на {new} чрез редакция',
           note_stock_revision: 'Наличността е променена от {old} на {new} чрез ревизия',
         },
+        logs: {
+          empty: 'Все още няма записи в лога. Активността ще се появи тук, докато вие и другите използвате приложението.',
+          loading: 'Зареждане на лога…',
+          load_older: 'Зареди по-стари',
+          beginning: '— Начало на лога —',
+          could_not_load: 'Логът не може да бъде зареден.',
+          retry: 'Опитай отново',
+          action_sale_created: 'Създаде продажба с {count} продукт(а)',
+          action_sale_edited: 'Редактира запис за продажба',
+          action_sale_deleted: 'Изтри запис за продажба ({count} продукт(а))',
+          action_stockin_created: 'Записа постъпване с {count} продукт(а)',
+          action_stockin_edited: 'Редактира запис за постъпване',
+          action_stockin_deleted: 'Изтри запис за постъпване ({count} продукт(а))',
+          action_product_added: 'Добави продукт {id} — {name}',
+          action_product_edited: 'Редактира продукт {id} — {name}',
+          action_product_deleted: 'Изтри продукт {id} — {name}',
+          action_revision_applied: 'Приложи ревизия на наличност ({count} корекция(и))',
+          action_import_executed: 'Внесе електронна таблица ({new_count} нови, {update_count} обновени)',
+          action_display_name_changed: 'Промени показваното име на "{name}"',
+          action_unknown: '{type}',
+          field_id: 'ID',
+          field_name: 'име',
+          field_stock: 'наличност',
+          product_edited_prefix: 'Редактира продукт',
+          display_name_changed_prefix: 'Промени показваното име от',
+        },
       },
     }
     function t(path) {
@@ -7593,6 +7772,10 @@
           }
           if (typeof renderStock === 'function' && typeof lastGoodStock !== 'undefined' && lastGoodStock) {
             renderStock(lastGoodStock)
+          }
+          // Log workspace also re-renders (action-type templates translate at display time)
+          if (typeof logsState !== 'undefined' && logsState && logsState.initialized) {
+            if (typeof renderLogsFeed === 'function') renderLogsFeed()
           }
           log('prefs', `language=${langSel.value}`)
         })
@@ -7812,7 +7995,7 @@ new events will not be in this file. Re-download periodically.
     function workspaceTitle(name) { return t(`workspaces.${name}`) }
     const WORKSPACE_TITLES = {
       // Kept for compatibility with getStoredWorkspace's validation check (keys, not values)
-      stock: true, history: true, calendar: true,
+      stock: true, history: true, calendar: true, logs: true,
     }
     const DEFAULT_WORKSPACE = 'history'
     const WORKSPACE_STORAGE_KEY = 'inv_last_workspace'
@@ -8470,8 +8653,211 @@ new events will not be in this file. Re-download periodically.
         calendarState.loading = false
       }
     }
-    // Dispatcher: re-render whichever activity feed is currently visible. Used by edit/cancel
-    // flows so the right feed gets refreshed without re-fetching when toggling edit mode.
+    // ===== Action Log workspace =====
+    // Fetches recent entries from action_logs, renders as chronological feed. Actions are
+    // recorded by logAction() calls scattered through the codebase. Realtime subscription
+    // keeps the feed live-updating for other users' actions. 30-day retention via server-side
+    // pg_cron job — no client cleanup needed.
+    const LOGS_PAGE_SIZE = 50
+    let logsState = {
+      rows: [],
+      hasMore: true,
+      loading: false,
+      initialized: false,   // true after first load, so switchWorkspace can distinguish
+    }
+    // logAction — write a single row to action_logs. Called from every mutation site (sale
+    // create/edit/delete, product add/edit/delete, revision, import, display-name change).
+    // Fires and forgets — errors are logged but don't block the user's action from completing.
+    // The details JSON is action-specific; see the renderLogSummary function for what each
+    // type reads out. All actions get the same actor snapshot at call time.
+    async function logAction(actionType, details) {
+      try {
+        if (!currentUser) return   // pre-login mutations don't happen, but guard anyway
+        const row = {
+          actor_email: currentUser.email,
+          actor_display: currentUser.display_name || currentUser.email,
+          action_type: actionType,
+          details: details || {},
+        }
+        // Fire and forget — but await so realtime propagation is more predictable
+        const { error } = await supabase.from('action_logs').insert(row)
+        if (error) log('error', `logAction failed: ${error.message}`, { actionType })
+      } catch (err) {
+        log('error', 'logAction exception', err)
+      }
+    }
+    // Render one log entry's summary as HTML. Returns escaped-user-data + literal-HTML markup
+    // suitable for innerHTML. Each action type has its own formatter that picks the right
+    // template and interpolates details. IDs get wrapped in <span class="log-id"> for
+    // italic-gray monospaced styling; changed field names/values get "→" arrow formatting.
+    //
+    // Simple actions use t() templates with {placeholder} substitution (escaped).
+    // Actions with a `changes` details object (e.g. product_edited) get custom handling
+    // that lists only the fields that actually changed.
+    function renderLogSummary(actionType, details) {
+      details = details || {}
+      // Helper: wrap a product ID in the styled span (escaped for safety)
+      const idSpan = (id) => `<span class="log-id">${escapeHtml(id ?? '')}</span>`
+      // Helper: quote a value with "old → new" arrow, escaped
+      const changeArrow = (oldV, newV) => `"${escapeHtml(String(oldV ?? ''))}" → "${escapeHtml(String(newV ?? ''))}"`
+      // Helper: template substitution with escaping. `escapedKeys` list = which keys should
+      // be raw HTML instead of escaped (e.g. an idSpan we built above).
+      const applyTemplate = (key, subs, escapedKeys = []) => {
+        let template = t(key)
+        if (template === key) template = t('logs.action_unknown').replace('{type}', actionType)
+        return template.replace(/\{(\w+)\}/g, (_, name) => {
+          const val = subs[name]
+          if (val == null) return ''
+          if (escapedKeys.includes(name)) return String(val)  // already HTML-safe
+          return escapeHtml(String(val))
+        })
+      }
+
+      switch (actionType) {
+        case 'product_edited': {
+          // Rich formatter: show what actually changed. If `changes` isn't populated (legacy
+          // entries from before the enhancement), fall back to the plain template.
+          const c = details.changes
+          if (!c || Object.keys(c).length === 0) {
+            return applyTemplate('logs.action_product_edited', {
+              id: idSpan(details.id),
+              name: details.name || '',
+            }, ['id'])
+          }
+          // Build a list of "field: old → new" phrases for each changed field
+          const parts = []
+          if (c.id) parts.push(`${escapeHtml(t('logs.field_id'))}: ${idSpan(c.id.old)} → ${idSpan(c.id.new)}`)
+          if (c.name) parts.push(`${escapeHtml(t('logs.field_name'))}: ${changeArrow(c.name.old, c.name.new)}`)
+          if (c.stock) parts.push(`${escapeHtml(t('logs.field_stock'))}: ${escapeHtml(String(c.stock.old))} → ${escapeHtml(String(c.stock.new))}`)
+          // Use the NEW id for the top-level identifier if it changed, otherwise the current id
+          const displayId = (c.id ? c.id.new : details.id)
+          return `${escapeHtml(t('logs.product_edited_prefix'))} ${idSpan(displayId)} — ${parts.join('; ')}`
+        }
+        case 'display_name_changed': {
+          // Show old → new if both are present, otherwise just the new name (legacy fallback)
+          if (details.old && details.new) {
+            return `${escapeHtml(t('logs.display_name_changed_prefix'))} ${changeArrow(details.old, details.new)}`
+          }
+          return applyTemplate('logs.action_display_name_changed', {
+            name: details.name || details.new || '',
+          })
+        }
+        case 'product_added':
+        case 'product_deleted': {
+          return applyTemplate(`logs.action_${actionType}`, {
+            id: idSpan(details.id),
+            name: details.name || '',
+          }, ['id'])
+        }
+        // Simple templates: just count-based
+        case 'sale_created':
+        case 'sale_deleted':
+        case 'stockin_created':
+        case 'stockin_deleted':
+        case 'revision_applied':
+          return applyTemplate(`logs.action_${actionType}`, {
+            count: details.count ?? 0,
+          })
+        case 'sale_edited':
+        case 'stockin_edited':
+          return applyTemplate(`logs.action_${actionType}`, {})
+        case 'import_executed':
+          return applyTemplate('logs.action_import_executed', {
+            new_count: details.new_count ?? 0,
+            update_count: details.update_count ?? 0,
+          })
+        default:
+          return applyTemplate(`logs.action_${actionType}`, details)
+      }
+    }
+    // Load a batch of log rows. Called on workspace open + "Load older" click + on realtime.
+    async function loadLogs({ before, replace = false } = {}) {
+      if (logsState.loading) return
+      logsState.loading = true
+      try {
+        let query = supabase.from('action_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(LOGS_PAGE_SIZE)
+        if (before) query = query.lt('created_at', before)
+        const { data, error } = await query
+        if (error) throw error
+        if (replace) {
+          logsState.rows = data || []
+        } else {
+          // Merge: dedupe by id
+          const existing = new Set(logsState.rows.map(r => r.id))
+          const newRows = (data || []).filter(r => !existing.has(r.id))
+          logsState.rows = [...logsState.rows, ...newRows]
+        }
+        logsState.hasMore = (data || []).length === LOGS_PAGE_SIZE
+        logsState.initialized = true
+        renderLogsFeed()
+      } catch (err) {
+        log('error', 'loadLogs failed', err)
+        const feed = document.getElementById('logsFeed')
+        if (feed) {
+          feed.innerHTML = `<div class="feed-error">${escapeHtml(t('logs.could_not_load'))}
+            <button class="btn small secondary" onclick="window.reloadLogs()">${escapeHtml(t('logs.retry'))}</button></div>`
+        }
+      } finally {
+        logsState.loading = false
+      }
+    }
+    window.reloadLogs = () => loadLogs({ replace: true })
+    // Render the current logsState.rows to the feed DOM. Called after every load + realtime.
+    function renderLogsFeed() {
+      const feed = document.getElementById('logsFeed')
+      if (!feed) return
+      if (logsState.rows.length === 0) {
+        feed.innerHTML = `<div class="feed-empty">${escapeHtml(t('logs.empty'))}</div>`
+        return
+      }
+      // Group by day-key like the activity feed does
+      let currentDay = null
+      const parts = []
+      for (const r of logsState.rows) {
+        const dayK = dayKey(r.created_at)
+        if (dayK !== currentDay) {
+          currentDay = dayK
+          parts.push(`<div class="day-separator">${escapeHtml(dayLabel(r.created_at))}</div>`)
+        }
+        const actor = r.actor_display || r.actor_email || '?'
+        // renderLogSummary returns HTML (escaped user data + inline styling for IDs). Insert
+        // as innerHTML so the ID styling and → arrows render correctly. Actor and time are
+        // still escaped separately since they're plain text.
+        const summaryHtml = renderLogSummary(r.action_type, r.details)
+        const time = formatHM(r.created_at)
+        parts.push(`<div class="log-entry">
+          <span class="log-actor">${escapeHtml(actor)}</span>
+          <span class="log-summary">${summaryHtml}</span>
+          <span class="log-time">${escapeHtml(time)}</span>
+        </div>`)
+      }
+      // Footer: load-older button OR beginning-of-log marker
+      if (logsState.hasMore) {
+        parts.push(`<div class="feed-loading"><button class="btn small secondary" onclick="window.loadMoreLogs()">${escapeHtml(t('logs.load_older'))}</button></div>`)
+      } else {
+        parts.push(`<div class="feed-loading" style="color: var(--text-faint);">${escapeHtml(t('logs.beginning'))}</div>`)
+      }
+      feed.innerHTML = parts.join('')
+    }
+    window.loadMoreLogs = () => {
+      const oldest = logsState.rows[logsState.rows.length - 1]
+      if (oldest) loadLogs({ before: oldest.created_at })
+    }
+    // Called from switchWorkspace when user opens the Log workspace. Always refetches the
+    // latest page — cheap query, and guarantees the user sees fresh data even if a realtime
+    // event was missed (or if the tab was in background when the event fired).
+    function initLogsWorkspace() {
+      const feed = document.getElementById('logsFeed')
+      if (!logsState.initialized && feed) {
+        feed.innerHTML = `<div class="feed-loading">${escapeHtml(t('logs.loading'))}</div>`
+      }
+      loadLogs({ replace: true })
+    }
+
+
     function rerenderActivityFeed() {
       // Remember which bubble had the context menu open (if any) so we can re-apply the
       // highlight + ants animation after re-render. Without this, the auto-refresh (every 20s)
@@ -8863,6 +9249,7 @@ new events will not be in this file. Re-download periodically.
 
         overlay.classList.remove('visible')
         if (failures.length === 0) {
+          logAction('revision_applied', { count: successCount })
           await showNotice(`✓ ${successCount} adjustment(s) applied.`, { title: t('revision.complete') })
         } else {
           await showNotice(
@@ -9224,6 +9611,19 @@ ${headerRowXml}${dataRowsXml}
           })
           if (stockErr) throw stockErr
         }
+        // Log the edit for the Log workspace. Capture what actually CHANGED so the Log
+        // summary can be descriptive (e.g. "renamed X from Old to New" rather than just
+        // "edited product X"). Only fields that changed are included; unchanged fields are
+        // omitted from the details object, keeping log entries compact.
+        const changes = {}
+        if (idChanged) changes.id = { old: oldId, new: newId }
+        if (nameChanged) changes.name = { old: oldName, new: newName }
+        if (stockChanged) changes.stock = { old: oldStock, new: newStock }
+        logAction('product_edited', {
+          id: newId || oldId,
+          name: newName,
+          changes,
+        })
         closeEditProductModal()
         // Refresh to reflect changes
         await loadAll(false)
@@ -9289,6 +9689,9 @@ ${headerRowXml}${dataRowsXml}
       try {
         const { error } = await supabase.rpc('delete_product_and_freeform', { product_id_arg: product.id })
         if (error) throw error
+        // Log the deletion for the Log workspace (includes both id + name so log entries
+        // remain readable even after the product is gone from the catalog).
+        logAction('product_deleted', { id: product.id, name: product.name })
         await loadAll(false)
       } catch (err) {
         log('error', 'Delete product failed', err)
@@ -9373,6 +9776,10 @@ ${headerRowXml}${dataRowsXml}
         renderCalWidget()
         // Only re-render the feed (from any existing applied selection); don't fire a new query.
         renderCalFeed()
+      } else if (name === 'logs') {
+        // Log workspace: initialize (first-time load) or re-render with fresh translations.
+        requestAnimationFrame(() => { window.scrollTo({ top: 0 }) })
+        initLogsWorkspace()
       } else {
         // Other workspaces: scroll to top of page
         requestAnimationFrame(() => { window.scrollTo({ top: 0 }) })
