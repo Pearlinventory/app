@@ -1227,6 +1227,32 @@
       padding: 10px 14px;
     }
     .bubble.stock-list-bubble .row-header .col-stock { text-align: center; }
+    /* Кликаеми хедъри за сортиране. Курсорът и лекото потъмняване при hover
+       подсказват, че клетката е бутон — иначе не личи, че е интерактивна. */
+    .bubble.stock-list-bubble .row-header .bubble-cell[data-sort] {
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: background 0.12s ease;
+      position: relative;
+    }
+    .bubble.stock-list-bubble .row-header .bubble-cell[data-sort]:hover {
+      background: linear-gradient(to right, #c3c9d2, #d8dce2);
+    }
+    /* Триъгълничето стои след текста. Резервираме му място винаги (чрез
+       неактивния вариант с opacity 0), за да не подскача заглавието при
+       смяна на колоната. */
+    .bubble.stock-list-bubble .row-header .sort-arrow {
+      display: inline-block;
+      margin-left: 5px;
+      font-size: 9px;
+      line-height: 1;
+      vertical-align: middle;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+    }
+    .bubble.stock-list-bubble .row-header .bubble-cell.sorted .sort-arrow { opacity: 1; }
+    .bubble.stock-list-bubble .row-header .bubble-cell.sorted { color: #1f2937; }
     /* Body rows — one per product. */
     .bubble.stock-list-bubble .row-body {
       border-top: 0.5px solid #d1d5db;
@@ -4093,6 +4119,45 @@
       }
     }
 
+    // Състояние на сортирането в „Наличност".
+    //   key: 'id' | 'name' | 'stock'
+    //   dir: 'asc' | 'desc'
+    // Пази се в паметта — нарочно не се записва в userPrefs, защото е
+    // изглед „за момента", а не предпочитание.
+    let stockSort = { key: 'id', dir: 'asc' }
+
+    // Групирането на изчерпаните продукти в дъното важи за ID и ИМЕ,
+    // но НЕ и когато сортираме по наличност — там подредбата по число
+    // е самата цел и групирането би я обезсмислило.
+    function stockSortGroupsLowToBottom() {
+      return stockSort.key !== 'stock'
+    }
+
+    window.setStockSort = function(key) {
+      if (stockSort.key === key) {
+        stockSort.dir = stockSort.dir === 'asc' ? 'desc' : 'asc'
+      } else {
+        stockSort.key = key
+        // Разумно начало според типа: текст от А нагоре, числа от голямо надолу.
+        stockSort.dir = (key === 'stock') ? 'desc' : 'asc'
+      }
+      if (typeof lastGoodStock !== 'undefined' && lastGoodStock) renderStock(lastGoodStock)
+    }
+
+    // Изгражда една кликаема клетка от хедъра, с триъгълниче за посоката.
+    // ▲ = възходящо, ▼ = низходящо. Стрелката се рендерира винаги (скрита
+    // чрез CSS при неактивна колона), за да не подскача текстът.
+    function stockHeaderCell(key, colClass, label) {
+      const active = stockSort.key === key
+      const arrow = stockSort.dir === 'asc' ? '\u25B2' : '\u25BC'
+      return `<div class="bubble-cell ${colClass}${active ? ' sorted' : ''}"
+        data-sort="${key}" role="button" tabindex="0"
+        title="${escapeHtml(t('stock.sort_hint'))}"
+        onclick="window.setStockSort('${key}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.setStockSort('${key}')}"
+      >${escapeHtml(label)}<span class="sort-arrow">${arrow}</span></div>`
+    }
+
     function renderStock(rows) {
       const main = document.getElementById('mainContent')
       const overlay = main.querySelector('#stockOverlay')
@@ -4109,15 +4174,35 @@
         main.insertBefore(emptyMsg, overlay)
         return
       }
-      // Sort low-stock rows (qty < 1) to the BOTTOM. In-stock products come first, then
-       // zero/negative products. Sort is stable so within each group, original catalog order
-       // (however the DB returned them) is preserved. Matches the same low-stock-bottom
-       // treatment done in the autocomplete dropdown filter.
+      // Подредбата има два слоя:
+      //   1) групиране — изчерпаните (кол-во < 1) отиват в дъното, НО само
+      //      когато сортираме по ID или ИМЕ. При сортиране по наличност
+      //      групирането се изключва, иначе би обезсмислило подредбата.
+      //   2) самото сравнение по избраната колона.
+      const groupLow = stockSortGroupsLowToBottom()
+      const dirMul = stockSort.dir === 'desc' ? -1 : 1
+      const collator = new Intl.Collator(
+        (typeof userPrefs !== 'undefined' && userPrefs && userPrefs.language) || 'bg',
+        { numeric: true, sensitivity: 'base' }
+      )
       const sorted = [...rows].sort((a, b) => {
-        const aLow = Number(a.current_quantity) < 1
-        const bLow = Number(b.current_quantity) < 1
-        if (aLow !== bLow) return aLow ? 1 : -1
-        return 0
+        if (groupLow) {
+          const aLow = Number(a.current_quantity) < 1
+          const bLow = Number(b.current_quantity) < 1
+          if (aLow !== bLow) return aLow ? 1 : -1
+        }
+        let cmp = 0
+        if (stockSort.key === 'stock') {
+          cmp = (Number(a.current_quantity) || 0) - (Number(b.current_quantity) || 0)
+          // При равни количества подреждаме по име, за да не подскачат редовете
+          if (cmp === 0) return collator.compare(a.name || '', b.name || '')
+        } else if (stockSort.key === 'name') {
+          // numeric:true кара „Продукт 10" да идва след „Продукт 9", а не преди него
+          cmp = collator.compare(a.name || '', b.name || '')
+        } else {
+          cmp = collator.compare(a.id || '', b.id || '')
+        }
+        return cmp * dirMul
       })
       // Emit as a "gray bubble" list (matches the app's visual language). Each product becomes
        // a body row inside one big bubble; a header row at top labels the columns.
@@ -4125,9 +4210,9 @@
         <div class="bubble stock-list-bubble">
           <div class="bubble-card">
             <div class="bubble-row row-header">
-              <div class="bubble-cell col-id">${escapeHtml(t('columns.id'))}</div>
-              <div class="bubble-cell col-name">${escapeHtml(t('columns.name'))}</div>
-              <div class="bubble-cell col-stock">${escapeHtml(t('columns.stock'))}</div>
+              ${stockHeaderCell('id', 'col-id', t('columns.id'))}
+              ${stockHeaderCell('name', 'col-name', t('columns.name'))}
+              ${stockHeaderCell('stock', 'col-stock', t('columns.stock'))}
             </div>
             ${sorted.length === 0
               ? `<div class="stock-empty">${escapeHtml(t('empty.products'))}</div>`
@@ -7143,7 +7228,7 @@
           pref_language: 'Language',
           pref_language_hint: 'Interface language. Applies immediately.',
         },
-        stock: { search_placeholder: 'Search products' },
+        stock: { search_placeholder: 'Search products', sort_hint: 'Click to sort' },
         export: {
           title: 'Export current stock',
           format: 'Format',
@@ -7492,7 +7577,7 @@
           pref_language: 'Език',
           pref_language_hint: 'Език на интерфейса. Прилага се веднага.',
         },
-        stock: { search_placeholder: 'Търси продукти' },
+        stock: { search_placeholder: 'Търси продукти', sort_hint: 'Натисни за сортиране' },
         export: {
           title: 'Изнеси наличността',
           format: 'Формат',
