@@ -2975,7 +2975,7 @@
             <div class="import-table-wrap"><table class="import-table" id="importTblNew"></table></div>
           </div>
           <div class="import-section" id="importSecRestock" hidden>
-            <h3 class="import-section-title restock">📦 Restocked items <span class="count" id="importSecRestockCount"></span></h3>
+            <h3 class="import-section-title restock"><span data-i18n="import.restocked_items">📦 Restocked items</span> <span class="count" id="importSecRestockCount"></span></h3>
             <p class="import-section-help" data-i18n="import.existing_products_help">Existing products. Current stock → new stock after import.</p>
             <div class="import-table-wrap"><table class="import-table" id="importTblRestock"></table></div>
           </div>
@@ -5334,7 +5334,7 @@
       const isStockIn = bubble.event_type === 'stock_in'
       const isLegacy = isLegacyGroupId(groupId)
       log(bubble.event_type, `Deleting bubble ${groupId}`, { isLegacy, itemCount: (bubble.items || []).length })
-      showSubmitOverlay('Deleting…')
+      showSubmitOverlay(t('forms.deleting'))
       try {
         if (isLegacy) {
           // Legacy: delete the single row from sales or stock_in by id
@@ -6188,7 +6188,7 @@
       const btn = opts.buttonEl
       const feedback = opts.feedbackEl
       btn.disabled = true
-      showSubmitOverlay('Sending…')
+      showSubmitOverlay(t('forms.sending'))
       let cancelled = false
       activeCancel = () => {
         cancelled = true
@@ -6221,7 +6221,7 @@
         log('error', `Insert to ${opts.tableName} failed`, err)
         hideSubmitOverlay()
         feedback.className = 'form-feedback error'
-        feedback.textContent = `✗ Failed: ${err.message || 'unknown error'}. Retry is safe.`
+        feedback.textContent = t('forms.submit_failed').replace('{error}', err.message || 'unknown error')
       } finally {
         if (!cancelled) btn.disabled = false
         activeCancel = null
@@ -6274,7 +6274,7 @@
       log('sale', `Submitting sale (group + ${collected.length} item${collected.length>1?'s':''})`, collected.map(c => ({ product: c.productName, qty: c.quantity })))
       const btn = document.getElementById('logSaleBtn')
       btn.disabled = true
-      showSubmitOverlay('Sending…')
+      showSubmitOverlay(t('forms.sending'))
       try {
         // Step 1: create the group (with optional note)
         const noteValue = getFormNoteValue('sale')
@@ -6307,7 +6307,7 @@
         logAction('sale_created', { count: collected.length, group_id: groupId })
         setSubmitOverlaySuccess()
         feedback.className = 'form-feedback success'
-        feedback.textContent = `✓ Sale logged with ${collected.length} product${collected.length>1?'s':''}.`
+        feedback.textContent = t('forms.sale_logged').replace('{count}', String(collected.length))
         setTimeout(() => {
           resetSaleForm()
         }, 1500)
@@ -6316,7 +6316,7 @@
         log('error', 'Sale submit failed', err)
         hideSubmitOverlay()
         feedback.className = 'form-feedback error'
-        feedback.textContent = `✗ Failed: ${err.message || 'unknown error'}. Retry is safe.`
+        feedback.textContent = t('forms.submit_failed').replace('{error}', err.message || 'unknown error')
       } finally {
         btn.disabled = false
       }
@@ -6392,14 +6392,16 @@
       log('stock_in', `Submitting stock_in (group + ${collected.length} item${collected.length>1?'s':''})`, { source, items: collected.map(c => ({ product: c.productName, qty: c.quantity, isNew: c.isNew })) })
       const btn = document.getElementById('logStockBtn')
       btn.disabled = true
-      showSubmitOverlay('Sending…')
+      showSubmitOverlay(t('forms.sending'))
       try {
         // Step 0: create any new products first
         for (const c of collected) {
           if (c.isNew) {
+            // Normalize before insert so a pasted/autocorrected ID never enters the catalog
+            // in a form that later fails to match a clean spreadsheet row.
             const { error: prodErr } = await supabase.from('products').insert({
-              id: c.newId,
-              name: c.productName,
+              id: normalizeId(c.newId),
+              name: normalizeName(c.productName),
             })
             // 23505 = unique violation. Could happen if another user just added the same product.
             // Continue — the existing product is fine to use.
@@ -6444,7 +6446,7 @@
         logAction('stockin_created', { count: collected.length, group_id: groupId })
         setSubmitOverlaySuccess()
         feedback.className = 'form-feedback success'
-        feedback.textContent = `✓ Received ${collected.length} product${collected.length>1?'s':''}.`
+        feedback.textContent = t('forms.stock_received').replace('{count}', String(collected.length))
         setTimeout(() => {
           resetStockForm()
         }, 1500)
@@ -6453,10 +6455,89 @@
         log('error', 'StockIn submit failed', err)
         hideSubmitOverlay()
         feedback.className = 'form-feedback error'
-        feedback.textContent = `✗ Failed: ${err.message || 'unknown error'}. Retry is safe.`
+        feedback.textContent = t('forms.submit_failed').replace('{error}', err.message || 'unknown error')
       } finally {
         btn.disabled = false
       }
+    }
+
+    // ===== Unicode normalization =====
+    // Spreadsheets (and humans pasting from the web) routinely introduce characters that LOOK
+    // identical to ASCII but aren't. Excel autocorrects hyphens into en dashes in some locales;
+    // copy-paste drags in zero-width spaces and non-breaking spaces; Bulgarian keyboards can
+    // produce a Unicode minus sign. None of this crashes anything — it silently fails to match,
+    // which is worse, because a product lands in "not in catalog" with no visible reason.
+    //
+    // JS .trim() already handles NBSP / BOM / en-quad / ideographic space, but NOT zero-width
+    // space (U+200B), soft hyphen (U+00AD), or directional marks (U+200E/200F) — those are
+    // invisible and survive. These helpers close the remaining gaps.
+
+    // NOTE ON PLACEMENT: the character classes below are written as inline regex literals
+    // rather than module-level `const`s on purpose. These helpers are function declarations,
+    // so they hoist and are callable from anywhere in the module — but a `const` regex would
+    // sit in the temporal dead zone until its line executes, so an early caller would throw.
+    // This project has already lost time to two TDZ incidents; inlining removes the class of
+    // bug entirely. V8 caches regex literals per call site, so there is no real cost.
+    //
+    // INVISIBLE: soft hyphen, zero-width space/non-joiner/joiner, directional marks and
+    //   embedding controls, word joiner, BOM. Carry no meaning but break string equality.
+    // DASHES: dash-family characters users mean as a plain hyphen. Applied to IDs only —
+    //   in a product NAME an em dash is legitimate content ("Product — 750ml").
+
+    // Normalize a product ID for storage AND comparison. Aggressive by design: an ID is an
+    // identifier, not prose, so we want every visually-identical spelling to collapse to one
+    // canonical form. NFKC folds full-width characters (１２３ -> 123) and compatibility forms.
+    // Case is deliberately NOT folded — some catalogs use case-significant IDs.
+    function normalizeId(v) {
+      if (v == null) return ''
+      return String(v)
+        .normalize('NFKC')
+        .replace(/[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '')
+        .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-')
+        .replace(/\s+/g, ' ')   // collapse any run of whitespace to a single space
+        .trim()
+    }
+
+    // Normalize a product name. Gentler than normalizeId — strips invisibles and tidies
+    // whitespace, but preserves dashes and uses NFC (canonical) rather than NFKC so legitimate
+    // typography and Cyrillic composition are left intact.
+    function normalizeName(v) {
+      if (v == null) return ''
+      return String(v)
+        .normalize('NFC')
+        .replace(/[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    }
+
+    // Robust quantity parse for spreadsheet cells. Returns a finite Number, or NaN if the cell
+    // isn't meaningfully numeric. Handles:
+    //   - full-width digits via NFKC
+    //   - invisible characters
+    //   - NBSP / thin-space thousands separators ("1 234" -> 1234)
+    //   - Unicode minus sign U+2212 (previously stripped by the import path, silently turning
+    //     "−5" into "+5" — a real sign flip)
+    //   - comma as decimal separator ("12,5" -> 12.5), which Bulgarian locale uses
+    //   - comma as thousands separator ("1,234" -> 1234)
+    function parseQuantityLoose(v) {
+      if (v == null) return NaN
+      if (typeof v === 'number') return Number.isFinite(v) ? v : NaN
+      let s = String(v)
+        .normalize('NFKC')
+        .replace(/[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '')
+        .replace(/[\u2212\uFE63\uFF0D]/g, '-')   // unicode minus / small / fullwidth -> ASCII
+        .replace(/\s+/g, '')                      // strip ALL whitespace (thousands separators)
+        .trim()
+      if (s === '') return NaN
+      // Disambiguate comma: "1,234" (thousands) vs "12,5" (decimal). If the comma is followed
+      // by exactly 3 digits and it's the only separator, treat as thousands; otherwise decimal.
+      if (s.includes(',') && !s.includes('.')) {
+        s = /^-?\d{1,3}(,\d{3})+$/.test(s) ? s.replace(/,/g, '') : s.replace(',', '.')
+      } else {
+        s = s.replace(/,/g, '')   // mixed "1,234.5" -> thousands commas are noise
+      }
+      const n = Number(s)
+      return Number.isFinite(n) ? n : NaN
     }
 
     function escapeHtml(text) {
@@ -6594,19 +6675,29 @@
       const renameRows = []
       const skippedRows = []
 
-      // Build current stock lookup: id → current_quantity (from lastGoodStock)
+      // Build lookups keyed by NORMALIZED id. Both sides of the comparison get normalized so
+      // that a legacy product whose stored ID contains an en dash still matches a clean CSV
+      // row (and vice versa). Each entry keeps `actualId` — the exact string as stored in the
+      // DB — because that's what the FK on stock_in must reference. Writing the normalized
+      // form for a legacy dirty ID would fail the foreign key.
       const stockByCode = {}
-      ;(lastGoodStock || []).forEach(s => { stockByCode[s.id] = Number(s.current_quantity) || 0 })
-      // Build product name lookup: id → current name
+      ;(lastGoodStock || []).forEach(s => {
+        stockByCode[normalizeId(s.id)] = Number(s.current_quantity) || 0
+      })
       const productByCode = {}
-      productsCache.forEach(p => { productByCode[p.id] = p.name })
+      productsCache.forEach(p => {
+        productByCode[normalizeId(p.id)] = { actualId: p.id, name: p.name }
+      })
 
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i]
-        const code = String(r[usedCols.code] || '').trim()
-        const name = String(r[usedCols.name] || '').trim()
-        const qtyRaw = String(r[usedCols.qty] || '').trim()
-        const qty = parseInt(qtyRaw.replace(/[^\d-]/g, ''), 10)
+        const code = normalizeId(r[usedCols.code])
+        const name = normalizeName(r[usedCols.name])
+        const qtyRaw = String(r[usedCols.qty] ?? '').trim()
+        // parseQuantityLoose handles full-width digits, unicode minus, NBSP thousands
+        // separators and comma decimals. Import requires whole units, so round after parsing.
+        const qtyParsed = parseQuantityLoose(r[usedCols.qty])
+        const qty = Number.isFinite(qtyParsed) ? Math.round(qtyParsed) : NaN
 
         const errors = []
         if (!code) errors.push('missing code')
@@ -6618,20 +6709,21 @@
           continue
         }
 
-        const existingName = productByCode[code]
-        if (existingName === undefined) {
-          // NEW product
+        const existing = productByCode[code]
+        if (existing === undefined) {
+          // NEW product — store the normalized code so we never CREATE a dirty ID
           newRows.push({ rowIndex: i + 1, code, name, qty })
         } else {
-          // EXISTING product → restock
+          // EXISTING product → restock. `code` carries the DB's actual id for FK safety.
+          const existingName = existing.name
           const currentStock = stockByCode[code] || 0
           restockRows.push({
-            rowIndex: i + 1, code, currentName: existingName, name, qty,
+            rowIndex: i + 1, code: existing.actualId, currentName: existingName, name, qty,
             currentStock, newStock: currentStock + qty,
             nameChanged: existingName !== name,
           })
           if (existingName !== name) {
-            renameRows.push({ rowIndex: i + 1, code, oldName: existingName, newName: name })
+            renameRows.push({ rowIndex: i + 1, code: existing.actualId, oldName: existingName, newName: name })
           }
         }
       }
@@ -6740,11 +6832,11 @@
                        plan.restockRows.reduce((s, r) => s + r.qty, 0)
       const sum = document.getElementById('importSummary')
       sum.innerHTML = `
-        <div><strong>Total rows in file:</strong> ${plan.totalRows}</div>
-        <div><strong>New products to create:</strong> ${plan.newRows.length}</div>
-        <div><strong>Restocked items:</strong> ${plan.restockRows.length} (total <strong>+${totalQty}</strong> units)</div>
-        <div><strong>Renames:</strong> ${plan.renameRows.length}</div>
-        <div><strong>Skipped:</strong> ${plan.skippedRows.length}</div>
+        <div><strong>${escapeHtml(t('import.sum_total_rows'))}</strong> ${plan.totalRows}</div>
+        <div><strong>${escapeHtml(t('import.sum_new_products'))}</strong> ${plan.newRows.length}</div>
+        <div><strong>${escapeHtml(t('import.sum_restocked'))}</strong> ${plan.restockRows.length} (<strong>+${totalQty}</strong> ${escapeHtml(t('import.sum_units'))})</div>
+        <div><strong>${escapeHtml(t('import.sum_renames'))}</strong> ${plan.renameRows.length}</div>
+        <div><strong>${escapeHtml(t('import.sum_skipped'))}</strong> ${plan.skippedRows.length}</div>
       `
 
       // Enable/disable confirm
@@ -6874,11 +6966,11 @@
             new_count: plan.newRows.length,
             update_count: plan.renameRows.length + successCount,
           })
-          await showNotice(`✓ Import complete.\n\n` +
-            `${plan.newRows.length} new product(s) created\n` +
-            `${plan.renameRows.length} rename(s) applied\n` +
-            `${successCount} stock receipt(s) added`,
-            { title: 'Import complete' })
+          await showNotice(`${t('import.complete_body')}\n\n` +
+            `${plan.newRows.length} ${t('import.complete_new')}\n` +
+            `${plan.renameRows.length} ${t('import.complete_renames')}\n` +
+            `${successCount} ${t('import.complete_receipts')}`,
+            { title: t('import.complete_title') })
         } else {
           await showNotice(`Import finished with ${failures.length} error(s):\n\n` + failures.slice(0, 10).join('\n') +
             (failures.length > 10 ? `\n…and ${failures.length - 10} more` : '') +
@@ -7081,6 +7173,9 @@
           stock_nan: 'Stock must be a number.',
           not_connected: 'No connection — please retry when online.',
           could_not_check_refs: 'Could not check references',
+          stock_recheck_failed: 'Could not verify current stock. The stock change was not saved — please reopen and try again.',
+          stock_drift_title: 'Stock changed while editing',
+          stock_drift_body: 'The form showed {shown}, but stock was actually {actual} by the time you saved (someone logged activity in the meantime).\n\nYour value of {saved} was applied correctly.',
         },
         confirm: {
           delete_product_title: 'Delete product?',
@@ -7156,6 +7251,12 @@
           count_diffs: 'differences',
           count_unknown: 'unknown',
           count_missing: 'missing',
+          adjustments_applied: 'adjustment(s) applied.',
+          applied_word: 'applied',
+          failed_word: 'failed',
+          stock_recheck_failed: 'Could not verify current stock before applying. Nothing was changed — please retry.',
+          drift_notice: 'Stock changed while you were reviewing:',
+          drift_explain: 'Your counted numbers were still applied — the app recalculated against live stock so the totals match your count.',
         },
         context_menu: { edit: 'Edit', delete: 'Delete' },
         calendar: {
@@ -7225,6 +7326,11 @@
           taking_longer: 'Taking longer than usual. Check your connection.',
           still_trying: 'Still trying… you can close this and verify in the list below.',
           stopped_waiting: 'Stopped waiting. The entry may still arrive — check the list below. Retry is safe.',
+          sending: 'Sending…',
+          deleting: 'Deleting…',
+          sale_logged: '✓ Sale logged with {count} product(s).',
+          stock_received: '✓ Received {count} product(s).',
+          submit_failed: '✗ Failed: {error}. Retry is safe.',
         },
         import: {
           review_title: 'Review import',
@@ -7250,6 +7356,18 @@
           adding_receipts: 'Adding stock receipts…',
           import_failed: 'Import failed',
           import_failed_details: 'Some rows may have been imported. Check the stock list. Retrying is safe.',
+          restocked_items: '📦 Restocked items',
+          sum_total_rows: 'Total rows in file:',
+          sum_new_products: 'New products to create:',
+          sum_restocked: 'Restocked items:',
+          sum_renames: 'Renames:',
+          sum_skipped: 'Skipped:',
+          sum_units: 'units',
+          complete_title: 'Import complete',
+          complete_body: '✓ Import complete.',
+          complete_new: 'new product(s) created',
+          complete_renames: 'rename(s) applied',
+          complete_receipts: 'stock receipt(s) added',
         },
         prefs_hints: {
           hide_zero_label: 'Hide out-of-stock products from dropdown suggestions',
@@ -7403,6 +7521,9 @@
           stock_nan: 'Наличността трябва да е число.',
           not_connected: 'Няма връзка — опитайте отново, когато сте онлайн.',
           could_not_check_refs: 'Неуспешна проверка на връзките',
+          stock_recheck_failed: 'Текущата наличност не можа да бъде проверена. Промяната на наличността не беше запазена — моля, отворете отново и опитайте.',
+          stock_drift_title: 'Наличността се промени по време на редакцията',
+          stock_drift_body: 'Формата показваше {shown}, но към момента на запазване наличността беше {actual} (междувременно е записана активност).\n\nВашата стойност {saved} беше приложена коректно.',
         },
         confirm: {
           delete_product_title: 'Изтриване на продукт?',
@@ -7478,6 +7599,12 @@
           count_diffs: 'разлики',
           count_unknown: 'непознати',
           count_missing: 'липсващи',
+          adjustments_applied: 'корекция(и) приложени.',
+          applied_word: 'приложени',
+          failed_word: 'неуспешни',
+          stock_recheck_failed: 'Текущата наличност не можа да бъде проверена преди прилагане. Нищо не беше променено — моля, опитайте отново.',
+          drift_notice: 'Наличността се промени, докато преглеждахте:',
+          drift_explain: 'Преброените от вас количества бяха приложени — приложението преизчисли спрямо актуалната наличност, така че сумите съвпадат с вашето броене.',
         },
         context_menu: { edit: 'Редактирай', delete: 'Изтрий' },
         calendar: {
@@ -7547,6 +7674,11 @@
           taking_longer: 'Отнема повече от обичайното. Проверете връзката си.',
           still_trying: 'Все още опитва… можете да затворите този прозорец и да проверите в списъка отдолу.',
           stopped_waiting: 'Спряно чакане. Записът все още може да пристигне — проверете в списъка отдолу. Повторният опит е безопасен.',
+          sending: 'Изпращане…',
+          deleting: 'Изтриване…',
+          sale_logged: '✓ Записана продажба с {count} продукт(а).',
+          stock_received: '✓ Приети {count} продукт(а).',
+          submit_failed: '✗ Неуспешно: {error}. Повторният опит е безопасен.',
         },
         import: {
           review_title: 'Преглед на внасяне',
@@ -7572,6 +7704,18 @@
           adding_receipts: 'Добавяне на постъпвания…',
           import_failed: 'Внасянето се провали',
           import_failed_details: 'Някои редове може да са внесени. Проверете списъка с наличности. Повторният опит е безопасен.',
+          restocked_items: '📦 Захранени продукти',
+          sum_total_rows: 'Общо редове във файла:',
+          sum_new_products: 'Нови продукти за създаване:',
+          sum_restocked: 'Захранени продукти:',
+          sum_renames: 'Преименувания:',
+          sum_skipped: 'Пропуснати:',
+          sum_units: 'бр.',
+          complete_title: 'Внасянето завърши',
+          complete_body: '✓ Внасянето завърши.',
+          complete_new: 'нови продукта създадени',
+          complete_renames: 'преименувания приложени',
+          complete_receipts: 'постъпвания добавени',
         },
         prefs_hints: {
           hide_zero_label: 'Скрий продуктите без наличност от предложенията в падащите менюта',
@@ -9041,29 +9185,36 @@ new events will not be in this file. Re-download periodically.
       // Header is always row 0 — skip it.
       const dataRows = rows.slice(1)
 
-      // Build a lookup from product_id → { name, current_quantity }
+      // Lookup keyed by NORMALIZED id so a file row with an en dash still matches a catalog
+      // entry with a plain hyphen (and vice versa for legacy dirty IDs already in the DB).
+      // `actualId` preserves the exact stored string — that's what the stock_in FK must
+      // reference, so writes use it rather than the normalized form.
       const stockById = new Map()
       stockRows.forEach(r => {
-        stockById.set(String(r.id).trim(), { name: r.name, current: Number(r.current_quantity) || 0 })
+        stockById.set(normalizeId(r.id), {
+          actualId: r.id,
+          name: r.name,
+          current: Number(r.current_quantity) || 0,
+        })
       })
 
       const diffs = []      // { id, name, current, new, delta }
       const unknowns = []   // { id, name, stock }  — from file, not in catalog
       const skipped = []    // { id, name, stock, reason }  — invalid data, ignored
-      const seenIds = new Set()
+      const seenIds = new Set()   // holds NORMALIZED ids, compared against normalized catalog ids
 
       for (const row of dataRows) {
-        const id = String(row[0] || '').trim()
-        const nameFromFile = String(row[1] || '').trim()
+        const id = normalizeId(row[0])
+        const nameFromFile = normalizeName(row[1])
         const stockCell = row[2]
         if (!id) continue   // empty row / no ID → skip silently
         seenIds.add(id)
 
-        // Try to parse the stock value. Accept numbers with or without spaces, decimal or integer.
-        // Treat blank / non-numeric as invalid.
-        const parsedStock = (stockCell === '' || stockCell == null) ? NaN : Number(String(stockCell).replace(/\s+/g, ''))
+        // Robust numeric parse: handles full-width digits, unicode minus, NBSP thousands
+        // separators and comma decimals. Blank / non-numeric → skipped as invalid.
+        const parsedStock = parseQuantityLoose(stockCell)
         if (!Number.isFinite(parsedStock)) {
-          skipped.push({ id, name: nameFromFile, stock: String(stockCell || ''), reason: 'invalid stock' })
+          skipped.push({ id, name: nameFromFile, stock: String(stockCell ?? ''), reason: 'invalid stock' })
           continue
         }
 
@@ -9074,9 +9225,17 @@ new events will not be in this file. Re-download periodically.
         }
 
         // Row is valid and matches a catalog product. Compare stock.
+        // Note: `delta` here is preview-only — executeRevision recomputes it against live
+        // stock at apply time (see V2.25 stale-stock fix).
         const delta = parsedStock - catalog.current
         if (delta !== 0) {
-          diffs.push({ id, name: catalog.name, current: catalog.current, new: parsedStock, delta })
+          diffs.push({
+            id: catalog.actualId,       // exact DB id — required for the FK on insert
+            name: catalog.name,
+            current: catalog.current,
+            new: parsedStock,
+            delta,
+          })
         }
         // Same-as-current products don't appear in any section (informational only, no action).
       }
@@ -9084,9 +9243,8 @@ new events will not be in this file. Re-download periodically.
       // Section 3: products in catalog that were NOT in the file
       const missing = []
       stockRows.forEach(r => {
-        const id = String(r.id).trim()
-        if (!seenIds.has(id)) {
-          missing.push({ id, name: r.name, current: Number(r.current_quantity) || 0 })
+        if (!seenIds.has(normalizeId(r.id))) {
+          missing.push({ id: r.id, name: r.name, current: Number(r.current_quantity) || 0 })
         }
       })
 
@@ -9223,19 +9381,61 @@ new events will not be in this file. Re-download periodically.
           failures.push(`Create revision group: ${err.message}`)
         }
 
-        // Insert one stock_in adjustment row per diff (quantity = new - current = delta)
+        // ---- CRITICAL: re-read live stock immediately before applying ----
+        // The deltas in revisionPlan.diffs were computed when the FILE WAS UPLOADED. If another
+        // user logged a sale (or the same user edited a product) while this preview was open,
+        // those deltas are stale and applying them would land on the WRONG number.
+        //
+        // A revision's contract is "the physical count is the truth" — so we recompute each
+        // delta against live stock so we always hit the counted target, and record which
+        // products drifted so the user learns a sale happened mid-count.
+        let liveStockById = new Map()
+        try {
+          const { data: freshStock, error: freshErr } = await supabase
+            .from('current_stock').select('id, current_quantity')
+          if (freshErr) throw freshErr
+          ;(freshStock || []).forEach(r => {
+            liveStockById.set(normalizeId(r.id), Number(r.current_quantity) || 0)
+          })
+        } catch (err) {
+          // If we can't verify live stock, abort rather than write deltas we know may be wrong.
+          overlay.classList.remove('visible')
+          log('error', 'Revision: could not re-read live stock', err)
+          await showNotice(
+            `${t('revision.stock_recheck_failed')}\n\n${err.message || 'unknown error'}`,
+            { title: t('revision.failed'), variant: 'danger' }
+          )
+          return
+        }
+        // Products whose stock moved between preview and apply: { id, previewCurrent, liveCurrent }
+        const drifted = []
+
+        // Insert one stock_in adjustment row per diff. `quantity` is recomputed here against
+        // live stock so the resulting total equals the counted target (d.new).
         substatus.textContent = `0 / ${revisionPlan.diffs.length}`
         for (let i = 0; i < revisionPlan.diffs.length; i++) {
           const d = revisionPlan.diffs[i]
           substatus.textContent = `${i + 1} / ${revisionPlan.diffs.length} — ${d.id}`
           try {
+            // Live value wins. Falls back to the preview snapshot if the product vanished from
+            // the stock view (deleted mid-preview) — the insert will then fail on the FK and
+            // land in `failures`, which is the correct outcome.
+            const liveKey = normalizeId(d.id)
+            const liveCurrent = liveStockById.has(liveKey) ? liveStockById.get(liveKey) : d.current
+            if (liveCurrent !== d.current) {
+              drifted.push({ id: d.id, previewCurrent: d.current, liveCurrent })
+            }
+            const liveDelta = d.new - liveCurrent
+            // Stock already matches the counted target (someone else corrected it, or a sale
+            // happened to land exactly on our number) — nothing to write.
+            if (liveDelta === 0) { successCount++; continue }
             const insertRow = {
               product_id: d.id,
-              quantity: d.delta,
+              quantity: liveDelta,
               received_by: currentUser.email,
               received_by_display: displayName,
               source: sourceText,
-              notes: `Set stock from ${d.current} to ${d.new} via revision`,
+              notes: `Set stock from ${liveCurrent} to ${d.new} via revision`,
               client_uuid: crypto.randomUUID(),
             }
             if (groupId) insertRow.stock_in_group_id = groupId
@@ -9248,12 +9448,26 @@ new events will not be in this file. Re-download periodically.
         }
 
         overlay.classList.remove('visible')
+        // Build the drift note (if any). Shown on BOTH success and partial-failure paths so
+        // the user always learns that stock moved while they were reviewing the preview.
+        let driftNote = ''
+        if (drifted.length > 0) {
+          const lines = drifted.slice(0, 10).map(x =>
+            `  • ${x.id}: ${x.previewCurrent} → ${x.liveCurrent}`
+          ).join('\n')
+          const more = drifted.length > 10 ? `\n  …+${drifted.length - 10}` : ''
+          driftNote = `\n\n${t('revision.drift_notice')}\n${lines}${more}\n\n${t('revision.drift_explain')}`
+        }
         if (failures.length === 0) {
-          logAction('revision_applied', { count: successCount })
-          await showNotice(`✓ ${successCount} adjustment(s) applied.`, { title: t('revision.complete') })
+          logAction('revision_applied', { count: successCount, drifted: drifted.length })
+          await showNotice(
+            `✓ ${successCount} ${t('revision.adjustments_applied')}${driftNote}`,
+            { title: t('revision.complete') }
+          )
         } else {
           await showNotice(
-            `${successCount} applied, ${failures.length} failed:\n\n` + failures.slice(0, 10).join('\n'),
+            `${successCount} ${t('revision.applied_word')}, ${failures.length} ${t('revision.failed_word')}:\n\n` +
+            failures.slice(0, 10).join('\n') + driftNote,
             { title: t('revision.failed'), variant: 'danger' }
           )
         }
@@ -9565,8 +9779,10 @@ ${headerRowXml}${dataRowsXml}
     }
     async function saveEditedProduct() {
       if (!editingProduct) return
-      const newId = document.getElementById('editProductId').value.trim()
-      const newName = document.getElementById('editProductName').value.trim()
+      // Normalize typed input — protects against pasted IDs carrying invisible characters
+      // or autocorrected dashes, which would silently break future spreadsheet matching.
+      const newId = normalizeId(document.getElementById('editProductId').value)
+      const newName = normalizeName(document.getElementById('editProductName').value)
       const newStockRaw = document.getElementById('editProductStock').value.trim()
       const newStock = Number(newStockRaw)
       if (!newId) { await showNotice(t('notices.id_empty'), { title: t('notices.invalid_input') }); return }
@@ -9596,20 +9812,43 @@ ${headerRowXml}${dataRowsXml}
         }
         // Stock change: insert a stock_in adjustment row with the delta. Preserves history —
         // no silent overwrite of the derived current_stock view.
+        //
+        // CRITICAL: `oldStock` came from the row dataset when the context menu was opened. If
+        // stock moved since then (a sale by the other user, or our own auto-refresh landing
+        // between open and save), a delta based on that stale value would land on the wrong
+        // number. Re-read live stock here so the result equals the number the user typed.
+        let stockDriftFrom = null
         if (stockChanged) {
-          // Use the possibly-new ID for the FK (in case both were changed in the same save)
           const targetProductId = idChanged ? newId : oldId
-          const { error: stockErr } = await supabase.from('stock_in').insert({
-            product_id: targetProductId,
-            quantity: stockDelta,
-            source: 'Manual adjustment',
-            notes: `Set stock from ${oldStock} to ${newStock} via edit`,
-            received_at: new Date().toISOString(),
-            received_by: currentUser?.email || null,
-            received_by_display: currentUser?.display_name || currentUser?.email || null,
-            client_uuid: crypto.randomUUID(),
-          })
-          if (stockErr) throw stockErr
+          let liveStock = oldStock
+          try {
+            const { data: freshRow, error: freshErr } = await supabase
+              .from('current_stock').select('current_quantity').eq('id', targetProductId).single()
+            if (freshErr) throw freshErr
+            liveStock = Number(freshRow?.current_quantity) || 0
+          } catch (err) {
+            // Couldn't verify — abort the stock change rather than write a delta we know may
+            // be wrong. ID/name changes above already succeeded and are kept.
+            log('error', 'Edit product: could not re-read live stock', err)
+            await showNotice(t('notices.stock_recheck_failed'), { title: t('notices.save_failed'), variant: 'danger' })
+            return
+          }
+          if (liveStock !== oldStock) stockDriftFrom = liveStock
+          const liveDelta = newStock - liveStock
+          // Already at the target (someone else set it there) — skip the no-op write.
+          if (liveDelta !== 0) {
+            const { error: stockErr } = await supabase.from('stock_in').insert({
+              product_id: targetProductId,
+              quantity: liveDelta,
+              source: 'Manual adjustment',
+              notes: `Set stock from ${liveStock} to ${newStock} via edit`,
+              received_at: new Date().toISOString(),
+              received_by: currentUser?.email || null,
+              received_by_display: currentUser?.display_name || currentUser?.email || null,
+              client_uuid: crypto.randomUUID(),
+            })
+            if (stockErr) throw stockErr
+          }
         }
         // Log the edit for the Log workspace. Capture what actually CHANGED so the Log
         // summary can be descriptive (e.g. "renamed X from Old to New" rather than just
@@ -9618,7 +9857,15 @@ ${headerRowXml}${dataRowsXml}
         const changes = {}
         if (idChanged) changes.id = { old: oldId, new: newId }
         if (nameChanged) changes.name = { old: oldName, new: newName }
-        if (stockChanged) changes.stock = { old: oldStock, new: newStock }
+        // Record the ACTUAL starting stock. If drift was detected, `stockDriftFrom` holds the
+        // live value we recomputed against — logging the stale form value would misrepresent
+        // what really happened in the audit trail.
+        if (stockChanged) {
+          changes.stock = {
+            old: stockDriftFrom !== null ? stockDriftFrom : oldStock,
+            new: newStock,
+          }
+        }
         logAction('product_edited', {
           id: newId || oldId,
           name: newName,
@@ -9627,6 +9874,18 @@ ${headerRowXml}${dataRowsXml}
         closeEditProductModal()
         // Refresh to reflect changes
         await loadAll(false)
+        // If stock moved while the modal was open, tell the user — the saved value is still
+        // the number they typed (we recomputed against live stock), but they should know a
+        // sale or another edit landed in the meantime.
+        if (stockDriftFrom !== null) {
+          await showNotice(
+            t('notices.stock_drift_body')
+              .replace('{shown}', String(oldStock))
+              .replace('{actual}', String(stockDriftFrom))
+              .replace('{saved}', String(newStock)),
+            { title: t('notices.stock_drift_title') }
+          )
+        }
       } catch (err) {
         log('error', 'Save edited product failed', err)
         await showNotice(`${t('notices.save_failed')}: ${err.message || 'unknown error'}`, { title: t('notices.save_failed'), variant: 'danger' })
@@ -9685,7 +9944,7 @@ ${headerRowXml}${dataRowsXml}
       if (!ok) return
       // Show a loading overlay while the RPC runs — with 3k+ references the transaction
       // takes noticeable time (though still typically well under a second).
-      showStockOverlay('Deleting…')
+      showStockOverlay(t('forms.deleting'))
       try {
         const { error } = await supabase.rpc('delete_product_and_freeform', { product_id_arg: product.id })
         if (error) throw error
