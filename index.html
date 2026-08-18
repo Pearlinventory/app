@@ -1210,7 +1210,7 @@
       margin: 0 auto 32px;
     }
     .bubble.stock-list-bubble .bubble-card {
-      grid-template-columns: 90px minmax(160px, 1fr) 90px;
+      grid-template-columns: 90px minmax(140px, 1fr) 72px 92px;
       border-color: #9ca3af;
       overflow: hidden;
     }
@@ -1227,6 +1227,15 @@
       padding: 10px 14px;
     }
     .bubble.stock-list-bubble .row-header .col-stock { text-align: center; }
+    /* Съвкупна стойност на наличността. Тя е ОЦЕНКА — средно претеглена доставна
+       цена по текущо количество — затова носи префикс „~“ и е с по-приглушен цвят,
+       за да не се чете като точна счетоводна стойност. */
+    .bubble.stock-list-bubble .col-value {
+      text-align: right; font-variant-numeric: tabular-nums; color: #4b5563;
+      white-space: nowrap;
+    }
+    .bubble.stock-list-bubble .row-header .col-value { text-align: right; }
+    .bubble.stock-list-bubble .col-value.no-cost { color: #b0b6bf; }
     /* Кликаеми хедъри за сортиране. Курсорът и лекото потъмняване при hover
        подсказват, че клетката е бутон — иначе не личи, че е интерактивна. */
     .bubble.stock-list-bubble .row-header .bubble-cell[data-sort] {
@@ -1319,7 +1328,7 @@
       background: linear-gradient(to right, #f3f4f6, #ffffff);
     }
     @media (max-width: 600px) {
-      .bubble.stock-list-bubble .bubble-card { grid-template-columns: 60px minmax(120px, 1fr) 60px; }
+      .bubble.stock-list-bubble .bubble-card { grid-template-columns: 56px minmax(84px, 1fr) 46px 74px; }
       .bubble.stock-list-bubble .row-header { font-size: 10px; letter-spacing: 0.3px; }
       .bubble.stock-list-bubble .row-header .bubble-cell,
       .bubble.stock-list-bubble .bubble-cell { padding: 8px 10px; }
@@ -4130,7 +4139,18 @@
     // но НЕ и когато сортираме по наличност — там подредбата по число
     // е самата цел и групирането би я обезсмислило.
     function stockSortGroupsLowToBottom() {
-      return stockSort.key !== 'stock'
+      // Групирането на изчерпаните в дъното важи за текстовите колони. При
+      // сортиране по число (наличност или стойност) то би обезсмислило подредбата.
+      return stockSort.key !== 'stock' && stockSort.key !== 'value'
+    }
+
+    // Съвкупната стойност е ОЦЕНКА, не точна счетоводна стойност: средно претеглена
+    // доставна цена по текущо количество. Затова се показва с „~“. Продукт, за който
+    // няма нито една доставка със записана цена, показва тире вместо подвеждаща нула.
+    function formatStockValue(v) {
+      if (v == null || Number.isNaN(Number(v))) return '—'
+      const n = Number(v)
+      return '~' + n.toFixed(2) + ' €'
     }
 
     window.setStockSort = function(key) {
@@ -4139,7 +4159,7 @@
       } else {
         stockSort.key = key
         // Разумно начало според типа: текст от А нагоре, числа от голямо надолу.
-        stockSort.dir = (key === 'stock') ? 'desc' : 'asc'
+        stockSort.dir = (key === 'stock' || key === 'value') ? 'desc' : 'asc'
       }
       if (typeof lastGoodStock !== 'undefined' && lastGoodStock) renderStock(lastGoodStock)
     }
@@ -4192,7 +4212,17 @@
           if (aLow !== bLow) return aLow ? 1 : -1
         }
         let cmp = 0
-        if (stockSort.key === 'stock') {
+        if (stockSort.key === 'value') {
+          // Продукти без записана себестойност винаги отиват НАКРАЯ, независимо от
+          // посоката — иначе биха се приемали за „най-евтини“ и биха заемали върха.
+          const av = a.stock_value == null ? null : Number(a.stock_value)
+          const bv = b.stock_value == null ? null : Number(b.stock_value)
+          if (av == null && bv == null) return collator.compare(a.name || '', b.name || '')
+          if (av == null) return 1
+          if (bv == null) return -1
+          cmp = av - bv
+          if (cmp === 0) return collator.compare(a.name || '', b.name || '')
+        } else if (stockSort.key === 'stock') {
           cmp = (Number(a.current_quantity) || 0) - (Number(b.current_quantity) || 0)
           // При равни количества подреждаме по име, за да не подскачат редовете
           if (cmp === 0) return collator.compare(a.name || '', b.name || '')
@@ -4213,6 +4243,7 @@
               ${stockHeaderCell('id', 'col-id', t('columns.id'))}
               ${stockHeaderCell('name', 'col-name', t('columns.name'))}
               ${stockHeaderCell('stock', 'col-stock', t('columns.stock'))}
+              ${stockHeaderCell('value', 'col-value', t('columns.value'))}
             </div>
             ${sorted.length === 0
               ? `<div class="stock-empty">${escapeHtml(t('empty.products'))}</div>`
@@ -4226,6 +4257,7 @@
                     <div class="bubble-cell col-id"><span>${escapeHtml(r.id)}</span></div>
                     <div class="bubble-cell col-name">${escapeHtml(r.name)}</div>
                     <div class="bubble-cell col-stock ${cellCls}">${qty}</div>
+                    <div class="bubble-cell col-value${r.stock_value == null ? ' no-cost' : ''}">${formatStockValue(r.stock_value)}</div>
                   </div>`
                 }).join('')}
           </div>
@@ -7240,7 +7272,7 @@
         },
         columns: {
           id: 'ID', name: 'Name', product: 'Product',
-          stock: 'Stock', qty: 'Qty', in_stock: 'In stock',
+          stock: 'Stock', qty: 'Qty', in_stock: 'In stock', value: 'Value',
         },
         // Compact abbreviated variants for tight column headers (form bubbles)
         cols_short: {
@@ -7592,7 +7624,7 @@
         },
         columns: {
           id: 'ID', name: 'Име', product: 'Продукт',
-          stock: 'Налич.', qty: 'Кол.', in_stock: 'Налич.',
+          stock: 'Налич.', qty: 'Кол.', in_stock: 'Налич.', value: 'Стойност',
         },
         // In tight form-bubble headers the stock column is narrower — use shorter abbreviation
         cols_short: {
