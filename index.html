@@ -1227,7 +1227,7 @@
       margin: 0 auto 32px;
     }
     .bubble.stock-list-bubble .bubble-card {
-      grid-template-columns: 90px minmax(140px, 1fr) 72px 92px;
+      grid-template-columns: 34px 78px minmax(110px, 1fr) 78px 96px;
       border-color: #9ca3af;
       overflow: hidden;
     }
@@ -1244,6 +1244,43 @@
       padding: 10px 14px;
     }
     .bubble.stock-list-bubble .row-header .col-stock { text-align: center; }
+    /* Тесните колони получават по-малък хоризонтален padding. Общият padding
+       е 10px 14px, тоест 28px — при колона от 78px това оставя 50px за текст
+       „НАЛИЧ." плюс триъгълника, и заглавието се режеше (балонът е с
+       overflow: hidden). Тук го сваляме и забраняваме пренасяне. */
+    .bubble.stock-list-bubble .row-header .col-status,
+    .bubble.stock-list-bubble .row-header .col-stock,
+    .bubble.stock-list-bubble .row-header .col-value {
+      padding-left: 5px; padding-right: 5px; white-space: nowrap;
+    }
+    .bubble.stock-list-bubble .row-body .col-status,
+    .bubble.stock-list-bubble .row-body .col-stock,
+    .bubble.stock-list-bubble .row-body .col-value,
+    .bubble.stock-list-bubble .row-totals .col-status,
+    .bubble.stock-list-bubble .row-totals .col-stock,
+    .bubble.stock-list-bubble .row-totals .col-value {
+      padding-left: 5px; padding-right: 8px; white-space: nowrap;
+    }
+    /* Триъгълникът за сортиране да не се свива, ако мястото е на ръба. */
+    .bubble.stock-list-bubble .row-header .sort-arrow { flex-shrink: 0; }
+    /* Колоната за статус няма заглавие — само триъгълникът, центриран.
+       Държим го леко видим и когато не е активна колона, иначе клетката
+       изглежда празна и не личи, че се цъка. */
+    .bubble.stock-list-bubble .row-header .col-status {
+      text-align: center; padding-left: 0; padding-right: 0;
+    }
+    .bubble.stock-list-bubble .row-header .col-status .sort-arrow {
+      margin-left: 0; opacity: 0.28;
+    }
+    .bubble.stock-list-bubble .row-header .col-status.sorted .sort-arrow { opacity: 1; }
+    @media (max-width: 600px) {
+      .bubble.stock-list-bubble .row-header .col-status,
+      .bubble.stock-list-bubble .row-header .col-stock,
+      .bubble.stock-list-bubble .row-header .col-value {
+        padding-left: 3px; padding-right: 3px; font-size: 9px; letter-spacing: 0;
+      }
+      .bubble.stock-list-bubble .row-header .sort-arrow { font-size: 8px; margin-left: 3px; }
+    }
     /* Съвкупна стойност на наличността. Тя е ОЦЕНКА — средно претеглена доставна
        цена по текущо количество — затова носи префикс „~“ и е с по-приглушен цвят,
        за да не се чете като точна счетоводна стойност. */
@@ -1253,6 +1290,33 @@
     }
     .bubble.stock-list-bubble .row-header .col-value { text-align: right; }
     .bubble.stock-list-bubble .col-value.no-cost { color: #b0b6bf; }
+
+    /* ── Статус на продукта ────────────────────────────────────────
+       Точка вместо текст: колоната трябва да е тясна, а цветът се чете
+       мигновено при сканиране надолу по списъка. */
+    .bubble.stock-list-bubble .col-status {
+      text-align: center; font-size: 11px; line-height: 1; user-select: none;
+    }
+    .bubble.stock-list-bubble .col-status .dot-on  { color: #16a34a; }
+    .bubble.stock-list-bubble .col-status .dot-off { color: #dc2626; }
+    /* Деактивиран ред: приглушен, за да личи и без да се гледа точката. */
+    .bubble.stock-list-bubble .row-body.is-disabled .col-id span,
+    .bubble.stock-list-bubble .row-body.is-disabled .col-name,
+    .bubble.stock-list-bubble .row-body.is-disabled .col-stock,
+    .bubble.stock-list-bubble .row-body.is-disabled .col-value {
+      opacity: 0.45;
+    }
+    .bubble.stock-list-bubble .row-body.is-disabled .col-name { text-decoration: line-through; }
+
+    /* ── Ред с общите суми, най-отдолу в същия балон ───────────────── */
+    .bubble.stock-list-bubble .row-totals .bubble-cell {
+      background: linear-gradient(to right, #e5e7eb, #f3f4f6);
+      border-top: 1.5px solid #9ca3af;
+      font-weight: 700; font-size: 12px; color: #374151; padding: 9px 14px;
+    }
+    .bubble.stock-list-bubble .row-totals .col-stock { text-align: center; }
+    .bubble.stock-list-bubble .row-totals .col-value { text-align: right; }
+    .bubble.stock-list-bubble .row-totals .col-name  { color: #6b7280; font-weight: 600; }
     /* Кликаеми хедъри за сортиране. Курсорът и лекото потъмняване при hover
        подсказват, че клетката е бутон — иначе не личи, че е интерактивна. */
     .bubble.stock-list-bubble .row-header .bubble-cell[data-sort] {
@@ -1345,7 +1409,7 @@
       background: linear-gradient(to right, #f3f4f6, #ffffff);
     }
     @media (max-width: 600px) {
-      .bubble.stock-list-bubble .bubble-card { grid-template-columns: 56px minmax(84px, 1fr) 46px 74px; }
+      .bubble.stock-list-bubble .bubble-card { grid-template-columns: 28px 52px minmax(56px, 1fr) 56px 74px; }
       .bubble.stock-list-bubble .row-header { font-size: 10px; letter-spacing: 0.3px; }
       .bubble.stock-list-bubble .row-header .bubble-cell,
       .bubble.stock-list-bubble .bubble-cell { padding: 8px 10px; }
@@ -1380,6 +1444,7 @@
     .log-entry .log-time { color: var(--text-muted); font-size: 12px; white-space: nowrap; flex-shrink: 0; }
     /* Product IDs in log summaries: italic, monospaced, subtly muted — makes them visually
        distinguishable from names + prose without shouting for attention. */
+    .log-entry .log-names { color: var(--text-muted); }
     .log-entry .log-id {
       font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
       font-style: italic;
@@ -4093,7 +4158,7 @@
       setConnectionStatus('loading')
       try {
         const [productsRes, stockRes] = await Promise.all([
-          supabase.from('products').select('id, name').order('name'),
+          supabase.from('products').select('id, name, archived_at').order('name'),
           supabase.from('current_stock').select('*')
         ])
         if (productsRes.error) throw productsRes.error
@@ -4159,12 +4224,23 @@
     function stockSortGroupsLowToBottom() {
       // Групирането на изчерпаните в дъното важи за текстовите колони. При
       // сортиране по число (наличност или стойност) то би обезсмислило подредбата.
-      return stockSort.key !== 'stock' && stockSort.key !== 'value'
+      // Групирането на изчерпаните в дъното важи само за ID и ИМЕ. При числовите
+      // колони и при статуса то би се борило със самата подредба.
+      return stockSort.key !== 'stock' && stockSort.key !== 'value' && stockSort.key !== 'status'
     }
 
     // Съвкупната стойност е ОЦЕНКА, не точна счетоводна стойност: средно претеглена
     // доставна цена по текущо количество. Затова се показва с „~“. Продукт, за който
     // няма нито една доставка със записана цена, показва тире вместо подвеждаща нула.
+    // Деактивиран ли е продуктът? Статусът е `products.archived_at` — не е NULL
+    // значи изключен. Списъкът „Наличност" идва от изгледа `current_stock`, който
+    // няма тази колона, затова я четем от кеша на продуктите.
+    function isProductDisabled(productId) {
+      if (!productId || typeof productsCache === 'undefined' || !productsCache) return false
+      const p = productsCache.find(x => x.id === productId)
+      return !!(p && p.archived_at)
+    }
+
     function formatStockValue(v) {
       if (v == null || Number.isNaN(Number(v))) return '—'
       const n = Number(v)
@@ -4230,7 +4306,14 @@
           if (aLow !== bLow) return aLow ? 1 : -1
         }
         let cmp = 0
-        if (stockSort.key === 'value') {
+        if (stockSort.key === 'status') {
+          // Активните и деактивираните се групират. Възходящо = първо активните.
+          // Вътре в група подреждаме по име, за да е предвидимо и да не подскача.
+          const ad = isProductDisabled(a.id) ? 1 : 0
+          const bd = isProductDisabled(b.id) ? 1 : 0
+          if (ad === bd) return collator.compare(a.name || '', b.name || '')
+          cmp = ad - bd
+        } else if (stockSort.key === 'value') {
           // Продукти без записана себестойност винаги отиват НАКРАЯ, независимо от
           // посоката — иначе биха се приемали за „най-евтини“ и биха заемали върха.
           const av = a.stock_value == null ? null : Number(a.stock_value)
@@ -4258,6 +4341,7 @@
         <div class="bubble stock-list-bubble">
           <div class="bubble-card">
             <div class="bubble-row row-header">
+              ${stockHeaderCell('status', 'col-status', '')}
               ${stockHeaderCell('id', 'col-id', t('columns.id'))}
               ${stockHeaderCell('name', 'col-name', t('columns.name'))}
               ${stockHeaderCell('stock', 'col-stock', t('columns.stock'))}
@@ -4271,13 +4355,37 @@
                   let rowCls = ''
                   if (qty < 0) { cellCls = 'qty-negative'; rowCls = 'low-stock' }
                   else if (qty === 0) { cellCls = 'qty-zero'; rowCls = 'low-stock' }
-                  return `<div class="bubble-row row-body${rowCls ? ' ' + rowCls : ''}" data-product-id="${escapeHtml(r.id)}" data-product-name="${escapeHtml(r.name)}" data-current-quantity="${qty}">
+                  // Статусът живее в `products.archived_at`, а списъкът идва от изгледа
+                  // `current_stock`. Свързваме ги от кеша, вместо да пипаме изгледа.
+                  const disabled = isProductDisabled(r.id)
+                  if (disabled) rowCls += (rowCls ? ' ' : '') + 'is-disabled'
+                  return `<div class="bubble-row row-body${rowCls ? ' ' + rowCls : ''}" data-product-id="${escapeHtml(r.id)}" data-product-name="${escapeHtml(r.name)}" data-current-quantity="${qty}" data-disabled="${disabled ? '1' : '0'}">
+                    <div class="bubble-cell col-status">${disabled
+                      ? '<span class="dot-off" title="' + escapeHtml(t('stock.disabled')) + '">\u2716</span>'
+                      : '<span class="dot-on" title="' + escapeHtml(t('stock.enabled')) + '">\u2714</span>'}</div>
                     <div class="bubble-cell col-id"><span>${escapeHtml(r.id)}</span></div>
                     <div class="bubble-cell col-name">${escapeHtml(r.name)}</div>
                     <div class="bubble-cell col-stock ${cellCls}">${qty}</div>
                     <div class="bubble-cell col-value${r.stock_value == null ? ' no-cost' : ''}">${formatStockValue(r.stock_value)}</div>
                   </div>`
                 }).join('')}
+            ${sorted.length === 0 ? '' : (() => {
+              // Общо количество и обща стойност, най-отдолу в същия балон.
+              // Стойността се сумира само от редовете, които имат себестойност —
+              // затова носи „~“, като отделните редове.
+              const totQty = sorted.reduce((s, x) => s + (Number(x.current_quantity) || 0), 0)
+              const withCost = sorted.filter(x => x.stock_value != null)
+              const totVal = withCost.reduce((s, x) => s + Number(x.stock_value), 0)
+              const missing = sorted.length - withCost.length
+              return `<div class="bubble-row row-totals">
+                <div class="bubble-cell col-status"></div>
+                <div class="bubble-cell col-id"></div>
+                <div class="bubble-cell col-name">${escapeHtml(t('stock.total'))}${
+                  missing ? ` <span style="font-weight:400;font-size:11px;">(${missing} ${escapeHtml(t('stock.without_cost'))})</span>` : ''}</div>
+                <div class="bubble-cell col-stock">${totQty}</div>
+                <div class="bubble-cell col-value">${withCost.length ? '~' + totVal.toFixed(2) + ' €' : '—'}</div>
+              </div>`
+            })()}
           </div>
         </div>`
       if (existing) existing.outerHTML = html
@@ -5492,6 +5600,8 @@
         logAction(isStockIn ? 'stockin_deleted' : 'sale_deleted', {
           count: (bubble.items || []).length,
           group_id: groupId,
+          names: (bubble.items || []).slice(0, 3)
+                   .map(it => it.product_name || it.freeform_name || '?'),
         })
         setSubmitOverlaySuccess()
         await reloadActivity()
@@ -5729,6 +5839,10 @@
           const searchable = (p.name + ' ' + p.id).toLowerCase()
           const textMatch = words.every(w => searchable.includes(w))
           if (!textMatch) return false
+          // Деактивиран продукт не се предлага. Това е ЦЕЛТА на функцията —
+          // продукти, които вече не продаваме, да не задръстват падащото меню.
+          // Остава видим в „Наличност" със статусна точка, за да може да се върне.
+          if (p.archived_at) return false
           // Hide zero-stock either if this specific call requested it (per-call), OR if the
           // user's preference is set to hide (global). The pref applies across all 4 dropdown
           // sites uniformly; per-call remains as an escape hatch if a specific site ever needs
@@ -6444,7 +6558,10 @@
           if (itemErr && itemErr.code !== '23505') throw itemErr
         }
         log('sale', `Sale inserted: ${collected.length} item(s) in group ${groupId}`)
-        logAction('sale_created', { count: collected.length, group_id: groupId })
+        logAction('sale_created', {
+          count: collected.length, group_id: groupId,
+          names: collected.slice(0, 3).map(c => c.productName),
+        })
         setSubmitOverlaySuccess()
         feedback.className = 'form-feedback success'
         feedback.textContent = t('forms.sale_logged').replace('{count}', String(collected.length))
@@ -6591,7 +6708,10 @@
           if (itemErr && itemErr.code !== '23505') throw itemErr
         }
         log('stock_in', `Stock_in inserted: ${collected.length} item(s) in group ${groupId}`)
-        logAction('stockin_created', { count: collected.length, group_id: groupId })
+        logAction('stockin_created', {
+          count: collected.length, group_id: groupId,
+          names: collected.slice(0, 3).map(c => c.productName),
+        })
         setSubmitOverlaySuccess()
         feedback.className = 'form-feedback success'
         feedback.textContent = t('forms.stock_received').replace('{count}', String(collected.length))
@@ -7156,9 +7276,14 @@
         // Show results
         overlay.classList.remove('visible')
         if (failures.length === 0) {
+          // `successCount` са ВСИЧКИ вмъкнати редове за постъпване — включително
+          // тези за новите продукти. Затова като „обновени" се броят само реално
+          // захранените вече съществуващи продукти.
           logAction('import_executed', {
             new_count: plan.newRows.length,
-            update_count: plan.renameRows.length + successCount,
+            update_count: plan.restockRows.length,
+            renamed: plan.renameRows.length,
+            units: [...plan.newRows, ...plan.restockRows].reduce((s, r) => s + (r.qty || 0), 0),
           })
           await showNotice(`${t('import.complete_body')}\n\n` +
             `${plan.newRows.length} ${t('import.complete_new')}\n` +
@@ -7337,7 +7462,9 @@
           pref_language: 'Language',
           pref_language_hint: 'Interface language. Applies immediately.',
         },
-        stock: { search_placeholder: 'Search products', sort_hint: 'Click to sort' },
+        stock: { search_placeholder: 'Search products', sort_hint: 'Click to sort',
+                 enabled: 'Active', disabled: 'Disabled',
+                 total: 'Total', without_cost: 'without cost' },
         export: {
           title: 'Export current stock',
           format: 'Format',
@@ -7372,6 +7499,9 @@
           stock_drift_body: 'The form showed {shown}, but stock was actually {actual} by the time you saved (someone logged activity in the meantime).\n\nYour value of {saved} was applied correctly.',
         },
         confirm: {
+          disable_title: 'Disable product?',
+          disable_body: '"{name}" will stop appearing in the product dropdowns.\n\nNothing is deleted — stock and history stay intact, and you can re-enable it any time from the same menu.',
+          disable_has_stock: '⚠ This product still has {qty} in stock. While disabled you will not be able to select it for a sale.',
           delete_product_title: 'Delete product?',
           delete_product_perm_prefix: 'Permanently delete',
           delete_product_no_refs: 'No sales or stock-in entries reference this product.',
@@ -7452,7 +7582,7 @@
           drift_notice: 'Stock changed while you were reviewing:',
           drift_explain: 'Your counted numbers were still applied — the app recalculated against live stock so the totals match your count.',
         },
-        context_menu: { edit: 'Edit', delete: 'Delete' },
+        context_menu: { edit: 'Edit', delete: 'Delete', disable: 'Disable', enable: 'Enable' },
         calendar: {
           quick_select: 'Quick Select',
           day: 'Day', range: 'Range', quick: 'Event', apply: 'Apply',
@@ -7633,11 +7763,20 @@
           action_product_edited: 'Edited product {id} — {name}',
           action_product_deleted: 'Deleted product {id} — {name}',
           action_revision_applied: 'Applied stock revision ({count} adjustment(s))',
-          action_import_executed: 'Imported spreadsheet ({new_count} new, {update_count} updated)',
+          action_import_executed: 'Imported spreadsheet',
+          action_product_disabled: 'Disabled product {id} — {name}',
+          action_product_enabled: 'Enabled product {id} — {name}',
+          and_more: 'and {n} more',
+          rev_drifted: '({n} changed while reviewing)',
+          imp_prefix: 'Imported spreadsheet:',
+          imp_new: 'new', imp_restocked: 'restocked', imp_renamed: 'renamed',
+          imp_units: 'units', imp_nothing: 'no changes',
           action_display_name_changed: 'Changed display name to "{name}"',
           action_unknown: '{type}',
           // Field labels + prefixes used by the richer per-change formatters
           field_id: 'ID',
+          field_status: 'status',
+          st_active: 'active', st_disabled: 'disabled',
           field_name: 'name',
           field_stock: 'stock',
           product_edited_prefix: 'Edited product',
@@ -7690,7 +7829,9 @@
           pref_language: 'Език',
           pref_language_hint: 'Език на интерфейса. Прилага се веднага.',
         },
-        stock: { search_placeholder: 'Търси продукти', sort_hint: 'Натисни за сортиране' },
+        stock: { search_placeholder: 'Търси продукти', sort_hint: 'Натисни за сортиране',
+                 enabled: 'Активен', disabled: 'Деактивиран',
+                 total: 'Общо', without_cost: 'без цена' },
         export: {
           title: 'Изнеси наличността',
           format: 'Формат',
@@ -7724,6 +7865,9 @@
           stock_drift_body: 'Формата показваше {shown}, но към момента на запазване наличността беше {actual} (междувременно е записана активност).\n\nВашата стойност {saved} беше приложена коректно.',
         },
         confirm: {
+          disable_title: 'Деактивиране на продукт?',
+          disable_body: '„{name}" ще спре да се показва в падащите менюта за продукти.\n\nНищо не се изтрива — наличността и историята остават непокътнати, и можеш да го активираш отново по всяко време от същото меню.',
+          disable_has_stock: '⚠ Този продукт все още има {qty} наличност. Докато е деактивиран, няма да можеш да го избереш за продажба.',
           delete_product_title: 'Изтриване на продукт?',
           delete_product_perm_prefix: 'Окончателно изтриване на',
           delete_product_no_refs: 'Няма продажби или постъпвания, свързани с този продукт.',
@@ -7804,7 +7948,7 @@
           drift_notice: 'Наличността се промени, докато преглеждахте:',
           drift_explain: 'Преброените от вас количества бяха приложени — приложението преизчисли спрямо актуалната наличност, така че сумите съвпадат с вашето броене.',
         },
-        context_menu: { edit: 'Редактирай', delete: 'Изтрий' },
+        context_menu: { edit: 'Редактирай', delete: 'Изтрий', disable: 'Деактивирай', enable: 'Активирай' },
         calendar: {
           quick_select: 'Бърз избор',
           day: 'Ден', range: 'Период', quick: 'Събитие', apply: 'Приложи',
@@ -7975,10 +8119,19 @@
           action_product_edited: 'Редактира продукт {id} — {name}',
           action_product_deleted: 'Изтри продукт {id} — {name}',
           action_revision_applied: 'Приложи ревизия на наличност ({count} корекция(и))',
-          action_import_executed: 'Внесе електронна таблица ({new_count} нови, {update_count} обновени)',
+          action_import_executed: 'Внесе електронна таблица',
+          action_product_disabled: 'Деактивира продукт {id} — {name}',
+          action_product_enabled: 'Активира продукт {id} — {name}',
+          and_more: 'и още {n}',
+          rev_drifted: '({n} се промениха при прегледа)',
+          imp_prefix: 'Внесе таблица:',
+          imp_new: 'нови', imp_restocked: 'захранени', imp_renamed: 'преименувани',
+          imp_units: 'бр.', imp_nothing: 'без промени',
           action_display_name_changed: 'Промени показваното име на "{name}"',
           action_unknown: '{type}',
           field_id: 'ID',
+          field_status: 'статус',
+          st_active: 'активен', st_disabled: 'деактивиран',
           field_name: 'име',
           field_stock: 'наличност',
           product_edited_prefix: 'Редактира продукт',
@@ -9070,13 +9223,31 @@ new events will not be in this file. Re-download periodically.
               name: details.name || '',
             }, ['id'])
           }
+          // Стар формат: деактивирането се записваше като product_edited със
+          // changes.status. Разчитаме го тук, за да се показва правилно, без да
+          // пипаме вече записаните редове в базата.
+          if (c.status && !c.id && !c.name && !c.stock) {
+            const goingOff = c.status.new === 'disabled'
+            return applyTemplate(goingOff ? 'logs.action_product_disabled'
+                                          : 'logs.action_product_enabled',
+              { id: idSpan(details.id), name: details.name || '' }, ['id'])
+          }
           // Build a list of "field: old → new" phrases for each changed field
           const parts = []
           if (c.id) parts.push(`${escapeHtml(t('logs.field_id'))}: ${idSpan(c.id.old)} → ${idSpan(c.id.new)}`)
           if (c.name) parts.push(`${escapeHtml(t('logs.field_name'))}: ${changeArrow(c.name.old, c.name.new)}`)
           if (c.stock) parts.push(`${escapeHtml(t('logs.field_stock'))}: ${escapeHtml(String(c.stock.old))} → ${escapeHtml(String(c.stock.new))}`)
+          if (c.status) parts.push(`${escapeHtml(t('logs.field_status'))}: ${escapeHtml(t('logs.st_' + c.status.old))} → ${escapeHtml(t('logs.st_' + c.status.new))}`)
           // Use the NEW id for the top-level identifier if it changed, otherwise the current id
           const displayId = (c.id ? c.id.new : details.id)
+          // Ако `changes` съдържа само непознати ключове, `parts` остава празен и
+          // редът излизаше като „Редактира продукт X —" с голо тире. Падаме
+          // обратно към простия шаблон.
+          if (!parts.length) {
+            return applyTemplate('logs.action_product_edited', {
+              id: idSpan(displayId), name: details.name || '',
+            }, ['id'])
+          }
           return `${escapeHtml(t('logs.product_edited_prefix'))} ${idSpan(displayId)} — ${parts.join('; ')}`
         }
         case 'display_name_changed': {
@@ -9088,6 +9259,12 @@ new events will not be in this file. Re-download periodically.
             name: details.name || details.new || '',
           })
         }
+        case 'product_disabled':
+        case 'product_enabled': {
+          return applyTemplate(`logs.action_${actionType}`, {
+            id: idSpan(details.id), name: details.name || '',
+          }, ['id'])
+        }
         case 'product_added':
         case 'product_deleted': {
           return applyTemplate(`logs.action_${actionType}`, {
@@ -9095,23 +9272,58 @@ new events will not be in this file. Re-download periodically.
             name: details.name || '',
           }, ['id'])
         }
-        // Simple templates: just count-based
         case 'sale_created':
         case 'sale_deleted':
         case 'stockin_created':
-        case 'stockin_deleted':
-        case 'revision_applied':
-          return applyTemplate(`logs.action_${actionType}`, {
-            count: details.count ?? 0,
-          })
+        case 'stockin_deleted': {
+          // Ако знаем имената, показваме ги — „Продаде Ябълка" е далеч по-полезно от
+          // „Създаде продажба с 1 продукт". При повече от три изброяваме първите три
+          // и добавяме „и още N", за да не става редът безкраен.
+          const base = applyTemplate(`logs.action_${actionType}`, { count: details.count ?? 0 })
+          const names = Array.isArray(details.names) ? details.names.filter(Boolean) : []
+          if (!names.length) return base
+          const total = details.count ?? names.length
+          const shown = names.map(n => escapeHtml(n)).join(', ')
+          const more = total > names.length
+            ? ' ' + escapeHtml(t('logs.and_more').replace('{n}', String(total - names.length)))
+            : ''
+          return `${base} — <span class="log-names">${shown}${more}</span>`
+        }
+        case 'revision_applied': {
+          const base = applyTemplate('logs.action_revision_applied', { count: details.count ?? 0 })
+          const its = Array.isArray(details.items) ? details.items : []
+          if (!its.length) return base
+          const shown = its.map(x =>
+            `${idSpan(x.id)} ${escapeHtml(String(x.from))}→${escapeHtml(String(x.to))}`).join(', ')
+          const more = (details.count ?? 0) > its.length
+            ? ' ' + escapeHtml(t('logs.and_more').replace('{n}', String(details.count - its.length)))
+            : ''
+          const drift = details.drifted
+            ? ` <span class="log-names">${escapeHtml(t('logs.rev_drifted').replace('{n}', String(details.drifted)))}</span>`
+            : ''
+          return `${base} — <span class="log-names">${shown}${more}</span>${drift}`
+        }
         case 'sale_edited':
         case 'stockin_edited':
           return applyTemplate(`logs.action_${actionType}`, {})
-        case 'import_executed':
-          return applyTemplate('logs.action_import_executed', {
-            new_count: details.new_count ?? 0,
-            update_count: details.update_count ?? 0,
-          })
+        case 'import_executed': {
+          // Стар формат (без ключ `units`): тогава `update_count` беше
+          // renames + ВСИЧКИ вмъкнати редове, тоест включваше и новите продукти.
+          // Числото е невъзстановимо, затова показваме само това, на което може
+          // да се вярва, вместо да повтаряме грешката.
+          if (!('units' in details)) {
+            const n = details.new_count ?? 0
+            return `${escapeHtml(t('logs.imp_prefix'))} ${escapeHtml(
+              n ? `${n} ${t('logs.imp_new')}` : t('logs.imp_nothing'))}`
+          }
+          const parts = []
+          if (details.new_count)    parts.push(`${details.new_count} ${t('logs.imp_new')}`)
+          if (details.update_count) parts.push(`${details.update_count} ${t('logs.imp_restocked')}`)
+          if (details.renamed)      parts.push(`${details.renamed} ${t('logs.imp_renamed')}`)
+          const units = details.units ? ` (+${details.units} ${t('logs.imp_units')})` : ''
+          const body = parts.length ? parts.join(', ') : t('logs.imp_nothing')
+          return `${escapeHtml(t('logs.imp_prefix'))} ${escapeHtml(body + units)}`
+        }
         default:
           return applyTemplate(`logs.action_${actionType}`, details)
       }
@@ -9661,7 +9873,15 @@ new events will not be in this file. Re-download periodically.
           driftNote = `\n\n${t('revision.drift_notice')}\n${lines}${more}\n\n${t('revision.drift_explain')}`
         }
         if (failures.length === 0) {
-          logAction('revision_applied', { count: successCount, drifted: drifted.length })
+          logAction('revision_applied', {
+            count: successCount, drifted: drifted.length,
+            // Първите три корекции с посоката им — за да се вижда какво е станало,
+            // а не само колко на брой.
+            items: revisionPlan.diffs.slice(0, 3).map(x => ({
+              id: x.id, from: x.current, to: x.new,
+            })),
+            total_delta: revisionPlan.diffs.reduce((s, x) => s + (x.new - x.current), 0),
+          })
           await showNotice(
             `✓ ${successCount} ${t('revision.adjustments_applied')}${driftNote}`,
             { title: t('revision.complete') }
@@ -9891,13 +10111,17 @@ ${headerRowXml}${dataRowsXml}
     }
     function openStockRowMenuAt(product, rowEl, anchor) {
       closeStockRowMenu()
+      // Етикетът зависи от текущия статус: изключен продукт се предлага за
+      // включване и обратно.
+      const isDis = isProductDisabled(product.id)
       const menu = document.createElement('div')
       menu.className = 'bubble-menu visible'
       menu.innerHTML = `
         <div class="bubble-menu-item" data-action="edit"><i style="font-style:normal;">✏️</i> ${escapeHtml(t('context_menu.edit'))}</div>
+        <div class="bubble-menu-item" data-action="toggle"><i style="font-style:normal;">${isDis ? '\u2714' : '\u2716'}</i> ${escapeHtml(t(isDis ? 'context_menu.enable' : 'context_menu.disable'))}</div>
         <div class="bubble-menu-item danger" data-action="delete"><i style="font-style:normal;">🗑️</i> ${escapeHtml(t('context_menu.delete'))}</div>
       `
-      const top = Math.min(anchor.y + 4, window.innerHeight - 100)
+      const top = Math.min(anchor.y + 4, window.innerHeight - 130)
       const left = Math.min(anchor.x, window.innerWidth - 160)
       menu.style.position = 'fixed'
       menu.style.top = `${top}px`
@@ -9909,6 +10133,11 @@ ${headerRowXml}${dataRowsXml}
         e.stopPropagation()
         closeStockRowMenu()
         openEditProductModal(product)
+      })
+      menu.querySelector('[data-action="toggle"]').addEventListener('click', (e) => {
+        e.stopPropagation()
+        closeStockRowMenu()
+        toggleProductDisabled(product, isDis)
       })
       menu.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
         e.stopPropagation()
@@ -9966,6 +10195,55 @@ ${headerRowXml}${dataRowsXml}
     // Opened from the row context menu. Prefills ID/Name/Stock with the current values;
     // Save writes any changed field back to the DB. Cancel closes without saving.
     let editingProduct = null
+    // Включва / изключва продукт. Не трие нищо: само вдига или сваля
+    // `products.archived_at`. Наличността и цялата история остават непокътнати —
+    // единствената разлика е, че изключеният не се предлага в падащите менюта.
+    async function toggleProductDisabled(product, currentlyDisabled) {
+      if (!isOnline) {
+        await showNotice(t('validation.no_conn_save'), { title: t('validation.no_connection') })
+        return
+      }
+      // Потвърждение САМО при деактивиране. Активирането връща продукта в
+      // обращение — безобидно е и не заслужава прекъсване. Ако продуктът има
+      // наличност, съобщението го казва изрично, защото тогава изключването
+      // значи „няма да можеш да продадеш тези бройки“.
+      if (!currentlyDisabled) {
+        const qty = (typeof getCurrentStockById === 'function') ? getCurrentStockById(product.id) : null
+        const extra = (qty != null && qty > 0)
+          ? '\n\n' + t('confirm.disable_has_stock').replace('{qty}', String(qty))
+          : ''
+        const ok = await confirmYesNo(
+          t('confirm.disable_body').replace('{name}', product.name) + extra,
+          { title: t('confirm.disable_title'),
+            okLabel: t('context_menu.disable'),
+            cancelLabel: t('buttons.cancel') }
+        )
+        if (!ok) return
+      }
+      try {
+        const newVal = currentlyDisabled ? null : new Date().toISOString()
+        const { error } = await supabase
+          .from('products').update({ archived_at: newVal }).eq('id', product.id)
+        if (error) throw error
+        // Обновяваме кеша веднага, за да се пречертае без да чакаме зареждане
+        const cached = productsCache.find(x => x.id === product.id)
+        if (cached) cached.archived_at = newVal
+        if (typeof lastGoodStock !== 'undefined' && lastGoodStock) renderStock(lastGoodStock)
+        // Собствен тип действие, не „редакция". Преди това се записваше като
+        // product_edited със changes.status, но форматиращата функция познава само
+        // id/name/stock — списъкът с промени излизаше празен и редът оставаше
+        // „Редактира продукт X —" с голо тире.
+        logAction(currentlyDisabled ? 'product_enabled' : 'product_disabled', {
+          id: product.id, name: product.name,
+        })
+        await loadAll(false)
+      } catch (err) {
+        log('error', 'toggle product disabled failed', err)
+        await showNotice(`${t('notices.save_failed')}: ${err.message || 'unknown error'}`,
+                         { title: t('notices.save_failed'), variant: 'danger' })
+      }
+    }
+
     function openEditProductModal(product) {
       editingProduct = product
       document.getElementById('editProductId').value = product.id || ''
