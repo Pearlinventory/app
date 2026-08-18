@@ -189,6 +189,23 @@
        in the bubble-card's subgrid (grid-column: 1 / -1 won't work otherwise). */
     .bubble.form-sale #saleRowsContainer,
     .bubble.form-sale #stockRowsContainer { display: contents; }
+    /* „Добави продукти" носи една колона повече от „Нова продажба" — доставната
+       цена. Затова получава СВОЯ решетка; правилото стои след общото, за да го
+       надделее, и така формата за продажба остава непокътната. */
+    .bubble.form-sale.form-stockin .bubble-card {
+      grid-template-columns: 24px 62px 1fr 38px 38px 62px;
+    }
+    @media (max-width: 600px) {
+      .bubble.form-sale.form-stockin .bubble-card {
+        grid-template-columns: 20px 50px 1fr 32px 32px 54px;
+      }
+    }
+    .bubble.form-sale.form-stockin .col-form-cost input {
+      width: 100%; text-align: right; border: none; background: transparent;
+      font: inherit; padding: 2px 4px; color: inherit;
+    }
+    .bubble.form-sale.form-stockin .col-form-cost input::placeholder { color: #b0b6bf; }
+
     .bubble.form-sale .bubble-card {
       display: grid;
       grid-template-columns: 24px 66px 1fr 40px 40px;
@@ -2910,6 +2927,7 @@
               <div class="bubble-cell" data-i18n="columns.product">Product</div>
               <div class="bubble-cell" data-i18n="cols_short.stock">Stock</div>
               <div class="bubble-cell" data-i18n="cols_short.qty">Qty</div>
+              <div class="bubble-cell" data-i18n="cols_short.cost">Cost</div>
             </div>
             <div id="stockRowsContainer"></div>
             <div class="row-add-button">
@@ -6115,6 +6133,11 @@
         <div class="bubble-cell col-form-qty">
           <input type="number" id="stockQtyInput-${rowId}" step="1" data-i18n-title="bubble_edit.negative_corrections" title="Use negative numbers for corrections (e.g. -7)">
         </div>
+        <div class="bubble-cell col-form-cost">
+          <input type="text" id="stockCostInput-${rowId}" inputmode="decimal" placeholder="—"
+                 data-i18n-title="bubble_edit.unit_cost_tooltip"
+                 title="Purchase price per unit (optional)">
+        </div>
       `
       container.appendChild(row)
       // Newly-inserted row has data-i18n-* attributes on the remove button + textarea placeholder
@@ -6471,9 +6494,15 @@
           return
         }
         // Stock-in allows any integer: positive (receipts), negative (corrections), or zero.
+        // Доставна цена — ПО ИЗБОР. Празно поле или нечислова стойност значи
+        // „не знаем", а не грешка: редът се приема нормално, само без себестойност.
+        const costRaw = document.getElementById(`stockCostInput-${rowId}`)?.value
+        const costNum = parseQuantityLoose(costRaw)
+        const unitCost = (Number.isFinite(costNum) && costNum >= 0) ? costNum : null
+
         const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
         if (exact) {
-          collected.push({ productName, quantity, exact, isNew: false })
+          collected.push({ productName, quantity, exact, isNew: false, unitCost })
         } else {
           // Freeform: read the typed ID from the editable .id-editor inside the wrapper cell
           const idWrapper = document.getElementById(`stockIdReadout-${rowId}`)
@@ -6493,7 +6522,7 @@
             flashRowError(rowEl)
             return
           }
-          collected.push({ productName, quantity, exact: null, isNew: true, newId })
+          collected.push({ productName, quantity, exact: null, isNew: true, newId, unitCost })
         }
       }
       if (collected.length === 0) {
@@ -6556,6 +6585,8 @@
             client_uuid: crypto.randomUUID(),
             stock_in_group_id: groupId,
           }
+          // Доставна цена — записва се само ако е въведена.
+          if (c.unitCost != null) itemRow.unit_cost = c.unitCost
           const { error: itemErr } = await supabase.from('stock_in').insert(itemRow)
           if (itemErr && itemErr.code !== '23505') throw itemErr
         }
@@ -7276,7 +7307,7 @@
         },
         // Compact abbreviated variants for tight column headers (form bubbles)
         cols_short: {
-          id: 'ID', name: 'Name', stock: 'Stock', qty: 'Qty',
+          id: 'ID', name: 'Name', stock: 'Stock', qty: 'Qty', cost: 'Cost',
         },
         placeholders: {
           product_name: 'Type product name…',
@@ -7448,6 +7479,7 @@
           add_a_note: 'Add a note',
           remove_row_aria: 'Remove row',
           remove_this_product: 'Remove this product',
+          unit_cost_tooltip: 'Purchase price per unit (optional)',
           current_stock_tooltip: 'Current stock for the selected product (read-only)',
           negative_corrections: 'Use negative numbers for corrections (e.g. -7)',
         },
@@ -7628,7 +7660,7 @@
         },
         // In tight form-bubble headers the stock column is narrower — use shorter abbreviation
         cols_short: {
-          id: 'ID', name: 'Име', stock: 'Нал.', qty: 'Кол.',
+          id: 'ID', name: 'Име', stock: 'Нал.', qty: 'Кол.', cost: 'Цена',
         },
         placeholders: {
           product_name: 'Въведи име на продукт…',
@@ -7799,6 +7831,7 @@
           add_a_note: 'Добави бележка',
           remove_row_aria: 'Премахни ред',
           remove_this_product: 'Премахни този продукт',
+          unit_cost_tooltip: 'Доставна цена за единица (по избор)',
           current_stock_tooltip: 'Текуща наличност на избрания продукт (само за четене)',
           negative_corrections: 'Използвайте отрицателни числа за корекции (напр. -7)',
         },
