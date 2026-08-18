@@ -6872,13 +6872,16 @@
       if (plan.newRows.length > 0) {
         secNew.hidden = false
         secNewCount.textContent = `(${plan.newRows.length})`
+        // Колоната с цената се показва само ако файлът изобщо е носил цени.
+        const showCostN = plan.newRows.some(r => r.unitCost != null)
         tblNew.innerHTML = `
-          <thead><tr><th>${escapeHtml(t('import.code'))}</th><th>${escapeHtml(t('columns.name'))}</th><th class="numeric">${escapeHtml(t('import.quantity'))}</th></tr></thead>
+          <thead><tr><th>${escapeHtml(t('import.code'))}</th><th>${escapeHtml(t('columns.name'))}</th><th class="numeric">${escapeHtml(t('import.quantity'))}</th>${showCostN ? `<th class="numeric">${escapeHtml(t('import.unit_cost'))}</th>` : ''}</tr></thead>
           <tbody>${plan.newRows.map(r => `
             <tr>
               <td class="code-cell">${escapeHtml(r.code)}</td>
               <td>${escapeHtml(r.name)}</td>
               <td class="numeric">+${r.qty}</td>
+              ${showCostN ? `<td class="numeric">${r.unitCost != null ? r.unitCost.toFixed(2) + ' €' : '—'}</td>` : ''}
             </tr>`).join('')}
           </tbody>`
       } else { secNew.hidden = true }
@@ -6890,13 +6893,15 @@
       if (plan.restockRows.length > 0) {
         secR.hidden = false
         secRCount.textContent = `(${plan.restockRows.length})`
+        const showCostR = plan.restockRows.some(r => r.unitCost != null)
         tblR.innerHTML = `
-          <thead><tr><th>${escapeHtml(t('import.code'))}</th><th>${escapeHtml(t('columns.name'))}</th><th class="numeric">${escapeHtml(t('import.adding'))}</th><th class="numeric">${escapeHtml(t('import.current'))}</th><th></th><th class="numeric">${escapeHtml(t('import.new_col'))}</th></tr></thead>
+          <thead><tr><th>${escapeHtml(t('import.code'))}</th><th>${escapeHtml(t('columns.name'))}</th><th class="numeric">${escapeHtml(t('import.adding'))}</th>${showCostR ? `<th class="numeric">${escapeHtml(t('import.unit_cost'))}</th>` : ''}<th class="numeric">${escapeHtml(t('import.current'))}</th><th></th><th class="numeric">${escapeHtml(t('import.new_col'))}</th></tr></thead>
           <tbody>${plan.restockRows.map(r => `
             <tr>
               <td class="code-cell">${escapeHtml(r.code)}</td>
               <td>${escapeHtml(r.currentName)}${r.nameChanged ? ' <span style="font-size:11px;color:#9a3412;">(renames below)</span>' : ''}</td>
               <td class="numeric">+${r.qty}</td>
+              ${showCostR ? `<td class="numeric">${r.unitCost != null ? r.unitCost.toFixed(2) + ' €' : '—'}</td>` : ''}
               <td class="numeric old-val">${r.currentStock}</td>
               <td class="diff-arrow">→</td>
               <td class="numeric new-val">${r.newStock}</td>
@@ -6944,15 +6949,23 @@
       } else { secSk.hidden = true }
 
       // Summary
-      const totalQty = plan.newRows.reduce((s, r) => s + r.qty, 0) +
-                       plan.restockRows.reduce((s, r) => s + r.qty, 0)
+      // Бройките се броят ПО СЕКЦИЯ. Преди тук стоеше една обща сума (нови + захранени),
+      // но се показваше само до „Захранени" — затова при чист внос излизаше безсмислицата
+      // „Захранени: 0 (+1373 бр.)“, където 1373 всъщност бяха бройките на новите продукти.
+      const qtyNew     = plan.newRows.reduce((s, r) => s + r.qty, 0)
+      const qtyRestock = plan.restockRows.reduce((s, r) => s + r.qty, 0)
+      // Обща стойност на внасяното — само от редовете, които носят себестойност.
+      const valueOf = rows => rows.reduce((s, r) => s + (r.unitCost != null ? r.qty * r.unitCost : 0), 0)
+      const totalValue = valueOf(plan.newRows) + valueOf(plan.restockRows)
+      const anyCost = [...plan.newRows, ...plan.restockRows].some(r => r.unitCost != null)
       const sum = document.getElementById('importSummary')
       sum.innerHTML = `
         <div><strong>${escapeHtml(t('import.sum_total_rows'))}</strong> ${plan.totalRows}</div>
-        <div><strong>${escapeHtml(t('import.sum_new_products'))}</strong> ${plan.newRows.length}</div>
-        <div><strong>${escapeHtml(t('import.sum_restocked'))}</strong> ${plan.restockRows.length} (<strong>+${totalQty}</strong> ${escapeHtml(t('import.sum_units'))})</div>
+        <div><strong>${escapeHtml(t('import.sum_new_products'))}</strong> ${plan.newRows.length}${plan.newRows.length ? ` (<strong>+${qtyNew}</strong> ${escapeHtml(t('import.sum_units'))})` : ''}</div>
+        <div><strong>${escapeHtml(t('import.sum_restocked'))}</strong> ${plan.restockRows.length}${plan.restockRows.length ? ` (<strong>+${qtyRestock}</strong> ${escapeHtml(t('import.sum_units'))})` : ''}</div>
         <div><strong>${escapeHtml(t('import.sum_renames'))}</strong> ${plan.renameRows.length}</div>
         <div><strong>${escapeHtml(t('import.sum_skipped'))}</strong> ${plan.skippedRows.length}</div>
+        ${anyCost ? `<div><strong>${escapeHtml(t('import.sum_value'))}</strong> ${totalValue.toFixed(2)} €</div>` : ''}
       `
 
       // Enable/disable confirm
@@ -7474,6 +7487,8 @@
           adding_receipts: 'Adding stock receipts…',
           import_failed: 'Import failed',
           import_failed_details: 'Some rows may have been imported. Check the stock list. Retrying is safe.',
+          unit_cost: 'Unit cost',
+          sum_value: 'Total value:',
           not_a_product_list: 'This file does not look like a product list — no valid quantities were found in any row.\n\nExpected columns: Code, Description, Quantity (and optionally Unit Price).',
           restocked_items: '📦 Restocked items',
           sum_total_rows: 'Total rows in file:',
@@ -7823,6 +7838,8 @@
           adding_receipts: 'Добавяне на постъпвания…',
           import_failed: 'Внасянето се провали',
           import_failed_details: 'Някои редове може да са внесени. Проверете списъка с наличности. Повторният опит е безопасен.',
+          unit_cost: 'Ед. цена',
+          sum_value: 'Обща стойност:',
           not_a_product_list: 'Този файл не изглежда като списък с продукти — в нито един ред не е намерено валидно количество.\n\nОчаквани колони: Код, Наименование, Количество (и по избор Единична цена).',
           restocked_items: '📦 Захранени продукти',
           sum_total_rows: 'Общо редове във файла:',
