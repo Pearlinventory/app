@@ -6611,6 +6611,12 @@
         .normalize('NFKC')
         .replace(/[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '')
         .replace(/[\u2212\uFE63\uFF0D]/g, '-')   // unicode minus / small / fullwidth -> ASCII
+        // Валутни и мерни знаци. Електронните таблици връщат ФОРМАТИРАНИЯ текст
+        // (SheetJS с raw:false), затова клетка с цена идва като "5.50 €", а не като
+        // числото 5.5. Без това чистене Number() връща NaN и цената тихо изчезва.
+        .replace(/[€$£¥₽]/g, '')
+        .replace(/\b(?:лв\.?|EUR|BGN|USD)\b/gi, '')
+        .replace(/%/g, '')
         .replace(/\s+/g, '')                      // strip ALL whitespace (thousands separators)
         .trim()
       if (s === '') return NaN
@@ -6707,6 +6713,12 @@
         const filename = file.name
         const sourceText = filename.replace(/\.[^.]+$/, '')  // strip extension
         const plan = classifyImportRows(rows, sourceText, filename)
+        if (!plan.looksLikeProductList) {
+          await showNotice(t('import.not_a_product_list'),
+                           { title: t('import.parse_error'), variant: 'danger' })
+          document.getElementById('importFile').value = ''
+          return
+        }
         importPlan = plan
 
         renderImportPlan(plan)
@@ -6746,11 +6758,16 @@
       const codeIdx = findCol(header, ['code', 'id', 'sku', 'product_id', 'артикул'])
       const nameIdx = findCol(header, ['description', 'name', 'product', 'item', 'наименование'])
       const qtyIdx = findCol(header, ['quantity', 'qty', 'count', 'amount', 'брой'])
+      // Доставна цена за единица. По избор — файл без такава колона се внася както преди,
+      // само че редовете остават без себестойност.
+      const costIdx = findCol(header, ['unit price', 'unit cost', 'ед. цена', 'ед.цена',
+                                       'цена', 'price', 'cost'])
 
       const usedCols = {
         code: codeIdx >= 0 ? codeIdx : 0,
         name: nameIdx >= 0 ? nameIdx : 1,
         qty: qtyIdx >= 0 ? qtyIdx : 2,
+        cost: costIdx,   // -1 = липсва
       }
 
       log('import', `Column mapping`, usedCols)
@@ -6783,6 +6800,13 @@
         // separators and comma decimals. Import requires whole units, so round after parsing.
         const qtyParsed = parseQuantityLoose(r[usedCols.qty])
         const qty = Number.isFinite(qtyParsed) ? Math.round(qtyParsed) : NaN
+        // Себестойността е ПО ИЗБОР — липсва ли, редът пак се внася, само без цена.
+        // Затова невалидна цена НЕ прави реда невалиден.
+        let unitCost = null
+        if (usedCols.cost >= 0) {
+          const c = parseQuantityLoose(r[usedCols.cost])
+          if (Number.isFinite(c) && c >= 0) unitCost = c
+        }
 
         const errors = []
         if (!code) errors.push('missing code')
@@ -6797,7 +6821,7 @@
         const existing = productByCode[code]
         if (existing === undefined) {
           // NEW product — store the normalized code so we never CREATE a dirty ID
-          newRows.push({ rowIndex: i + 1, code, name, qty })
+          newRows.push({ rowIndex: i + 1, code, name, qty, unitCost })
         } else {
           // EXISTING product → restock. `code` carries the DB's actual id for FK safety.
           const existingName = existing.name
@@ -6805,7 +6829,7 @@
           restockRows.push({
             rowIndex: i + 1, code: existing.actualId, currentName: existingName, name, qty,
             currentStock, newStock: currentStock + qty,
-            nameChanged: existingName !== name,
+            nameChanged: existingName !== name, unitCost,
           })
           if (existingName !== name) {
             renameRows.push({ rowIndex: i + 1, code: existing.actualId, oldName: existingName, newName: name })
@@ -6813,10 +6837,17 @@
         }
       }
 
+      // Пазач срещу файлове, които не са списък с продукти.
+      // Помощните таблици на питон скрипта (Product_Typos.ods, Product_Corrections.ods,
+      // Product_Removal_*.ods) имат заглавия, които не съвпадат с нищо. Затова разпознаването
+      // на колони пада на „първите три" и файлът би минал за продуктов списък — например
+      // „gél lakk" би влязло като ID на продукт. Ако нито един ред не е дал валидно
+      // количество, файлът не е за внасяне.
+      const looksLikeProductList = (newRows.length + restockRows.length) > 0
       return {
         newRows, restockRows, renameRows, skippedRows,
         totalRows: rows.length - 1,
-        sourceText, filename,
+        sourceText, filename, looksLikeProductList,
       }
     }
 
@@ -6993,8 +7024,8 @@
         //    All rows from this file share the same group so the History bubble represents
         //    "one import event" instead of many disconnected stock-in rows.
         const allStockIns = [
-          ...plan.newRows.map(r => ({ product_id: r.code, quantity: r.qty, name: r.name })),
-          ...plan.restockRows.map(r => ({ product_id: r.code, quantity: r.qty, name: r.name })),
+          ...plan.newRows.map(r => ({ product_id: r.code, quantity: r.qty, name: r.name, unitCost: r.unitCost })),
+          ...plan.restockRows.map(r => ({ product_id: r.code, quantity: r.qty, name: r.name, unitCost: r.unitCost })),
         ]
         let importGroupId = null
         if (allStockIns.length > 0) {
@@ -7033,6 +7064,8 @@
                 source: sourceText || null,
                 client_uuid: crypto.randomUUID(),
               }
+              // Доставна цена за единица — само ако файлът я е носил.
+              if (r.unitCost != null) insertRow.unit_cost = r.unitCost
               if (importGroupId) insertRow.stock_in_group_id = importGroupId
               const { error } = await supabase.from('stock_in').insert(insertRow)
               if (error && error.code !== '23505') throw error
@@ -7441,6 +7474,7 @@
           adding_receipts: 'Adding stock receipts…',
           import_failed: 'Import failed',
           import_failed_details: 'Some rows may have been imported. Check the stock list. Retrying is safe.',
+          not_a_product_list: 'This file does not look like a product list — no valid quantities were found in any row.\n\nExpected columns: Code, Description, Quantity (and optionally Unit Price).',
           restocked_items: '📦 Restocked items',
           sum_total_rows: 'Total rows in file:',
           sum_new_products: 'New products to create:',
@@ -7789,6 +7823,7 @@
           adding_receipts: 'Добавяне на постъпвания…',
           import_failed: 'Внасянето се провали',
           import_failed_details: 'Някои редове може да са внесени. Проверете списъка с наличности. Повторният опит е безопасен.',
+          not_a_product_list: 'Този файл не изглежда като списък с продукти — в нито един ред не е намерено валидно количество.\n\nОчаквани колони: Код, Наименование, Количество (и по избор Единична цена).',
           restocked_items: '📦 Захранени продукти',
           sum_total_rows: 'Общо редове във файла:',
           sum_new_products: 'Нови продукти за създаване:',
