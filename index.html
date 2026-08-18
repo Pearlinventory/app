@@ -2965,6 +2965,13 @@
           <input type="checkbox" id="exportIncludeZero">
           <span data-i18n="export.include_zero">Include products with 0 or less stock</span>
         </label>
+        <!-- Изключено по подразбиране: обичайният износ е ID / Име / Количество,
+             същият формат, който импортът чете обратно. Себестойността е
+             вътрешна информация и се добавя само при изрично поискване. -->
+        <label class="export-checkbox-row">
+          <input type="checkbox" id="exportIncludeCost">
+          <span data-i18n="export.include_cost">Include unit cost column</span>
+        </label>
         <p class="export-filename-hint">Filename: <code id="exportFilenamePreview">stock_YYYY-MM-DD.xlsx</code></p>
         <div class="confirm-actions">
           <button class="btn secondary" id="exportStockCancelBtn" type="button" data-i18n="buttons.cancel">Cancel</button>
@@ -7473,6 +7480,7 @@
           sort_quantity: 'Quantity (high to low)',
           sort_id: 'ID',
           include_zero: 'Include products with 0 or less stock',
+          include_cost: 'Include unit cost column',
           filename_preview: 'Filename:',
         },
         edit_product: {
@@ -7840,6 +7848,7 @@
           sort_quantity: 'Количество (от най-много)',
           sort_id: 'ID',
           include_zero: 'Включи продукти с 0 или по-малко наличност',
+          include_cost: 'Включи колона с доставна цена',
           filename_preview: 'Име на файл:',
         },
         edit_product: {
@@ -9909,6 +9918,11 @@ new events will not be in this file. Re-download periodically.
     function openExportStockModal() {
       const modal = document.getElementById('exportStockModal')
       if (!modal) return
+      // Себестойността се нулира при ВСЯКО отваряне, не само при зареждане на
+      // страницата. Иначе една отметка отпреди седмица би вкарала покупните цени
+      // във файл, който пращаш навън. Тук по-безопасното поведение струва един клик.
+      const cost = document.getElementById('exportIncludeCost')
+      if (cost) cost.checked = false
       modal.classList.add('visible')
       updateExportFilenamePreview()
     }
@@ -9960,8 +9974,21 @@ new events will not be in this file. Re-download periodically.
         if (sortBy === 'quantity') return (Number(b.current_quantity) || 0) - (Number(a.current_quantity) || 0)
         return (a.id || '').localeCompare(b.id || '')
       })
-      const header = ['ID', 'Name', 'Quantity']
-      const dataRows = sorted.map(r => [r.id, r.name, Number(r.current_quantity) || 0])
+      const includeCost = document.getElementById('exportIncludeCost')?.checked === true
+      // Четвъртата колона носи СРЕДНО ПРЕТЕГЛЕНАТА доставна цена (`avg_cost` от
+      // изгледа), а не стойността на наличността. Така изнесеният файл може да се
+      // внесе обратно — импортът чака точно единична цена на четвърта позиция.
+      const header = includeCost ? ['ID', 'Name', 'Quantity', 'Unit Price']
+                                 : ['ID', 'Name', 'Quantity']
+      const dataRows = sorted.map(r => {
+        const base = [r.id, r.name, Number(r.current_quantity) || 0]
+        if (!includeCost) return base
+        // Продукт без нито една доставка със записана цена дава празна клетка,
+        // а не нула — нулата би значела „струва нищо", което е невярно.
+        const c = r.avg_cost
+        base.push(c == null || Number.isNaN(Number(c)) ? '' : Number(Number(c).toFixed(4)))
+        return base
+      })
       try {
         // ODS gets its own hand-rolled XML path (below). SheetJS's ODS writer doesn't honor
         // cell styling reliably — building the ODS ourselves guarantees bold/centered headers
