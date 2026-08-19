@@ -2,7 +2,7 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Inventory — V2.3</title>
   <!-- xlsx-js-style: drop-in replacement for SheetJS with cell styling support (bold/centered
        headers, colors, etc.). Same global (`XLSX`) so all existing import + export code keeps
@@ -10,6 +10,59 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
+    /* ═══════════════════════════════════════════════════════════════
+       iOS: спиране на автоматичното увеличаване при фокус
+
+       WebKit увеличава страницата ВСЕКИ ПЪТ, когато фокусираш поле с
+       шрифт под 16px — и после НЕ се връща обратно. Оттам идва
+       безкрайното щипане с пръсти. Не се изключва с настройка; шрифтът
+       е единственото, което го спира.
+
+       Не ползваме `maximum-scale=1` / `user-scalable=no`: Safari ги
+       игнорира от iOS 10 насам, а и биха забранили ръчното увеличаване,
+       което е нужно за достъпност.
+
+       `@supports (-webkit-touch-callout: none)` хваща само WebKit на iOS.
+       Настолната версия и Android остават непроменени — там компактните
+       13–14px са добре, защото автоматично увеличаване няма.
+
+       16px е прагът на Apple. Не 15.9px.
+       ═══════════════════════════════════════════════════════════════ */
+    @supports (-webkit-touch-callout: none) {
+      input[type="text"], input[type="number"], input[type="email"],
+      input[type="password"], input[type="search"], input[type="tel"],
+      input[type="url"], input[type="date"], input:not([type]),
+      textarea, select {
+        font-size: 16px !important;
+      }
+      /* Полетата в редовете на балоните са тесни. За да не се разбие
+         решетката от по-едрия шрифт, ги свиваме визуално обратно — но
+         с transform, а не с font-size, защото iOS гледа изчисления
+         font-size, не крайния вид на екрана. */
+      .bubble .bubble-cell input,
+      .bubble .bubble-cell textarea,
+      .bubble .bubble-cell .id-editor {
+        font-size: 16px !important;
+        transform-origin: left center;
+      }
+      /* Полетата за количество са най-тесни — там намаляваме padding-а,
+         вместо шрифта, за да остане мястото. */
+      .bubble .col-form-qty input,
+      .bubble .col-qty input {
+        padding-left: 2px !important; padding-right: 2px !important;
+      }
+    }
+
+    /* iOS мести „визуалния прозорец" отделно от оформлението, когато
+       клавиатурата излезе. Заедно с плавно скролване това дава онова
+       подскачане, при което фокусираното поле изчезва зад клавиатурата.
+       Плавното скролване се изключва само на iOS. */
+    @supports (-webkit-touch-callout: none) {
+      html { scroll-behavior: auto !important; }
+      /* Спира „гумичката" при дърпане отвъд края, която на iOS изглежда
+         като че оформлението се чупи. */
+      body { overscroll-behavior-y: none; }
+    }
     :root {
       --bg: #ffffff;
       --bg-elevated: #f7f7f8;
@@ -192,19 +245,6 @@
     /* „Добави продукти" носи една колона повече от „Нова продажба" — доставната
        цена. Затова получава СВОЯ решетка; правилото стои след общото, за да го
        надделее, и така формата за продажба остава непокътната. */
-    .bubble.form-sale.form-stockin .bubble-card {
-      grid-template-columns: 24px 62px 1fr 38px 38px 62px;
-    }
-    @media (max-width: 600px) {
-      .bubble.form-sale.form-stockin .bubble-card {
-        grid-template-columns: 20px 50px 1fr 32px 32px 54px;
-      }
-    }
-    .bubble.form-sale.form-stockin .col-form-cost input {
-      width: 100%; text-align: right; border: none; background: transparent;
-      font: inherit; padding: 2px 4px; color: inherit;
-    }
-    .bubble.form-sale.form-stockin .col-form-cost input::placeholder { color: #b0b6bf; }
 
     .bubble.form-sale .bubble-card {
       display: grid;
@@ -1227,7 +1267,7 @@
       margin: 0 auto 32px;
     }
     .bubble.stock-list-bubble .bubble-card {
-      grid-template-columns: 34px 78px minmax(110px, 1fr) 78px 96px;
+      grid-template-columns: 34px 88px minmax(140px, 1fr) 84px;
       border-color: #9ca3af;
       overflow: hidden;
     }
@@ -1249,16 +1289,13 @@
        „НАЛИЧ." плюс триъгълника, и заглавието се режеше (балонът е с
        overflow: hidden). Тук го сваляме и забраняваме пренасяне. */
     .bubble.stock-list-bubble .row-header .col-status,
-    .bubble.stock-list-bubble .row-header .col-stock,
-    .bubble.stock-list-bubble .row-header .col-value {
+    .bubble.stock-list-bubble .row-header .col-stock {
       padding-left: 5px; padding-right: 5px; white-space: nowrap;
     }
     .bubble.stock-list-bubble .row-body .col-status,
     .bubble.stock-list-bubble .row-body .col-stock,
-    .bubble.stock-list-bubble .row-body .col-value,
     .bubble.stock-list-bubble .row-totals .col-status,
-    .bubble.stock-list-bubble .row-totals .col-stock,
-    .bubble.stock-list-bubble .row-totals .col-value {
+    .bubble.stock-list-bubble .row-totals .col-stock {
       padding-left: 5px; padding-right: 8px; white-space: nowrap;
     }
     /* Триъгълникът за сортиране да не се свива, ако мястото е на ръба. */
@@ -1275,21 +1312,11 @@
     .bubble.stock-list-bubble .row-header .col-status.sorted .sort-arrow { opacity: 1; }
     @media (max-width: 600px) {
       .bubble.stock-list-bubble .row-header .col-status,
-      .bubble.stock-list-bubble .row-header .col-stock,
-      .bubble.stock-list-bubble .row-header .col-value {
+      .bubble.stock-list-bubble .row-header .col-stock {
         padding-left: 3px; padding-right: 3px; font-size: 9px; letter-spacing: 0;
       }
       .bubble.stock-list-bubble .row-header .sort-arrow { font-size: 8px; margin-left: 3px; }
     }
-    /* Съвкупна стойност на наличността. Тя е ОЦЕНКА — средно претеглена доставна
-       цена по текущо количество — затова носи префикс „~“ и е с по-приглушен цвят,
-       за да не се чете като точна счетоводна стойност. */
-    .bubble.stock-list-bubble .col-value {
-      text-align: right; font-variant-numeric: tabular-nums; color: #4b5563;
-      white-space: nowrap;
-    }
-    .bubble.stock-list-bubble .row-header .col-value { text-align: right; }
-    .bubble.stock-list-bubble .col-value.no-cost { color: #b0b6bf; }
 
     /* ── Статус на продукта ────────────────────────────────────────
        Точка вместо текст: колоната трябва да е тясна, а цветът се чете
@@ -1302,8 +1329,7 @@
     /* Деактивиран ред: приглушен, за да личи и без да се гледа точката. */
     .bubble.stock-list-bubble .row-body.is-disabled .col-id span,
     .bubble.stock-list-bubble .row-body.is-disabled .col-name,
-    .bubble.stock-list-bubble .row-body.is-disabled .col-stock,
-    .bubble.stock-list-bubble .row-body.is-disabled .col-value {
+    .bubble.stock-list-bubble .row-body.is-disabled .col-stock {
       opacity: 0.45;
     }
     .bubble.stock-list-bubble .row-body.is-disabled .col-name { text-decoration: line-through; }
@@ -1315,7 +1341,6 @@
       font-weight: 700; font-size: 12px; color: #374151; padding: 9px 14px;
     }
     .bubble.stock-list-bubble .row-totals .col-stock { text-align: center; }
-    .bubble.stock-list-bubble .row-totals .col-value { text-align: right; }
     .bubble.stock-list-bubble .row-totals .col-name  { color: #6b7280; font-weight: 600; }
     /* Кликаеми хедъри за сортиране. Курсорът и лекото потъмняване при hover
        подсказват, че клетката е бутон — иначе не личи, че е интерактивна. */
@@ -1409,7 +1434,7 @@
       background: linear-gradient(to right, #f3f4f6, #ffffff);
     }
     @media (max-width: 600px) {
-      .bubble.stock-list-bubble .bubble-card { grid-template-columns: 28px 52px minmax(56px, 1fr) 56px 74px; }
+      .bubble.stock-list-bubble .bubble-card { grid-template-columns: 28px 56px minmax(70px, 1fr) 58px; }
       .bubble.stock-list-bubble .row-header { font-size: 10px; letter-spacing: 0.3px; }
       .bubble.stock-list-bubble .row-header .bubble-cell,
       .bubble.stock-list-bubble .bubble-cell { padding: 8px 10px; }
@@ -2965,13 +2990,6 @@
           <input type="checkbox" id="exportIncludeZero">
           <span data-i18n="export.include_zero">Include products with 0 or less stock</span>
         </label>
-        <!-- Изключено по подразбиране: обичайният износ е ID / Име / Количество,
-             същият формат, който импортът чете обратно. Себестойността е
-             вътрешна информация и се добавя само при изрично поискване. -->
-        <label class="export-checkbox-row">
-          <input type="checkbox" id="exportIncludeCost">
-          <span data-i18n="export.include_cost">Include unit cost column</span>
-        </label>
         <p class="export-filename-hint">Filename: <code id="exportFilenamePreview">stock_YYYY-MM-DD.xlsx</code></p>
         <div class="confirm-actions">
           <button class="btn secondary" id="exportStockCancelBtn" type="button" data-i18n="buttons.cancel">Cancel</button>
@@ -2999,7 +3017,6 @@
               <div class="bubble-cell" data-i18n="columns.product">Product</div>
               <div class="bubble-cell" data-i18n="cols_short.stock">Stock</div>
               <div class="bubble-cell" data-i18n="cols_short.qty">Qty</div>
-              <div class="bubble-cell" data-i18n="cols_short.cost">Cost</div>
             </div>
             <div id="stockRowsContainer"></div>
             <div class="row-add-button">
@@ -4233,7 +4250,7 @@
       // сортиране по число (наличност или стойност) то би обезсмислило подредбата.
       // Групирането на изчерпаните в дъното важи само за ID и ИМЕ. При числовите
       // колони и при статуса то би се борило със самата подредба.
-      return stockSort.key !== 'stock' && stockSort.key !== 'value' && stockSort.key !== 'status'
+      return stockSort.key !== 'stock' && stockSort.key !== 'status'
     }
 
     // Съвкупната стойност е ОЦЕНКА, не точна счетоводна стойност: средно претеглена
@@ -4248,11 +4265,6 @@
       return !!(p && p.archived_at)
     }
 
-    function formatStockValue(v) {
-      if (v == null || Number.isNaN(Number(v))) return '—'
-      const n = Number(v)
-      return '~' + n.toFixed(2) + ' €'
-    }
 
     window.setStockSort = function(key) {
       if (stockSort.key === key) {
@@ -4260,7 +4272,7 @@
       } else {
         stockSort.key = key
         // Разумно начало според типа: текст от А нагоре, числа от голямо надолу.
-        stockSort.dir = (key === 'stock' || key === 'value') ? 'desc' : 'asc'
+        stockSort.dir = (key === 'stock') ? 'desc' : 'asc'
       }
       if (typeof lastGoodStock !== 'undefined' && lastGoodStock) renderStock(lastGoodStock)
     }
@@ -4320,16 +4332,6 @@
           const bd = isProductDisabled(b.id) ? 1 : 0
           if (ad === bd) return collator.compare(a.name || '', b.name || '')
           cmp = ad - bd
-        } else if (stockSort.key === 'value') {
-          // Продукти без записана себестойност винаги отиват НАКРАЯ, независимо от
-          // посоката — иначе биха се приемали за „най-евтини“ и биха заемали върха.
-          const av = a.stock_value == null ? null : Number(a.stock_value)
-          const bv = b.stock_value == null ? null : Number(b.stock_value)
-          if (av == null && bv == null) return collator.compare(a.name || '', b.name || '')
-          if (av == null) return 1
-          if (bv == null) return -1
-          cmp = av - bv
-          if (cmp === 0) return collator.compare(a.name || '', b.name || '')
         } else if (stockSort.key === 'stock') {
           cmp = (Number(a.current_quantity) || 0) - (Number(b.current_quantity) || 0)
           // При равни количества подреждаме по име, за да не подскачат редовете
@@ -4352,7 +4354,6 @@
               ${stockHeaderCell('id', 'col-id', t('columns.id'))}
               ${stockHeaderCell('name', 'col-name', t('columns.name'))}
               ${stockHeaderCell('stock', 'col-stock', t('columns.stock'))}
-              ${stockHeaderCell('value', 'col-value', t('columns.value'))}
             </div>
             ${sorted.length === 0
               ? `<div class="stock-empty">${escapeHtml(t('empty.products'))}</div>`
@@ -4373,7 +4374,6 @@
                     <div class="bubble-cell col-id"><span>${escapeHtml(r.id)}</span></div>
                     <div class="bubble-cell col-name">${escapeHtml(r.name)}</div>
                     <div class="bubble-cell col-stock ${cellCls}">${qty}</div>
-                    <div class="bubble-cell col-value${r.stock_value == null ? ' no-cost' : ''}">${formatStockValue(r.stock_value)}</div>
                   </div>`
                 }).join('')}
             ${sorted.length === 0 ? '' : (() => {
@@ -4381,16 +4381,11 @@
               // Стойността се сумира само от редовете, които имат себестойност —
               // затова носи „~“, като отделните редове.
               const totQty = sorted.reduce((s, x) => s + (Number(x.current_quantity) || 0), 0)
-              const withCost = sorted.filter(x => x.stock_value != null)
-              const totVal = withCost.reduce((s, x) => s + Number(x.stock_value), 0)
-              const missing = sorted.length - withCost.length
               return `<div class="bubble-row row-totals">
                 <div class="bubble-cell col-status"></div>
                 <div class="bubble-cell col-id"></div>
-                <div class="bubble-cell col-name">${escapeHtml(t('stock.total'))}${
-                  missing ? ` <span style="font-weight:400;font-size:11px;">(${missing} ${escapeHtml(t('stock.without_cost'))})</span>` : ''}</div>
+                <div class="bubble-cell col-name">${escapeHtml(t('stock.total'))}</div>
                 <div class="bubble-cell col-stock">${totQty}</div>
-                <div class="bubble-cell col-value">${withCost.length ? '~' + totVal.toFixed(2) + ' €' : '—'}</div>
               </div>`
             })()}
           </div>
@@ -6254,11 +6249,6 @@
         <div class="bubble-cell col-form-qty">
           <input type="number" id="stockQtyInput-${rowId}" step="1" data-i18n-title="bubble_edit.negative_corrections" title="Use negative numbers for corrections (e.g. -7)">
         </div>
-        <div class="bubble-cell col-form-cost">
-          <input type="text" id="stockCostInput-${rowId}" inputmode="decimal" placeholder="—"
-                 data-i18n-title="bubble_edit.unit_cost_tooltip"
-                 title="Purchase price per unit (optional)">
-        </div>
       `
       container.appendChild(row)
       // Newly-inserted row has data-i18n-* attributes on the remove button + textarea placeholder
@@ -6618,15 +6608,9 @@
           return
         }
         // Stock-in allows any integer: positive (receipts), negative (corrections), or zero.
-        // Доставна цена — ПО ИЗБОР. Празно поле или нечислова стойност значи
-        // „не знаем", а не грешка: редът се приема нормално, само без себестойност.
-        const costRaw = document.getElementById(`stockCostInput-${rowId}`)?.value
-        const costNum = parseQuantityLoose(costRaw)
-        const unitCost = (Number.isFinite(costNum) && costNum >= 0) ? costNum : null
-
         const exact = productsCache.find(p => p.name.toLowerCase() === productName.toLowerCase())
         if (exact) {
-          collected.push({ productName, quantity, exact, isNew: false, unitCost })
+          collected.push({ productName, quantity, exact, isNew: false })
         } else {
           // Freeform: read the typed ID from the editable .id-editor inside the wrapper cell
           const idWrapper = document.getElementById(`stockIdReadout-${rowId}`)
@@ -6646,7 +6630,7 @@
             flashRowError(rowEl)
             return
           }
-          collected.push({ productName, quantity, exact: null, isNew: true, newId, unitCost })
+          collected.push({ productName, quantity, exact: null, isNew: true, newId })
         }
       }
       if (collected.length === 0) {
@@ -6709,8 +6693,6 @@
             client_uuid: crypto.randomUUID(),
             stock_in_group_id: groupId,
           }
-          // Доставна цена — записва се само ако е въведена.
-          if (c.unitCost != null) itemRow.unit_cost = c.unitCost
           const { error: itemErr } = await supabase.from('stock_in').insert(itemRow)
           if (itemErr && itemErr.code !== '23505') throw itemErr
         }
@@ -7435,11 +7417,11 @@
         },
         columns: {
           id: 'ID', name: 'Name', product: 'Product',
-          stock: 'Stock', qty: 'Qty', in_stock: 'In stock', value: 'Value',
+          stock: 'Stock', qty: 'Qty', in_stock: 'In stock',
         },
         // Compact abbreviated variants for tight column headers (form bubbles)
         cols_short: {
-          id: 'ID', name: 'Name', stock: 'Stock', qty: 'Qty', cost: 'Cost',
+          id: 'ID', name: 'Name', stock: 'Stock', qty: 'Qty',
         },
         placeholders: {
           product_name: 'Type product name…',
@@ -7471,7 +7453,7 @@
         },
         stock: { search_placeholder: 'Search products', sort_hint: 'Click to sort',
                  enabled: 'Active', disabled: 'Disabled',
-                 total: 'Total', without_cost: 'without cost' },
+                 total: 'Total' },
         export: {
           title: 'Export current stock',
           format: 'Format',
@@ -7480,7 +7462,6 @@
           sort_quantity: 'Quantity (high to low)',
           sort_id: 'ID',
           include_zero: 'Include products with 0 or less stock',
-          include_cost: 'Include unit cost column',
           filename_preview: 'Filename:',
         },
         edit_product: {
@@ -7617,7 +7598,6 @@
           add_a_note: 'Add a note',
           remove_row_aria: 'Remove row',
           remove_this_product: 'Remove this product',
-          unit_cost_tooltip: 'Purchase price per unit (optional)',
           current_stock_tooltip: 'Current stock for the selected product (read-only)',
           negative_corrections: 'Use negative numbers for corrections (e.g. -7)',
         },
@@ -7803,11 +7783,11 @@
         },
         columns: {
           id: 'ID', name: 'Име', product: 'Продукт',
-          stock: 'Налич.', qty: 'Кол.', in_stock: 'Налич.', value: 'Стойност',
+          stock: 'Налич.', qty: 'Кол.', in_stock: 'Налич.',
         },
         // In tight form-bubble headers the stock column is narrower — use shorter abbreviation
         cols_short: {
-          id: 'ID', name: 'Име', stock: 'Нал.', qty: 'Кол.', cost: 'Цена',
+          id: 'ID', name: 'Име', stock: 'Нал.', qty: 'Кол.',
         },
         placeholders: {
           product_name: 'Въведи име на продукт…',
@@ -7839,7 +7819,7 @@
         },
         stock: { search_placeholder: 'Търси продукти', sort_hint: 'Натисни за сортиране',
                  enabled: 'Активен', disabled: 'Деактивиран',
-                 total: 'Общо', without_cost: 'без цена' },
+                 total: 'Общо' },
         export: {
           title: 'Изнеси наличността',
           format: 'Формат',
@@ -7848,7 +7828,6 @@
           sort_quantity: 'Количество (от най-много)',
           sort_id: 'ID',
           include_zero: 'Включи продукти с 0 или по-малко наличност',
-          include_cost: 'Включи колона с доставна цена',
           filename_preview: 'Име на файл:',
         },
         edit_product: {
@@ -7984,7 +7963,6 @@
           add_a_note: 'Добави бележка',
           remove_row_aria: 'Премахни ред',
           remove_this_product: 'Премахни този продукт',
-          unit_cost_tooltip: 'Доставна цена за единица (по избор)',
           current_stock_tooltip: 'Текуща наличност на избрания продукт (само за четене)',
           negative_corrections: 'Използвайте отрицателни числа за корекции (напр. -7)',
         },
@@ -9918,11 +9896,6 @@ new events will not be in this file. Re-download periodically.
     function openExportStockModal() {
       const modal = document.getElementById('exportStockModal')
       if (!modal) return
-      // Себестойността се нулира при ВСЯКО отваряне, не само при зареждане на
-      // страницата. Иначе една отметка отпреди седмица би вкарала покупните цени
-      // във файл, който пращаш навън. Тук по-безопасното поведение струва един клик.
-      const cost = document.getElementById('exportIncludeCost')
-      if (cost) cost.checked = false
       modal.classList.add('visible')
       updateExportFilenamePreview()
     }
@@ -9974,21 +9947,8 @@ new events will not be in this file. Re-download periodically.
         if (sortBy === 'quantity') return (Number(b.current_quantity) || 0) - (Number(a.current_quantity) || 0)
         return (a.id || '').localeCompare(b.id || '')
       })
-      const includeCost = document.getElementById('exportIncludeCost')?.checked === true
-      // Четвъртата колона носи СРЕДНО ПРЕТЕГЛЕНАТА доставна цена (`avg_cost` от
-      // изгледа), а не стойността на наличността. Така изнесеният файл може да се
-      // внесе обратно — импортът чака точно единична цена на четвърта позиция.
-      const header = includeCost ? ['ID', 'Name', 'Quantity', 'Unit Price']
-                                 : ['ID', 'Name', 'Quantity']
-      const dataRows = sorted.map(r => {
-        const base = [r.id, r.name, Number(r.current_quantity) || 0]
-        if (!includeCost) return base
-        // Продукт без нито една доставка със записана цена дава празна клетка,
-        // а не нула — нулата би значела „струва нищо", което е невярно.
-        const c = r.avg_cost
-        base.push(c == null || Number.isNaN(Number(c)) ? '' : Number(Number(c).toFixed(4)))
-        return base
-      })
+      const header = ['ID', 'Name', 'Quantity']
+      const dataRows = sorted.map(r => [r.id, r.name, Number(r.current_quantity) || 0])
       try {
         // ODS gets its own hand-rolled XML path (below). SheetJS's ODS writer doesn't honor
         // cell styling reliably — building the ODS ourselves guarantees bold/centered headers
@@ -10648,6 +10608,52 @@ ${headerRowXml}${dataRowsXml}
 
     // Periodic safety-net poll
     setInterval(() => { if (currentUser) { log('auto-refresh', 'tick'); loadAll(false) } }, AUTO_REFRESH_INTERVAL_MS)
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  iOS: фокусираното поле да не остава под клавиатурата
+    //
+    //  На iOS клавиатурата НЕ смалява оформлението — тя само свива
+    //  „визуалния прозорец". Страницата не знае, че долната ѝ част е
+    //  закрита, затова полето може да остане отдолу. Собственото
+    //  превъртане на Safari често не помага, понеже се задейства преди
+    //  клавиатурата да е излязла напълно.
+    //
+    //  visualViewport ни казва колко място е останало НАИСТИНА. Ако
+    //  фокусираното поле е под тази граница, го превъртаме нагоре.
+    //  Само за iOS — другаде поведението е наред и не го пипаме.
+    // ═══════════════════════════════════════════════════════════════════
+    ;(function setupIOSKeyboardFix() {
+      const isIOS = /iP(hone|ad|od)/.test(navigator.platform)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      if (!isIOS || !window.visualViewport) return
+
+      let pending = null
+      function revealFocused() {
+        const el = document.activeElement
+        if (!el || !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return
+        const vv = window.visualViewport
+        const r = el.getBoundingClientRect()
+        // Долният ръб на видимата площ, в координати на страницата.
+        const visibleBottom = vv.height + vv.offsetTop
+        const margin = 12
+        if (r.bottom > visibleBottom - margin) {
+          window.scrollBy({ top: r.bottom - visibleBottom + margin + 40, behavior: 'auto' })
+        }
+      }
+      function schedule() {
+        // Клавиатурата се анимира; едно изчакване не стига, затова
+        // проверяваме няколко пъти, докато спре да се мести.
+        clearTimeout(pending)
+        pending = setTimeout(revealFocused, 60)
+        setTimeout(revealFocused, 200)
+        setTimeout(revealFocused, 400)
+      }
+      document.addEventListener('focusin', e => {
+        if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) schedule()
+      })
+      window.visualViewport.addEventListener('resize', schedule)
+      log('init', 'iOS keyboard fix active')
+    })()
 
     // Boot: set the initial connection status label in the current language, then check session.
     setConnectionStatus('connecting')
